@@ -1,4 +1,4 @@
-const { pg } = require("./database/db")
+const { pg } = require("./db")
 
 async function deleteUserDB(){
     try{
