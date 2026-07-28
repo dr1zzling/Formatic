@@ -22,20 +22,12 @@ async function migrate() {
 
         const userModel = [
             {
-                username: "john_doe",
-                password: "password123" 
+                username: "fadhil hebat", 
+                password: "fadhil123"
             },
             {
-                username: "jane_smith",
-                password: "password123"
-            },
-            {
-                username: "alex_admin",
-                password: "password123" 
-            },
-            {
-                username: "budi_collaborator",
-                password: "password123"
+                username: "erzy mantap", 
+                password: "erzy123"
             }
         ]
 

@@ -15,6 +15,7 @@ export class SoalService {
             form_title: "forms.title" 
         })
         .where("forms.id", id)
+        if(get.length === 0) throw new NotFoundException("Form Tersebut Belum Memiliki Soal")
 
         return {
             message: "Berhasil Mendapatkan Soal",

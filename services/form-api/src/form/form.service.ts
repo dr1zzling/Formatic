@@ -19,7 +19,7 @@ export class FormService {
     // Create Form
     async create(req: {id: number, username: string}, data: {title: string}){
         const slug = slugify(data.title, { lower: true, strict: true})
-        const finalSlug = slug + Date.now()
+        const finalSlug = slug + '-' + Date.now()
 
         const [createForm] = await this.knexService.connection("forms")
         .insert({ title: data.title, slug: finalSlug, status: "private"})
@@ -64,7 +64,6 @@ export class FormService {
 
     // Get All By User
     async getUserForm(data: {id: number, username: string}){
-        console.log(data.id)
         const get = await this.knexService.connection("user_form")
         .leftJoin("forms", "forms.id", "form_id")
         .select({
