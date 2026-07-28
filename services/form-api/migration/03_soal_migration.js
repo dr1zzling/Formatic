@@ -7,7 +7,7 @@ exports.up = function(knex) {
         table.increments()
         table.text('question').notNullable()
         table.integer('form_id').unsigned()
-
+        table.enum('type', ['radio', 'text', 'file', 'checkbox'])
         table.foreign('form_id').references('forms.id')
     })
 };

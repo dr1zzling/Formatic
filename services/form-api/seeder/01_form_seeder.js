@@ -8,21 +8,13 @@ exports.seed = async function(knex) {
   await knex('forms').del()
   const dummyData = [
     {
-      title: 'Survei Kepuasan Pelanggan 2026',
-      status: 'public',
+      title: 'Soal Matematika 2026',
+      status: 'public'
     },
     {
-      title: 'Formulir Pendaftaran Event Internal',
-      status: 'private',
-    },
-    {
-      title: 'Feedback Aplikasi Mobile V2',
-      status: 'public',
-    },
-    {
-      title: 'Evaluasi Kinerja Karyawan Q3',
-      status: 'private',
-    },
+      title: 'Soal Pendidikan Pancasila 2026',
+      status: 'private'
+    }
   ];
 
   const inserForm = dummyData.map((item) => ({
