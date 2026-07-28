@@ -16,8 +16,8 @@ export class FormService {
     }
 
     // Get All By User
-    async getUserForm(data){
-        const { userId, username } = data
+    async getUserForm(data: {id: number, username: string}){
+        console.log(data.id)
         const get = await this.knexService.connection("user_form")
         .leftJoin("forms", "forms.id", "form_id")
         .select({
@@ -30,13 +30,13 @@ export class FormService {
             form_title: "forms.title",
             form_status: "forms.status"
         })
-        .where("user_form.user_id", userId)
+        .where("user_form.user_id", data.id)
 
         return {
             message: "Berhasil Mendapatkan Form Yang Anda Terlibat",
             data: {
-                user_id: userId,
-                username: username,
+                user_id: data.id,
+                username: data.username,
                 form: get.map((e) => ({
                     form_id: e.form_id,
                     form_title: e.form_title,
