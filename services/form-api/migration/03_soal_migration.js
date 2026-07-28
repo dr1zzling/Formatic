@@ -1,0 +1,21 @@
+/**
+ * @param { import("knex").Knex } knex
+ * @returns { Promise<void> }
+ */
+exports.up = function(knex) {
+    return knex.schema.createTable('soal', function(table){
+        table.increments()
+        table.text('question').notNullable()
+        table.integer('form_id').unsigned()
+
+        table.foreign('form_id').references('forms.id')
+    })
+};
+
+/**
+ * @param { import("knex").Knex } knex
+ * @returns { Promise<void> }
+ */
+exports.down = function(knex) {
+    return knex.schema.dropTable('soal')
+};

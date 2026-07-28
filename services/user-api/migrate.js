@@ -1,7 +1,8 @@
 const { pool, pg } = require("./db")
+const bcrypt = require("bcrypt")
 
-async function migrate(){
-    try{
+async function migrate() {
+    try {
 
         // Create Database user_db
         await pg.query(`
@@ -19,11 +20,38 @@ async function migrate(){
         `)
         console.log("Berhasil Membuat Table User")
 
+        const userModel = [
+            {
+                username: "john_doe",
+                password: "password123" 
+            },
+            {
+                username: "jane_smith",
+                password: "password123"
+            },
+            {
+                username: "alex_admin",
+                password: "password123" 
+            },
+            {
+                username: "budi_collaborator",
+                password: "password123"
+            }
+        ]
+
+        for (let user of userModel) {
+            const hashPassword = await bcrypt.hash(user.password, 10)
+            await pool.query(`
+                INSERT INTO users (username, password) VALUES ($1, $2)
+            `, [user.username, hashPassword])
+        }
+
+        console.log("Berhasil Membuat Seeder User")
     }
-    catch(err){
+    catch (err) {
         console.log(err)
     }
-    finally{
+    finally {
         process.exit(0)
     }
 }

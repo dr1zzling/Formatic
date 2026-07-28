@@ -3,7 +3,7 @@ const { pg } = require("./db")
 async function deleteUserDB(){
     try{
         await pg.query(`
-          DROP DATABASE IF EXISTS user_db
+          DROP DATABASE IF EXISTS user_db WITH (FORCE)
         `)
 
         console.log("berhasil")
