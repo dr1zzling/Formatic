@@ -11,6 +11,7 @@ export class SoalService {
         .select({
             id: "soal.id",
             question: "soal.question",
+            type: "soal.type",
             form_id: "forms.id",
             form_title: "forms.title" 
         })
@@ -24,7 +25,8 @@ export class SoalService {
                 form_title: get[0].form_title,
                 soal: get.map((e) => ({
                     id: e.id,
-                    question: e.question
+                    question: e.question,
+                    type: e.type
                 }))
             }
         }
