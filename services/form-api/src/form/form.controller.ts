@@ -1,4 +1,4 @@
-import { Controller, Get, Request, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Post, Req, Request, UseGuards } from '@nestjs/common';
 import { FormService } from './form.service';
 import { JwtAuthGuard } from 'src/guard/jwt.auth.guard';
 
@@ -11,9 +11,17 @@ export class FormController {
     return this.formService.getAll()
   }
 
+  @Post()
+  @UseGuards(JwtAuthGuard)
+  createForm(@Request() req, @Body() data: {title: string}){
+    if(!data.title) throw new BadRequestException("Isi Yang Benar")
+    return this.formService.create(req.user, data)
+  }
+
   @Get('/user')
   @UseGuards(JwtAuthGuard)
   getUserForm(@Request() req){
     return this.formService.getUserForm(req.user)
   }
+
 }
