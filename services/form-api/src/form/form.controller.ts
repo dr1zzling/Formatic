@@ -21,7 +21,7 @@ export class FormController {
   @Get('/user')
   @UseGuards(JwtAuthGuard)
   getUserForm(@Request() req){
-    return this.formService.getUserForm(req.user)
+    return this.formService.getMyForm(req.user)
   }
 
 }

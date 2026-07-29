@@ -1,4 +1,4 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { SoalService } from './soal.service';
 import { ValidateFormExist } from 'src/Pipe/validate.form.exist';
 
@@ -9,5 +9,10 @@ export class SoalController {
   @Get('/:id')
   getSoalByForm(@Param('id', ValidateFormExist) id: string ){
     return this.soalService.getSoalByForm(Number(id))
+  }
+
+  @Post('/:id')
+  createSoalAndOption(@Param('id', ValidateFormExist) id: string, @Body() data: any){
+    return this.soalService.createSoalAndOption(Number(id), data)
   }
 }
