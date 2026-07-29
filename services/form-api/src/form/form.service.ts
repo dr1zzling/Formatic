@@ -46,7 +46,6 @@ export class FormService {
         return {
             message: "Berhasil Membuat Form",
             data: {
-                id: get.id,
                 user: {
                     user_id: req.id,
                     username: req.username,
@@ -62,8 +61,8 @@ export class FormService {
         }
     }
 
-    // Get All By User
-    async getUserForm(data: {id: number, username: string}){
+    // Get All My Form
+    async getMyForm(data: {id: number, username: string}){
         const get = await this.knexService.connection("user_form")
         .leftJoin("forms", "forms.id", "form_id")
         .select({
@@ -93,4 +92,6 @@ export class FormService {
             }
         }
     }
+
+
 }
