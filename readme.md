@@ -1,8 +1,8 @@
-# 📖 FormMaker
+# 📖 Formatic
 
 > Platform pembuatan dan pengerjaan formulir atau kuis, terinspirasi dari Google Forms.
 
-FormMaker memungkinkan pengguna membuat formulir, mengelola soal, dan mengerjakan soal dengan batas waktu. Aplikasi tersedia sebagai aplikasi mobile Android berbasis Flutter dan aplikasi web berbasis React.
+Formatic memungkinkan pengguna membuat formulir, mengelola soal, dan mengerjakan soal dengan batas waktu. Aplikasi tersedia sebagai aplikasi mobile Android berbasis Flutter dan aplikasi web berbasis React.
 
 ## ⚙️ Fitur
 
@@ -14,7 +14,7 @@ FormMaker memungkinkan pengguna membuat formulir, mengelola soal, dan mengerjaka
 
 ## 🛠️ Arsitektur
 
-FormMaker menggunakan beberapa aplikasi dan service yang memiliki tanggung jawab berbeda:
+Formatic menggunakan beberapa aplikasi dan service yang memiliki tanggung jawab berbeda:
 
 | Komponen | Teknologi | Tanggung jawab |
 | --- | --- | --- |
@@ -137,4 +137,4 @@ Nama environment variable dan port dapat disesuaikan dengan implementasi backend
 
 
 #
-<div align="center">Dibuat dengan ❤️ oleh tim FormMaker</div>
+<div align="center">Dibuat dengan ❤️ oleh tim Formatic</div>

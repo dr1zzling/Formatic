@@ -6,10 +6,11 @@ exports.up = function(knex) {
   return knex.schema.createTable('soal_option', function(table){
     table.increments()
     table.integer('soal_id').unsigned()
-    table.text('option_value')
+    table.integer('option_value_id').unsigned()
     table.boolean('is_correct')
 
     table.foreign('soal_id').references("soal.id")
+    table.foreign('option_value_id').references("option_value.id")
   })
 };
 
