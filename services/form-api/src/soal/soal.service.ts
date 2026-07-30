@@ -9,12 +9,14 @@ export class SoalService {
     async getSoalByForm(id: number) {
         const get = await this.knexService
             .connection("forms")
+            .join("category", "category.id", "forms.category_id")
             .leftJoin("soal", "soal.form_id", "forms.id")
             .leftJoin("soal_option", "soal_option.soal_id", "soal.id")
             .leftJoin("option_value", "option_value.id", "soal_option.option_value_id")
             .select({
                 form_id: "forms.id",
                 form_title: "forms.title",
+                category: "category.category_name",
 
                 soal_id: "soal.id",
                 soal_question: "soal.question",
@@ -60,6 +62,7 @@ export class SoalService {
             data: {
                 form_id: get[0].form_id,
                 form_title: get[0].form_title,
+                category: get[0].category,
                 total_soal: listSoal.length,
                 list_soal: listSoal,
             },

@@ -9,19 +9,22 @@ exports.seed = async function(knex) {
   const dummyData = [
     {
       title: 'Soal Matematika 2026',
-      status: 'public'
+      status: 'public',
+      category_id: 1
     },
     {
       title: 'Soal Pendidikan Pancasila 2026',
-      status: 'private'
+      status: 'private',
+      category_id: 1
     }
   ];
 
-  const inserForm = dummyData.map((item) => ({
+  const insertForm = dummyData.map((item) => ({
     title: item.title,
     slug: slugify(item.title, { lower: true, strict: true}),
-    status: item.status
+    status: item.status,
+    category_id: item.category_id
   }))
 
-  await knex('forms').insert(inserForm)
+  await knex('forms').insert(insertForm)
 };
