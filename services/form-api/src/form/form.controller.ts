@@ -1,6 +1,7 @@
-import { BadRequestException, Body, Controller, Get, Post, Req, Request, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Post, Query, Req, Request, UseGuards } from '@nestjs/common';
 import { FormService } from './form.service';
 import { JwtAuthGuard } from 'src/guard/jwt.auth.guard';
+import { ValidateCategoryExist } from 'src/Pipe/validate.category.exist';
 
 @Controller('form')
 export class FormController {
@@ -13,9 +14,18 @@ export class FormController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
-  createForm(@Request() req, @Body() data: {title: string}){
-    if(!data.title) throw new BadRequestException("Isi Yang Benar")
-    return this.formService.create(req.user, data)
+  createForm(
+    @Request() req, 
+    @Body('title') title: string,
+    @Body('category_id', ValidateCategoryExist) category_id: string)
+    {
+    if(!title || !category_id) throw new BadRequestException("Isi Yang Benar")
+    return this.formService.create(req.user, title, Number(category_id))
+  }
+
+  @Get('/slug/')
+  getFormBySlug(@Query('slug') slug: string){
+    return this.formService.getFormBySlug(slug)
   }
 
   @Get('/user')

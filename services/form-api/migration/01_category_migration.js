@@ -3,11 +3,9 @@
  * @returns { Promise<void> }
  */
 exports.up = function(knex) {
-  return knex.schema.createTable('forms', function(table){
+  return knex.schema.createTable('category', function(table){
     table.increments()
-    table.string('slug').unique().index()
-    table.string('title')
-    table.enum('status', ['public', 'private'])
+    table.string('category_name')
   })
 };
 
@@ -16,5 +14,5 @@ exports.up = function(knex) {
  * @returns { Promise<void> }
  */
 exports.down = function(knex) {
-  return knex.schema.dropTable('forms')
+  return knex.schema.dropTable('category')
 };
