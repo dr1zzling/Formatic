@@ -36,8 +36,9 @@ export class FormController {
   }
 
   @Get('/submit')
-  getFormSubmitByForm(@Body('form_id', ValidateFormExist) form_id: string){
-    return this.formService.getFormSubmitByForm(Number(form_id))
+  @UseGuards(JwtAuthGuard)
+  getFormSubmitByForm(@Request() req, @Body('form_id', ValidateFormExist) form_id: string){
+    return this.formService.getMySubmitForm(req.user, Number(form_id))
   }
 
 }
