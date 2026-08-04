@@ -149,5 +149,63 @@ export class FormService {
         }
     }
 
+    async getFormSubmitByForm(form_id: number){
+        const get = await this.knexService.connection("form_submit")
+        .join("forms", "forms.id", "form_submit.form_id")
+        .select({
+            id: "form_submit.id",
+            form_id: "forms.id",
+            form_title: "forms.title",
+            submitted_at: "form_submit.submitted_at",
+            user_id: "form_submit.user_id"
+        })
+        .where("forms.id", form_id)
+
+        if (get.length === 0) throw new NotFoundException("Maaf, Form Yang Kamu Tuju Tidak Ada")
+
+        const submitIds = get.map((e) => e.id)
+
+        const answers = await this.knexService.connection("user_answer")
+        .leftJoin("soal_option", "soal_option.id", "user_answer.soal_option_id")
+        .leftJoin("option_value", "option_value.id", "soal_option.option_value_id")
+        .leftJoin("file_upload", "file_upload.id", "user_answer.file_id")
+        .select({
+            submitted_id: "user_answer.submitted_id",
+            soal_option_id: "user_answer.soal_option_id",
+            option_value_id: "option_value.id",
+            option_value: "option_value.value",
+            file_id: "user_answer.file_id",
+            answer_text: "user_answer.answer_text",
+            file_path: "file_upload.file_path"
+        })
+        .whereIn("user_answer.submitted_id", submitIds)
+
+        const answerBySubmitId = answers.reduce((acc, answer) => {
+            if (!acc[answer.submitted_id]) acc[answer.submitted_id] = []
+
+            acc[answer.submitted_id].push({
+                soal_option_id: answer.soal_option_id,
+                option_value_id: answer.option_value_id,
+                option_value: answer.option_value,
+                file_id: answer.file_id,
+                answer_text: answer.answer_text,
+                file_path: answer.file_path,
+                answer_type: answer.file_id ? "file" : (answer.answer_text !== null ? "text" : "radio")
+            })
+
+            return acc
+        }, {})
+
+        return {
+            form_id: get[0].form_id,
+            form_title: get[0].form_title,
+            data: get.map((e) => ({
+                id: e.id,
+                user_id: e.user_id,
+                submitted_at: e.submitted_at,
+                user_answer: answerBySubmitId[e.id] || []
+            }))
+        }
+    }
 
 }

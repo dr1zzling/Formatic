@@ -1,7 +1,8 @@
-import { BadRequestException, Body, Controller, Get, Post, Query, Req, Request, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { FormService } from './form.service';
 import { JwtAuthGuard } from 'src/guard/jwt.auth.guard';
 import { ValidateCategoryExist } from 'src/Pipe/validate.category.exist';
+import { ValidateFormExist } from 'src/Pipe/validate.form.exist';
 
 @Controller('form')
 export class FormController {
@@ -32,6 +33,11 @@ export class FormController {
   @UseGuards(JwtAuthGuard)
   getUserForm(@Request() req){
     return this.formService.getMyForm(req.user)
+  }
+
+  @Get('/submit')
+  getFormSubmitByForm(@Body('form_id', ValidateFormExist) form_id: string){
+    return this.formService.getFormSubmitByForm(Number(form_id))
   }
 
 }
