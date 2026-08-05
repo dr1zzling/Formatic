@@ -103,6 +103,7 @@ export class FormService {
 
     // Create Form
     async create(req: { id: number, username: string }, title: string, category_id: number) {
+        console.log(req, title, category_id)
         const slug = slugify(title, { lower: true, strict: true })
         const finalSlug = slug + '-' + Date.now()
 
