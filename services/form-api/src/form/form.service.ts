@@ -7,7 +7,7 @@ export class FormService {
     constructor(private knexService: KnexService) { }
 
     // Get All For Development 
-    async getAll() {
+    async getAll(category: string) {
         const get = await this.knexService.connection("forms")
             .join("category", "category.id", "forms.category_id")
             .select({
@@ -18,8 +18,9 @@ export class FormService {
                 category_id: "category.id",
                 category: "category.category_name"
             })
+            .where('category.category_name', category)
 
-        console.log(get)
+        if(get.length === 0) throw new NotFoundException("Tidak Ada Form Dari Category Tersebut")
 
         return {
             message: "Berhasil Mendapatkan Seluruh Form",

@@ -28,10 +28,10 @@ Service autentikasi untuk aplikasi Form Maker yang dibangun menggunakan Express.
 - `dropDatabase.js` - menghapus database user_db
 
 ## Variabel Lingkungan
-Buat file `.env` pada root service `user-api` dengan isi berikut:
+Ubah file `.env.example` menjadi `.env` pada root service `user-api` dengan isi berikut:
 
 ```env
-APP_PORT=3001
+APP_PORT=3000
 DB_HOST=localhost
 DB_USER=postgres
 DB_PASSWORD=your_password

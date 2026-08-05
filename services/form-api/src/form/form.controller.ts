@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { FormService } from './form.service';
 import { JwtAuthGuard } from 'src/guard/jwt.auth.guard';
-import { ValidateCategoryExist } from 'src/Pipe/validate.category.exist';
+import { ValidateCategoryExist, ValidateCategoryExistByName } from 'src/Pipe/validate.category.exist';
 import { ValidateFormExist } from 'src/Pipe/validate.form.exist';
 
 @Controller('form')
@@ -9,8 +9,8 @@ export class FormController {
   constructor(private formService: FormService) {}
 
   @Get()
-  getAll(){
-    return this.formService.getAll()
+  getAll(@Query('category', ValidateCategoryExistByName) category: string){
+    return this.formService.getAll(category)
   }
 
   @Post()
