@@ -150,4 +150,22 @@ export class SubmitService {
       },
     }
   }
+
+  async getAllSubmitByForm(form_id: number){
+    const get = await this.knexService.connection("form_submit")
+    .join("forms", "forms.id", "form_submit.form_id")
+    .select({
+      form_submit_id: "form_submit.id",
+      submitted_at: "form_submit.submitted_at",
+
+      form_id: "forms.id",
+      form_title: "forms.title"
+    })
+    .where("forms.id", form_id)
+
+    return {
+      message: "Berhasil",
+      data: get
+    }
+  }
 }
