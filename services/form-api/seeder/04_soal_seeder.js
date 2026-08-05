@@ -505,5 +505,255 @@ exports.seed = async function (knex) {
       form_id: 2,
       type: 'radio'
     },
+    {
+      question: 'Pertanyaan form 3 nomor 1',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 2',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 3',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 4',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 5',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 6',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 7',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 8',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 9',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 10',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 11',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 12',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 13',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 14',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 15',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 16',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 17',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 18',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 19',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 20',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 21',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 22',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 23',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 24',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 25',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 26',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 27',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 28',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 29',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 30',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 31',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 32',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 33',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 34',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 35',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 36',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 37',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 38',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 39',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 40',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 41',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 42',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 43',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 44',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 45',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 46',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 47',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 48',
+      form_id: 3,
+      type: 'file'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 49',
+      form_id: 3,
+      type: 'text'
+    },
+    {
+      question: 'Pertanyaan form 3 nomor 50',
+      form_id: 3,
+      type: 'file'
+    },
   ])
 };

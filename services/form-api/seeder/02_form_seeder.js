@@ -16,6 +16,11 @@ exports.seed = async function(knex) {
       title: 'Soal Pendidikan Pancasila 2026',
       status: 'private',
       category_id: 1
+    },
+    {
+      title: 'Soal Bahasa Asing 2026',
+      status: 'public',
+      category_id: 1
     }
   ];
 

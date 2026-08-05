@@ -28,6 +28,10 @@ async function migrate() {
             {
                 username: "erzy mantap", 
                 password: "erzy123"
+            },
+            {
+                username: "abdi coy",
+                password: "abdi123"
             }
         ]
 
