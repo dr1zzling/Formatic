@@ -7,5 +7,6 @@ import { KnexModule } from 'src/database/knex.module';
   imports: [KnexModule],
   controllers: [SoalController],
   providers: [SoalService],
+  exports: [SoalService]
 })
 export class SoalModule {}
