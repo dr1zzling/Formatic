@@ -57,16 +57,7 @@ export class SoalService {
 
         const listSoal = Array.from(soalMap.values())
 
-        return {
-            message: `Berhasil Mendapatkan Semua Soal Dari Form ${get[0].form_title}`,
-            data: {
-                form_id: get[0].form_id,
-                form_title: get[0].form_title,
-                category: get[0].category,
-                total_soal: listSoal.length,
-                list_soal: listSoal,
-            },
-        }
+        return listSoal
     }
 
     // Create Soal And Option

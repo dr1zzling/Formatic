@@ -8,11 +8,13 @@ import { ValidateFormExist } from 'src/Pipe/validate.form.exist';
 export class FormController {
   constructor(private formService: FormService) {}
 
+  // Get All For Development
   @Get()
   getAll(@Query('category', ValidateCategoryExistByName) category: string){
     return this.formService.getAll(category)
   }
 
+  // Create Form
   @Post()
   @UseGuards(JwtAuthGuard)
   createForm(
@@ -24,16 +26,19 @@ export class FormController {
     return this.formService.create(req.user, title, Number(category_id))
   }
 
+  // Get Form By Slug
   @Get('/slug/')
   getFormBySlug(@Query('slug') slug: string){
     return this.formService.getFormBySlug(slug)
   }
 
+  // Get Form That User Create
   @Get('/user')
   @UseGuards(JwtAuthGuard)
   getUserForm(@Request() req){
     return this.formService.getMyForm(req.user)
   }
+
 
   @Get('/submit')
   @UseGuards(JwtAuthGuard)

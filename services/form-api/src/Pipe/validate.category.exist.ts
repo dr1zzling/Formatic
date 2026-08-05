@@ -16,7 +16,7 @@ export class ValidateCategoryExist implements PipeTransform{
 @Injectable()
 export class ValidateCategoryExistByName implements PipeTransform{
     constructor(private knexService: KnexService) {}
-    async transform(value: any) {
+    async transform(value: string) {
         const lower = value.toLowerCase()
         const kapital = value.charAt(0).toUpperCase() + lower.slice(1) 
 
