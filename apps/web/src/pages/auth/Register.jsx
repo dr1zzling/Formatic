@@ -34,8 +34,10 @@ function Cluster({ icon, title, subtitle, style }) {
 export default function Register() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const iconStyle = { color: COLORS.iconGlyph };
@@ -43,12 +45,17 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    if (password !== confirmPassword) {
+      setError("Password tidak cocok");
+      return;
+    }
+
     setLoading(true);
-    
+
     try {
-      const { data } = await authAPI.register(username, password);
-      localStorage.setItem("token", data.token);
-      navigate("/");
+      await authAPI.register(username, password);
+      navigate("/login");
     } catch (err) {
       setError(err.response?.data?.message || "Register gagal");
     } finally {
@@ -211,7 +218,7 @@ export default function Register() {
 
               <div>
                 <label htmlFor="password" className="block text-sm font-semibold mb-1.5" style={{ color: COLORS.navy }}>
-                  Enter your password
+                  Password
                 </label>
                 <div className="relative">
                   <input
@@ -233,6 +240,34 @@ export default function Register() {
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-semibold mb-1.5" style={{ color: COLORS.navy }}>
+                  Enter your password
+                </label>
+                <div className="relative">
+                  <input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="••••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className="w-full rounded-lg pl-4 pr-10 py-2.5 text-sm outline-none focus:ring-2 focus:ring-cyan-400 transition"
+                    style={{ border: `1px solid ${COLORS.border}` }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((v) => !v)}
+                    className="absolute text-slate-400 hover:text-slate-600"
+                    style={{ right: "12px", top: "50%", transform: "translateY(-50%)" }}
+                    aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                  >
+                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
               </div>
