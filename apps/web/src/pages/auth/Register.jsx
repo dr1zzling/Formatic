@@ -162,7 +162,7 @@ export default function Register() {
                 icon={<Users size={24} style={iconStyle} />}
                 title="View Insights"
                 subtitle="Analyze responses and make decisions"
-                style={{ left: "-40px", top: "100px" }}
+                style={{ left: "-10px", top: "115px" }}
               />
 
               <Cluster

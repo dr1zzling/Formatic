@@ -1,9 +1,7 @@
 import axios from "axios";
 
-// Base URL untuk API
 const API_BASE_URL = "http://localhost:3000";
 
-// Konfigurasi axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -25,7 +23,6 @@ api.interceptors.request.use(
   }
 );
 
-// Interceptor untuk handle response error
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -38,7 +35,6 @@ api.interceptors.response.use(
   }
 );
 
-// Auth API
 export const authAPI = {
   login: (username, password) => api.post("/user/login", { username, password }),
   register: (username, password) => api.post("/user/register", { username, password }),
