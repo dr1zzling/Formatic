@@ -8,6 +8,7 @@ exports.up = function(knex) {
     table.integer('user_id').unsigned().notNullable()
     table.integer('form_id').unsigned().notNullable()
     table.timestamp('submitted_at', { useTz: true }).defaultTo(knex.fn.now())
+    table.enum('status', ['submitted', 'draft', 'reviewed']).notNullable().defaultTo('submitted')
 
     table.foreign('form_id').references('forms.id').onDelete('CASCADE')
   })

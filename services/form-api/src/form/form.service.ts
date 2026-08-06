@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
 import { KnexService } from 'src/database/knex.service'
 import { SubmitService } from '../submit/submit.service'
 import { SoalService } from 'src/soal/soal.service'
@@ -17,6 +17,7 @@ export class FormService {
         form_title: 'forms.title',
         form_slug: 'forms.slug',
         form_status: 'forms.status',
+        form_banner: 'forms.banner',
         category_id: 'category.id',
         category: 'category.category_name',
       })
@@ -40,6 +41,7 @@ export class FormService {
       .select({
         form_id: 'forms.id',
         form_title: 'forms.title',
+        form_banner: 'forms.banner',
         category: 'category.category_name',
 
         soal_id: 'soal.id',
@@ -63,6 +65,7 @@ export class FormService {
       data: {
         form_id: get[0].form_id,
         form_title: get[0].form_title,
+        form_banner: get[0].form_banner,
         category: get[0].category,
         soal: list_soal,
       },
@@ -70,7 +73,7 @@ export class FormService {
   }
 
   // Get All My Form
-  async getMyForm(data: { id: number; username: string }) {
+  async getMyForm(data: { id: number, username: string }) {
     const get = await this.knexService.connection('user_form')
       .leftJoin('forms', 'forms.id', 'form_id')
       .leftJoin('category', 'category.id', 'forms.category_id')
@@ -83,6 +86,7 @@ export class FormService {
         form_slug: 'forms.slug',
         form_title: 'forms.title',
         form_status: 'forms.status',
+        form_banner: 'forms.banner',
         category: 'category.category_name',
       })
       .where('user_form.user_id', data.id)
@@ -97,6 +101,7 @@ export class FormService {
           form_title: e.form_title,
           form_slug: e.form_slug,
           form_status: e.form_status,
+          form_banner: e.form_banner,
           access_type: e.access_type,
           category: e.category,
         })),
@@ -105,12 +110,12 @@ export class FormService {
   }
 
   // Create Form
-  async create(req: { id: number; username: string }, title: string, category_id: number) {
+  async create(req: { id: number, username: string }, title: string, category_id: number, banner?: string) {
     const slug = slugify(title, { lower: true, strict: true })
     const finalSlug = slug + '-' + Date.now()
 
     const [createForm] = await this.knexService.connection('forms')
-      .insert({ title: title, slug: finalSlug, status: 'private', category_id: category_id })
+      .insert({ title: title, slug: finalSlug, status: 'private', category_id: category_id, banner: banner ?? null })
       .returning('*')
 
     const [createUserForm] = await this.knexService.connection('user_form')
@@ -128,6 +133,7 @@ export class FormService {
         form_slug: 'forms.slug',
         form_title: 'forms.title',
         form_status: 'forms.status',
+        form_banner: 'forms.banner',
         category: 'category.category_name',
       })
       .where('user_form.id', createUserForm.id)
@@ -145,7 +151,8 @@ export class FormService {
           form_id: get.form_id,
           form_title: get.form_title,
           form_slug: get.form_slug,
-          form_status: get.form_title,
+          form_status: get.form_status,
+          form_banner: get.form_banner,
           category: get.category,
         },
       },
@@ -153,7 +160,15 @@ export class FormService {
   }
 
   // Get My Submit History
-  async getMySubmitForm(req: { id: number; username: string }, form_id: number) {
+  async getMySubmitForm(req: { id: number, username: string }, form_id: number) {
     return this.submitService.getMySubmitForm(req, form_id)
+  }
+
+  async getAllRespon(req: {id: number, username: string}, form_id: number){
+    return this.submitService.getAllSubmitByForm(req, form_id)
+  }
+
+  async createSubmit(req: {id: number, username: string}, form_id: number, body: any){
+    return this.submitService.createSubmitForm(req, form_id, body)
   }
 }
