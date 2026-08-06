@@ -1,10 +1,10 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Query, Request, UseGuards, ParseIntPipe, UseInterceptors, UploadedFiles } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Query, Request, UseGuards, ParseIntPipe, UseInterceptors, UploadedFile, UploadedFiles } from '@nestjs/common';
 import { FormService } from './form.service';
 import { JwtAuthGuard } from 'src/guard/jwt.auth.guard';
 import { ValidateCategoryExist, ValidateCategoryExistByName } from 'src/Pipe/validate.category.exist';
 import { ValidateFormExist } from 'src/Pipe/validate.form.exist';
 import { SubmitService } from 'src/submit/submit.service';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 
@@ -22,12 +22,23 @@ export class FormController {
   // Create Form
   @Post()
   @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('banner', {
+    storage: diskStorage({
+      destination: './uploads',
+      filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        const ext = extname(file.originalname);
+        cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
+      },
+    }),
+  }))
   createForm(
     @Request() req,
     @Body('title') title: string,
-    @Body('category_id', ValidateCategoryExist) category_id: string,
-    @Body('banner') banner?: string) {
+    @UploadedFile() banner: Express.Multer.File,
+    @Body('category_id', ValidateCategoryExist) category_id: string) {
     if (!title || !category_id) throw new BadRequestException("Isi Yang Benar")
+
     return this.formService.create(req.user, title, Number(category_id), banner)
   }
 
