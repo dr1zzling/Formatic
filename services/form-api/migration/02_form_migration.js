@@ -9,6 +9,7 @@ exports.up = function(knex) {
     table.string('title')
     table.enum('status', ['public', 'private'])
     table.integer('category_id').unsigned()
+    table.text('banner').nullable()
     
     table.foreign('category_id').references('category.id')
   })
