@@ -344,12 +344,7 @@ export class SubmitService {
   }
 
   // Create Submit
-  async createSubmitForm(
-    req: { id: number, username: string },
-    form_id: number,
-    body: any,
-    files: Express.Multer.File[] = []
-  ) {
+  async createSubmitForm(req: { id: number, username: string }, form_id: number, body: any, files: Express.Multer.File[] = []) {
     const listJawaban = Array.isArray(body) ? body : [body]
     if (!body || listJawaban.length === 0) {
       throw new BadRequestException("Isi Yang Benar")
@@ -380,6 +375,16 @@ export class SubmitService {
     const soalMap = new Map<number, string>(
       soalList.map((s) => [s.id, s.type])
     )
+
+    // Apakah sudah diisi
+    const existingSubmit = await this.knexService.connection('form_submit')
+      .select('id')
+      .where({ user_id: req.id, form_id: form_id })
+      .first()
+
+    if (existingSubmit) {
+      throw new ConflictException('Anda sudah mengisi form ini')
+    }
 
     return await this.knexService.connection.transaction(async (trx) => {
       const fileIdMap = new Map<string, number>()
@@ -434,14 +439,24 @@ export class SubmitService {
             ? jawaban.soal_option_id
             : [jawaban.soal_option_id]
 
+          const validOptionIds = await trx('soal_option')
+            .select('id')
+            .where('soal_id', jawaban.soal_id)
+
+          const validOptionIdSet = new Set(validOptionIds.map((option: { id: number }) => option.id))
+
           for (const optId of options) {
-            if (optId) {
-              answersToInsert.push({
-                submitted_id: submittedId,
-                soal_id: jawaban.soal_id,
-                soal_option_id: optId,
-              })
+            if (!optId) continue
+
+            if (!validOptionIdSet.has(Number(optId))) {
+              throw new BadRequestException(`Opsi ${optId} bukan milik soal ${jawaban.soal_id}`)
             }
+
+            answersToInsert.push({
+              submitted_id: submittedId,
+              soal_id: jawaban.soal_id,
+              soal_option_id: Number(optId),
+            })
           }
         } else if (normalizedType === 'file') {
           let uploadedFileId = jawaban.file_name ? fileIdMap.get(jawaban.file_name) : null
