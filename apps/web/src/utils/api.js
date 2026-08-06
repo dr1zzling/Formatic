@@ -27,9 +27,17 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired atau invalid, redirect ke login
-      localStorage.removeItem("token");
-      window.location.href = "/login";
+      const isAuthRequest =
+        error.config?.url?.includes("/user/login") ||
+        error.config?.url?.includes("/user/register");
+      const isAuthPage =
+        window.location.pathname === "/login" ||
+        window.location.pathname === "/register";
+
+      if (!isAuthRequest && !isAuthPage) {
+        localStorage.removeItem("token");
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
   }

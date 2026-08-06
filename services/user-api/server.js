@@ -96,9 +96,9 @@ app.post('/user/login', async (req, res) => {
 
         const exist = await userExist(username)
         if(!exist){
-            return res.status(404).json({
-                status: 404,
-                message: "User Tidak Ada",
+            return res.status(401).json({
+                status: 401,
+                message: "Username atau password salah",
             })
         }
 
@@ -106,7 +106,7 @@ app.post('/user/login', async (req, res) => {
         if(!isMatch){
             return res.status(401).json({
                 status: 401,
-                message: "Password Salah"
+                message: "Username atau password salah"
             })
         }
 

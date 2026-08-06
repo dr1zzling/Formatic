@@ -288,7 +288,7 @@ const options = {
                         },
 
                         "401": {
-                            description: "Password salah",
+                            description: "Username atau password salah",
 
                             content: {
                                 "application/json": {
@@ -301,7 +301,7 @@ const options = {
                                             },
                                             message: {
                                                 type: "string",
-                                                example: "Password Salah"
+                                                example: "Username atau password salah"
                                             }
                                         }
                                     }
