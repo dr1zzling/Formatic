@@ -110,17 +110,43 @@ export class FormService {
   }
 
   // Create Form
-  async create(req: { id: number, username: string }, title: string, category_id: number, banner?: string) {
+  async create(req: { id: number, username: string }, title: string, category_id: number, banner?: string | Express.Multer.File) {
     const slug = slugify(title, { lower: true, strict: true })
     const finalSlug = slug + '-' + Date.now()
 
-    const [createForm] = await this.knexService.connection('forms')
-      .insert({ title: title, slug: finalSlug, status: 'private', category_id: category_id, banner: banner ?? null })
-      .returning('*')
+    const bannerPath = typeof banner === 'string'
+      ? banner
+      : banner && typeof banner === 'object' && 'filename' in banner
+        ? `/uploads/${banner.filename}`
+        : null
 
-    const [createUserForm] = await this.knexService.connection('user_form')
-      .insert({ user_id: req.id, form_id: createForm.id, access_type: 'Creator' })
-      .returning('id')
+    const createForm = await this.knexService.connection.transaction(async (trx) => {
+      let fileUploadId: number | null = null
+
+      if (bannerPath) {
+        const [insertedFile] = await trx('file_upload')
+          .insert({ file_path: bannerPath })
+          .returning('id')
+
+        fileUploadId = typeof insertedFile === 'object' ? insertedFile.id : insertedFile
+      }
+
+      const [createdForm] = await trx('forms')
+        .insert({
+          title,
+          slug: finalSlug,
+          status: 'private',
+          category_id,
+          banner: bannerPath,
+        })
+        .returning('*')
+
+      const [createUserForm] = await trx('user_form')
+        .insert({ user_id: req.id, form_id: createdForm.id, access_type: 'Creator' })
+        .returning('id')
+
+      return { createdForm, createUserForm, fileUploadId }
+    })
 
     const get = await this.knexService.connection('user_form')
       .leftJoin('forms', 'forms.id', 'form_id')
@@ -136,7 +162,7 @@ export class FormService {
         form_banner: 'forms.banner',
         category: 'category.category_name',
       })
-      .where('user_form.id', createUserForm.id)
+      .where('user_form.id', createForm.createUserForm.id)
       .first()
 
     return {
