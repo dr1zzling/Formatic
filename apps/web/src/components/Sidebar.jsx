@@ -5,7 +5,7 @@ import { Home, FileText, Trash2, ChevronDown, LogOut } from "lucide-react";
 export default function Sidebar({ activeTab, onTabChange }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const [user, setUser] = useState({ name: "Nabixka", email: "nabixka@gmail.com" });
+  const [user, setUser] = useState({ name: "User" });
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
@@ -14,9 +14,8 @@ export default function Sidebar({ activeTab, onTabChange }) {
       try {
         const payload = JSON.parse(atob(token.split(".")[1]));
         if (payload) {
-          const name = payload.username || payload.name || "Nabixka";
-          const email = payload.email || `${name.toLowerCase()}@gmail.com`;
-          setUser({ name, email });
+          const name = payload.username || payload.name || "User";
+          setUser({ name });
         }
       } catch (e) {
         // Fallback to default
@@ -30,9 +29,9 @@ export default function Sidebar({ activeTab, onTabChange }) {
   };
 
   const navItems = [
-    { id: "home", label: "Home", path: "/", icon: Home },
-    { id: "create", label: "Create", path: "/create", icon: FileText },
-    { id: "trash", label: "Trash", path: "/trash", icon: Trash2 },
+    { id: "home",     label: "Home",     path: "/",         icon: Home },
+    { id: "my-forms", label: "My Form",  path: "/my-forms", icon: FileText },
+    { id: "trash",    label: "Trash",    path: "/trash",    icon: Trash2 },
   ];
 
   const currentPath = location.pathname;
@@ -56,7 +55,9 @@ export default function Sidebar({ activeTab, onTabChange }) {
             const isActive =
               activeTab !== undefined
                 ? activeTab === item.id
-                : currentPath === item.path || (item.id === "home" && currentPath === "/");
+                : currentPath === item.path ||
+                  (item.id === "home" && currentPath === "/") ||
+                  currentPath.startsWith(item.path === "/" ? "/home" : item.path);
 
             return (
               <button
@@ -86,19 +87,16 @@ export default function Sidebar({ activeTab, onTabChange }) {
       <div className="relative pt-4 border-t border-white/10">
         <div
           onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-          className="flex items-center justify-between p-2 rounded-xl hover:bg-white/10 cursor-pointer transition-all duration-200"
-        >
+          className="flex items-center justify-between p-2 rounded-xl hover:bg-white/10 cursor-pointer transition-all duration-200"        >
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="w-10 h-10 rounded-full bg-blue-600 border border-white/20 flex items-center justify-center font-bold text-white shadow-md shrink-0">
-              {user.name ? user.name.charAt(0).toUpperCase() : "N"}
+              {user.name ? user.name.charAt(0).toUpperCase() : "U"}
             </div>
             <div className="flex flex-col truncate text-left">
               <span className="text-sm font-semibold text-white leading-tight truncate">
                 {user.name}
               </span>
-              <span className="text-xs text-white/75 truncate">
-                {user.email}
-              </span>
+              <span className="text-xs text-white/60 truncate">Lihat profil</span>
             </div>
           </div>
           <ChevronDown
@@ -111,7 +109,15 @@ export default function Sidebar({ activeTab, onTabChange }) {
 
         {/* Profile Dropdown Menu */}
         {isDropdownOpen && (
-          <div className="absolute bottom-16 left-0 right-0 bg-[#003487] border border-white/20 rounded-xl p-2 shadow-2xl backdrop-blur-lg">
+          <div className="absolute bottom-16 left-0 right-0 bg-[#003487] border border-white/20 rounded-xl p-2 shadow-2xl backdrop-blur-lg z-50">
+            <button
+              type="button"
+              onClick={() => { navigate("/profile"); setIsDropdownOpen(false); }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-white/80 hover:bg-white/10 hover:text-white rounded-lg transition-colors cursor-pointer"
+            >
+              <span>👤</span>
+              <span>Profil Saya</span>
+            </button>
             <button
               type="button"
               onClick={handleLogout}

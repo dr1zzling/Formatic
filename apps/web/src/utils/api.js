@@ -1,6 +1,11 @@
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:3000";
+// User API (auth) berjalan di port 3001
+// Form API berjalan di port 3000
+const USER_API_URL = "http://localhost:3001";
+const FORM_API_URL = "http://localhost:3000";
+
+const API_BASE_URL = FORM_API_URL;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -44,8 +49,14 @@ api.interceptors.response.use(
 );
 
 export const authAPI = {
-  login: (username, password) => api.post("/user/login", { username, password }),
-  register: (username, password) => api.post("/user/register", { username, password }),
+  login: (username, password) =>
+    axios.post(`${USER_API_URL}/user/login`, { username, password }, {
+      headers: { "Content-Type": "application/json" },
+    }),
+  register: (username, password) =>
+    axios.post(`${USER_API_URL}/user/register`, { username, password }, {
+      headers: { "Content-Type": "application/json" },
+    }),
 };
 
 export default api;
