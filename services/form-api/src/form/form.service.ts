@@ -6,10 +6,9 @@ const slugify = require('slugify')
 
 @Injectable()
 export class FormService {
-  constructor( private knexService: KnexService, private submitService: SubmitService, private soalService: SoalService ) {}
+  constructor(private knexService: KnexService, private submitService: SubmitService, private soalService: SoalService) { }
 
-  // Get All For Development
-  async getAll(category: string) {
+  async getAll() {
     const get = await this.knexService.connection('forms')
       .join('category', 'category.id', 'forms.category_id')
       .select({
@@ -21,6 +20,31 @@ export class FormService {
         category_id: 'category.id',
         category: 'category.category_name',
       })
+      .limit(10)
+      .offset(0)
+
+    if (get.length === 0) throw new NotFoundException('Tidak Ada Form Dari Category Tersebut')
+
+    return {
+      message: 'Berhasil Mendapatkan Seluruh Form',
+      data: get,
+    }
+  }
+  // Get All For Development
+  async getAllByCategory(category: string) {
+    const get = await this.knexService.connection('forms')
+      .join('category', 'category.id', 'forms.category_id')
+      .select({
+        id: 'forms.id',
+        form_title: 'forms.title',
+        form_slug: 'forms.slug',
+        form_status: 'forms.status',
+        form_banner: 'forms.banner',
+        category_id: 'category.id',
+        category: 'category.category_name',
+      })
+      .limit(10)
+      .offset(0)
       .where('category.category_name', category)
 
     if (get.length === 0) throw new NotFoundException('Tidak Ada Form Dari Category Tersebut')
@@ -185,16 +209,51 @@ export class FormService {
     }
   }
 
+  // Update Form Public
+  async updateForm(req: {id: number, username: string}, form_id: number, status: string){
+    const isCreator = await this.knexService.connection("user_form")
+    .select("access_type")
+    .where({user_id: req.id, form_id: form_id})
+    .first()
+
+    if(!isCreator || isCreator.access_type == "Collaborator") throw new UnauthorizedException("Anda Tidak Berhak Menghapus Form Ini")
+    
+    const [updateToPublic] = await this.knexService.connection("forms")
+    .update("status", status)
+    .where("id", form_id)
+
+    return {
+      message: `Berhasil Mengubah ke ${status}`
+    }
+  }
+
+  // Delete Form
+  async deleteForm(req: { id: number, username: string }, form_id: number) {
+    const isCreator = await this.knexService.connection("user_form")
+    .select("access_type")
+    .where({user_id: req.id, form_id: form_id})
+    .first()
+
+    if(!isCreator || isCreator.access_type == "Collaborator") throw new UnauthorizedException("Anda Tidak Berhak Menghapus Form Ini")
+    const deleteForm = await this.knexService.connection("forms")
+    .delete()
+    .where(form_id)
+
+    return {
+      message: "Berhasil Menghapus" 
+    }
+  }
+
   // Get My Submit History
   async getMySubmitForm(req: { id: number, username: string }, form_id: number) {
     return this.submitService.getMySubmitForm(req, form_id)
   }
 
-  async getAllRespon(req: {id: number, username: string}, form_id: number){
+  async getAllRespon(req: { id: number, username: string }, form_id: number) {
     return this.submitService.getAllSubmitByForm(req, form_id)
   }
 
-  async createSubmit(req: {id: number, username: string}, form_id: number, body: any){
+  async createSubmit(req: { id: number, username: string }, form_id: number, body: any) {
     return this.submitService.createSubmitForm(req, form_id, body)
   }
 }

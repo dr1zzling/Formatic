@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Query, Request, UseGuards, ParseIntPipe, UseInterceptors, UploadedFile, UploadedFiles } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Query, Request, UseGuards, ParseIntPipe, UseInterceptors, UploadedFile, UploadedFiles, Delete, Patch } from '@nestjs/common';
 import { FormService } from './form.service';
 import { JwtAuthGuard } from 'src/guard/jwt.auth.guard';
 import { ValidateCategoryExist, ValidateCategoryExistByName } from 'src/Pipe/validate.category.exist';
@@ -13,10 +13,18 @@ import { extname } from 'path';
 export class FormController {
   constructor(private formService: FormService, private submitService: SubmitService) { }
 
-  // Get All For Development
+  // Get All Form
   @Get()
-  getAll(@Query('category', ValidateCategoryExistByName) category: string) {
-    return this.formService.getAll(category)
+  getAllForm() {
+    return this.formService.getAll()
+  }
+
+  // Get All By Category
+  @Get('category')
+  getAll(
+    @Query('category', ValidateCategoryExistByName) category: string
+  ){
+    return this.formService.getAllByCategory(category)
   }
 
   // Create Form
@@ -34,24 +42,47 @@ export class FormController {
   }))
   createForm(
     @Request() req,
-    @Body('title') title: string,
     @UploadedFile() banner: Express.Multer.File,
-    @Body('category_id', ValidateCategoryExist) category_id: string) {
-    if (!title || !category_id) throw new BadRequestException("Isi Yang Benar")
-
+    @Body('title') title: string,
+    @Body('category_id', ValidateCategoryExist) category_id: string
+  ){
+    if (!title || !category_id || !banner ) throw new BadRequestException("Isi Yang Benar")
     return this.formService.create(req.user, title, Number(category_id), banner)
+  }
+
+  // Update Form
+  @Patch('/:form_id')
+  updateForm(
+    @Request() req, 
+    @Param('form_id', ValidateFormExist) form_id: string,
+    @Body() status: string
+  ){
+    return this.formService.updateForm(req.user, Number(form_id), status )
+  }
+
+  // Delete Form
+  @Delete('/:form_id')
+  deleteForm(
+    @Request() req, 
+    @Param('form_id', ValidateFormExist) form_id: string 
+  ){
+    return this.formService.deleteForm(req.user, Number(form_id))
   }
 
   // Get Form By Slug
   @Get('/slug/')
-  getFormBySlug(@Query('slug') slug: string) {
+  getFormBySlug(
+    @Query('slug') slug: string
+  ){
     return this.formService.getFormBySlug(slug)
   }
 
   // Get Form That User Create
   @Get('/user')
   @UseGuards(JwtAuthGuard)
-  getUserForm(@Request() req) {
+  getUserForm(
+    @Request() req
+  ){
     return this.formService.getMyForm(req.user)
   }
 
@@ -60,7 +91,8 @@ export class FormController {
   @UseGuards(JwtAuthGuard)
   getFormSubmitByForm(
     @Request() req,
-    @Body('form_id', ValidateFormExist) form_id: string) {
+    @Body('form_id', ValidateFormExist) form_id: string
+  ){
     return this.formService.getMySubmitForm(req.user, Number(form_id))
   }
 
@@ -69,7 +101,8 @@ export class FormController {
   @UseGuards(JwtAuthGuard)
   getAllRespon(
     @Request() req,
-    @Param('form_id', ValidateFormExist) form_id: string) {
+    @Param('form_id', ValidateFormExist) form_id: string
+  ){
     return this.formService.getAllRespon(req.user, Number(form_id))
   }
 
@@ -93,7 +126,7 @@ export class FormController {
     @Param('form_id', ParseIntPipe, ValidateFormExist) form_id: number,
     @Body() body: any,
     @UploadedFiles() files: Express.Multer.File[]
-  ) {
+  ){
     let parsedBody = body;
     if (typeof body === 'string') {
       try { parsedBody = JSON.parse(body); } catch (e) {}
