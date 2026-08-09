@@ -96,7 +96,7 @@ export default function FormEditor() {
   function showToast(msg) { setToast(msg); setTimeout(()=>setToast(""),3000); }
 
   if (loading) return (
-    <div className="flex min-h-screen"><Sidebar />
+    <div className="flex min-h-screen pb-24 md:pb-0"><Sidebar />
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center"><div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"/><p className="text-gray-500 text-sm">Memuat form...</p></div>
       </div>
@@ -104,7 +104,7 @@ export default function FormEditor() {
   );
 
   if (error && !form) return (
-    <div className="flex min-h-screen"><Sidebar />
+    <div className="flex min-h-screen pb-24 md:pb-0"><Sidebar />
       <div className="flex-1 flex items-center justify-center text-center">
         <div><p className="text-5xl mb-3">😕</p><p className="font-semibold text-gray-700">{error}</p>
           <button onClick={() => navigate("/my-forms")} className="mt-4 px-4 py-2 rounded-lg text-white text-sm" style={{background:"#005fb3"}}>Kembali</button>
@@ -116,31 +116,31 @@ export default function FormEditor() {
   return (
     <div className="flex min-h-screen bg-slate-50">
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-auto">
+      <div className="flex-1 flex flex-col overflow-auto pb-24 md:pb-0">
         {/* Top Bar */}
-        <header className="flex items-center gap-4 px-8 py-4 border-b border-gray-100 bg-white">
-          <button onClick={() => navigate("/my-forms")} className="text-gray-400 hover:text-gray-600"><ArrowLeft size={20}/></button>
-          <div className="flex-1">
-            <h1 className="font-bold text-gray-800 truncate">{form?.form_title ?? "Form"}</h1>
-            <p className="text-xs text-gray-400">{form?.category}</p>
+        <header className="flex items-center gap-2 md:gap-4 px-3 md:px-8 py-3 md:py-4 border-b border-gray-100 bg-white">
+          <button onClick={() => navigate("/my-forms")} className="text-gray-400 hover:text-gray-600 shrink-0"><ArrowLeft size={20}/></button>
+          <div className="flex-1 min-w-0">
+            <h1 className="font-bold text-gray-800 truncate text-sm md:text-base">{form?.form_title ?? "Form"}</h1>
+            <p className="text-xs text-gray-400 hidden sm:block">{form?.category}</p>
           </div>
-          <div className="flex items-center gap-2">
-            <button className="p-2 rounded-lg text-gray-400 hover:bg-gray-100"><Undo2 size={16}/></button>
-            <button className="p-2 rounded-lg text-gray-400 hover:bg-gray-100"><Redo2 size={16}/></button>
+          <div className="flex items-center gap-1 md:gap-2">
+            <button className="hidden md:flex p-2 rounded-lg text-gray-400 hover:bg-gray-100"><Undo2 size={16}/></button>
+            <button className="hidden md:flex p-2 rounded-lg text-gray-400 hover:bg-gray-100"><Redo2 size={16}/></button>
             <button className="p-2 rounded-lg text-gray-400 hover:bg-gray-100"><Link2 size={16}/></button>
             <button onClick={saveQuestions} disabled={saving}
-              className="px-4 py-2 rounded-xl text-white text-sm font-semibold hover:opacity-90 disabled:opacity-60 transition"
+              className="px-3 md:px-4 py-2 rounded-xl text-white text-sm font-semibold hover:opacity-90 disabled:opacity-60 transition"
               style={{background:"linear-gradient(90deg,#005fb3,#009bf5)"}}>
-              {saving ? "Menyimpan..." : "Publish"}
+              {saving ? "..." : "Publish"}
             </button>
           </div>
         </header>
 
         {/* Tabs */}
-        <div className="flex px-8 border-b border-gray-100 bg-white">
+        <div className="flex px-3 md:px-8 border-b border-gray-100 bg-white overflow-x-auto">
           {TABS.map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition ${activeTab===tab ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+              className={`px-3 md:px-4 py-3 text-sm font-medium border-b-2 transition whitespace-nowrap ${activeTab===tab ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
               {tab}
               {tab === "Jawaban" && <span className="ml-1.5 bg-blue-100 text-blue-600 text-xs px-1.5 py-0.5 rounded-full">{questions.length}</span>}
             </button>

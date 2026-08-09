@@ -42,16 +42,16 @@ export default function Profile() {
   return (
     <div className="flex min-h-screen bg-slate-50">
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-auto">
+      <div className="flex-1 flex flex-col overflow-auto pb-24 md:pb-0">
         {/* Header */}
-        <header className="flex items-center justify-between px-8 pt-7 pb-2">
+        <header className="flex items-center justify-between px-4 md:px-8 pt-16 md:pt-7 pb-3">
           <div>
-            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">Hi, {username}! 👋</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Kelola informasi profil dan pengaturan akunmu.</p>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-800">Hi, {username}! 👋</h1>
+            <p className="text-xs md:text-sm text-gray-500 mt-0.5">Kelola informasi profil dan pengaturan akunmu.</p>
           </div>
           <div className="flex items-center gap-2">
             <button className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-100"><Bell size={18}/></button>
-            <button className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-100"><HelpCircle size={18}/></button>
+            <button className="hidden sm:flex w-9 h-9 rounded-full border border-gray-200 items-center justify-center text-gray-500 hover:bg-gray-100"><HelpCircle size={18}/></button>
             <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm" style={{background:"linear-gradient(135deg,#005fb3,#009bf5)"}}>
               {initials}
             </div>
@@ -59,21 +59,21 @@ export default function Profile() {
         </header>
 
         {/* Tabs */}
-        <div className="flex px-8 border-b border-gray-100 mt-2">
+        <div className="flex px-4 md:px-8 border-b border-gray-100 mt-2 overflow-x-auto scrollbar-hide">
           {PROFILE_TABS.map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition ${activeTab===tab ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+              className={`px-3 md:px-4 py-3 text-sm font-medium border-b-2 transition whitespace-nowrap ${activeTab===tab ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
               {tab}
             </button>
           ))}
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto px-8 py-6">
+        <div className="flex-1 overflow-auto px-4 md:px-8 py-6">
           {activeTab === "Profil" && (
-            <div className="flex gap-8 flex-wrap">
+            <div className="flex gap-6 flex-col md:flex-row">
               {/* Left */}
-              <div className="flex-1 min-w-0 max-w-lg">
+              <div className="flex-1 min-w-0">
                 <h2 className="font-bold text-gray-800 mb-1">Informasi Profil</h2>
                 <p className="text-sm text-gray-400 mb-6">Kelola informasi profil yang akan ditampilkan di Formatic.</p>
 
@@ -125,27 +125,7 @@ export default function Profile() {
               </div>
 
               {/* Right */}
-              <div className="w-64 shrink-0 space-y-4">
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                  <h3 className="font-bold text-gray-800 mb-4 text-sm">Rangkuman Akun</h3>
-                  <div className="space-y-3">
-                    {[
-                      { icon:"📋", label:"Total Form",       value:"—" },
-                      { icon:"💬", label:"Total Responses",  value:"—" },
-                      { icon:"👁️", label:"Total Views",      value:"—" },
-                      { icon:"📅", label:"Bergabung Sejak",  value:"—" },
-                    ].map(item => (
-                      <div key={item.label} className="flex items-center gap-3">
-                        <span className="text-lg">{item.icon}</span>
-                        <div>
-                          <p className="text-xs text-gray-400">{item.label}</p>
-                          <p className="text-sm font-semibold text-gray-700">{item.value}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
+              <div className="w-full md:w-64 shrink-0 space-y-4">
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                   <h3 className="font-bold text-gray-800 mb-4 text-sm">Aksi Cepat</h3>
                   <div className="space-y-1">

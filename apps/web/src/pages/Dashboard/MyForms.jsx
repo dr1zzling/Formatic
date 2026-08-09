@@ -52,16 +52,15 @@ export default function MyForms() {
   return (
     <div className="flex min-h-screen bg-slate-50">
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-auto">
+      <div className="flex-1 flex flex-col overflow-auto pb-24 md:pb-0">
         {/* Header */}
-        <header className="flex items-center justify-between px-8 pt-7 pb-2">
+        <header className="flex items-center justify-between px-4 md:px-8 pt-16 md:pt-7 pb-3">
           <div>
-            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">Hi, {username}! 👋</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Create and manage your forms easily.</p>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-800">Hi, {username}!</h1>
           </div>
           <div className="flex items-center gap-2">
             <button className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-100"><Bell size={18}/></button>
-            <button className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-100"><Settings size={18}/></button>
+            <button className="hidden sm:flex w-9 h-9 rounded-full border border-gray-200 items-center justify-center text-gray-500 hover:bg-gray-100"><Settings size={18}/></button>
             <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm" style={{ background:"linear-gradient(135deg,#005fb3,#009bf5)" }}>
               {username[0]?.toUpperCase()}
             </div>
@@ -69,8 +68,8 @@ export default function MyForms() {
         </header>
 
         {/* Toolbar */}
-        <div className="px-8 mt-5 mb-4 flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 max-w-md">
+        <div className="px-4 md:px-8 mt-5 mb-10 flex items-center gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-0">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
@@ -80,29 +79,28 @@ export default function MyForms() {
               className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-300 transition"
             />
           </div>
-          <div className="flex border border-gray-200 rounded-xl overflow-hidden bg-white">
+          <div className="flex border border-gray-200 rounded-xl overflow-hidden bg-white shrink-0">
             <button onClick={() => setView("list")} className={`p-2.5 transition ${view==="list" ? "bg-[#005fb3] text-white" : "text-gray-400 hover:bg-gray-50"}`}><List size={16}/></button>
             <button onClick={() => setView("grid")} className={`p-2.5 transition ${view==="grid" ? "bg-[#005fb3] text-white" : "text-gray-400 hover:bg-gray-50"}`}><LayoutGrid size={16}/></button>
           </div>
           <button
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-semibold hover:opacity-90 transition"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-semibold hover:opacity-90 transition shrink-0"
             style={{ background:"linear-gradient(90deg,#005fb3,#009bf5)" }}
           >
-            <Plus size={16}/> Create Form
+            <Plus size={16}/> <span className="hidden sm:inline">Create Form</span><span className="sm:hidden">Create</span>
           </button>
         </div>
 
-        {/* Title + count */}
-        <div className="px-8 mb-3 flex items-center justify-between">
+        <div className="px-4 md:px-8 mb-5 flex items-center justify-between">
           <h2 className="font-bold text-gray-800">My Forms</h2>
           <span className="text-xs text-gray-400">
-            {filtered.length > 0 ? `Showing ${(page-1)*ITEMS_PER_PAGE+1}–${Math.min(page*ITEMS_PER_PAGE,filtered.length)} of ${filtered.length} forms` : "0 forms"}
+            {filtered.length > 0 ? `${(page-1)*ITEMS_PER_PAGE+1}–${Math.min(page*ITEMS_PER_PAGE,filtered.length)} / ${filtered.length}` : "0 forms"}
           </span>
         </div>
 
         {/* List/Grid */}
-        <div className="flex-1 px-8 pb-4 overflow-auto">
+        <div className="flex-1 px-4 md:px-8 pb-4 overflow-auto">
           {loading && (
             <div className="space-y-3">
               {[1,2,3].map(i => <div key={i} className="h-16 bg-white rounded-xl border border-gray-100 animate-pulse" />)}
@@ -131,7 +129,7 @@ export default function MyForms() {
 
         {/* Pagination */}
         {!loading && filtered.length > ITEMS_PER_PAGE && (
-          <div className="px-8 py-4 border-t border-gray-100 flex items-center justify-center gap-1">
+          <div className="px-4 md:px-8 py-4 border-t border-gray-100 flex items-center justify-center gap-1">
             <button disabled={page===1} onClick={() => setPage(p=>p-1)} className="w-8 h-8 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 transition">‹</button>
             {Array.from({length:totalPages},(_,i)=>i+1).map(p => (
               <button key={p} onClick={() => setPage(p)} className="w-8 h-8 rounded-lg text-sm font-medium transition"
@@ -181,7 +179,7 @@ function ListView({ forms, navigate }) {
 
 function GridView({ forms, navigate }) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {forms.map((form, idx) => (
         <div key={form.form_id ?? idx} onClick={() => navigate(`/form/${form.form_slug}`)}
           className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer">
@@ -229,7 +227,7 @@ function CreateFormModal({ onClose, onCreated }) {
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Judul Form</label>
-            <input type="text" placeholder="Contoh: Kuesioner Kepuasan Pelanggan" value={title}
+            <input type="text" value={title}
               onChange={e => { setTitle(e.target.value); setError(""); }}
               className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-300 transition" />
           </div>
