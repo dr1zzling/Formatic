@@ -6,12 +6,10 @@ exports.up = function(knex) {
   return knex.schema.createTable('forms', function(table){
     table.increments()
     table.string('slug').unique().index()
-    table.string('title')
-    table.enum('status', ['public', 'private'])
-    table.integer('category_id').unsigned()
-    table.text('banner').nullable()
-    
-    table.foreign('category_id').references('category.id')
+    table.string('title').notNullable()
+    table.enum('category', ['ujian', 'survey']).notNullable()
+    table.enum('status', ['public', 'private']).defaultTo('public')
+    table.text('banner').notNullable()
   })
 };
 
