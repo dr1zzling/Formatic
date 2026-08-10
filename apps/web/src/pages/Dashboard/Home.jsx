@@ -47,7 +47,7 @@ export default function Home() {
       const res = await api.get("/form", { params });
       setForms(res.data?.data ?? []);
     } catch {
-      setError("Gagal memuat form. Pastikan backend berjalan.");
+      setError("Gagal memuat form.");
     } finally {
       setLoading(false);
     }
@@ -63,22 +63,20 @@ export default function Home() {
   return (
     <div className="flex min-h-screen bg-slate-50">
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-auto">
+      <div className="flex-1 flex flex-col overflow-auto pb-24 md:pb-0">
         {/* Header */}
-        <header className="flex items-center justify-between px-8 pt-7 pb-2">
+        <header className="flex items-center justify-between px-4 md:px-8 pt-16 md:pt-7 pb-3">
           <div>
-            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-              Hi, {username}! <span>👋</span>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-800">
+              Hi, {username}!
             </h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              {greeting}! Fill your forms, give responses, and share your feedback.
-            </p>
+            
           </div>
           <div className="flex items-center gap-2">
             <button className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-100 transition">
               <Bell size={18} />
             </button>
-            <button className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-100 transition">
+            <button className="hidden sm:flex w-9 h-9 rounded-full border border-gray-200 items-center justify-center text-gray-500 hover:bg-gray-100 transition">
               <Settings size={18} />
             </button>
             <div
@@ -91,7 +89,7 @@ export default function Home() {
         </header>
 
         {/* Search */}
-        <div className="px-8 mt-4 mb-5">
+        <div className="px-4 md:px-8 mt-5 mb-7">
           <div className="relative max-w-lg">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -99,18 +97,18 @@ export default function Home() {
               placeholder="Search forms or templates..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition"
+              className="w-full pl-9 pr-4 py-3 border border-gray-200 rounded-2xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition shadow-sm"
             />
           </div>
         </div>
 
         {/* Category Tabs */}
-        <div className="px-8 mb-6 flex items-center gap-2">
+        <div className="px-4 md:px-8 mb-10 flex items-center gap-2 overflow-x-auto scrollbar-hide">
           {CATEGORIES.map((cat) => (
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
                 activeCategory === cat
                   ? "text-white shadow"
                   : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
@@ -123,17 +121,17 @@ export default function Home() {
           <button
             onClick={loadForms}
             title="Refresh"
-            className="ml-auto p-2 rounded-xl border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 transition"
+            className="ml-auto p-2 rounded-xl border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 transition shrink-0"
           >
             <RefreshCw size={15} />
           </button>
         </div>
 
         {/* Content */}
-        <div className="flex-1 px-8 pb-8">
+        <div className="flex-1 px-4 md:px-8 pb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-gray-800 text-base">Recommended Forms</h2>
-            <button className="text-sm font-medium text-blue-500 hover:underline">View all →</button>
+            <button className="text-sm font-medium text-blue-500 hover:underline whitespace-nowrap">View all →</button>
           </div>
 
           {loading && (
@@ -152,7 +150,6 @@ export default function Home() {
 
           {!loading && error && (
             <div className="flex flex-col items-center py-20 text-center">
-              <p className="text-4xl mb-3">⚠️</p>
               <p className="text-gray-500 text-sm">{error}</p>
               <button onClick={loadForms} className="mt-4 px-4 py-2 rounded-lg text-white text-sm" style={{ background: "#005fb3" }}>
                 Coba Lagi
