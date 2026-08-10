@@ -1,18 +1,25 @@
-import { BadRequestException, Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { SoalService } from './soal.service';
 import { ValidateFormExist } from 'src/Pipe/validate.form.exist';
+import { JwtAuthGuard } from 'src/guard/jwt.auth.guard';
 
 @Controller('form/soal')
 export class SoalController {
-  constructor(private soalService: SoalService) {}
-  
+  constructor(private soalService: SoalService) { }
+
   @Get('/:id')
-  getSoalByForm(@Param('id', ValidateFormExist) id: string ){
+  @UseGuards(JwtAuthGuard)
+  getSoalByForm(@Param('id', ValidateFormExist) id: string) {
     return this.soalService.getSoalByForm(Number(id))
   }
 
-  @Post('/:id')
-  createSoalAndOption(@Param('id', ValidateFormExist) id: string, @Body() data: any){
-    return this.soalService.createSoalAndOption(Number(id), data)
+  @Post()
+  @UseGuards(JwtAuthGuard)
+  createSoalAndOption(
+    @Query('form_slug', ValidateFormExist) form_slug: string,
+    @Body() data: any
+  ){
+    return this.soalService.createSoalAndOption(form_slug, data)
   }
+
 }

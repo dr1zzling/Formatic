@@ -7,134 +7,80 @@ export class SoalService {
 
     // Get Soal From Form
     async getSoalByForm(id: number) {
-        const get = await this.knexService
-            .connection("forms")
-            .join("category", "category.id", "forms.category_id")
-            .leftJoin("soal", "soal.form_id", "forms.id")
-            .leftJoin("soal_option", "soal_option.soal_id", "soal.id")
-            .leftJoin("option_value", "option_value.id", "soal_option.option_value_id")
-            .select({
-                form_id: "forms.id",
-                form_title: "forms.title",
-                category: "category.category_name",
+        const getSoal = await this.knexService.connection("soal")
+            .select("*")
+            .where("form_id", id)
 
-                soal_id: "soal.id",
-                soal_question: "soal.question",
-                soal_type: "soal.type",
+        const soalId = getSoal.map((soal) => soal.id)
+        const getOption = await this.knexService.connection("soal_option")
+            .select("*")
+            .whereIn("soal_id", soalId)
 
-                option_id: "soal_option.id",
-                option_value: "option_value.value",
-                option_value_id: "option_value.id",
-                is_correct: "soal_option.is_correct",
-            })
-            .where("forms.id", id)
-
-        if (get.length === 0) throw new NotFoundException("Form tidak ditemukan atau tidak memiliki soal apapun")
-
-        const soalMap = new Map()
-
-        get.forEach((row) => {
-            if (row.soal_id) {
-                if (!soalMap.has(row.soal_id)) {
-                    soalMap.set(row.soal_id, {
-                        id: row.soal_id,
-                        question: row.soal_question,
-                        type: row.soal_type,
-                        options: [],
-                    })
-                }
-
-                if (row.option_id) {
-                    soalMap.get(row.soal_id).options.push({
-                        id: row.option_id,
-                        option_value_id: row.option_value_id,
-                        option_value: row.option_value,
-                        is_correct: row.is_correct,
-                    })
-                }
-            }
-        })
-
-        const listSoal = Array.from(soalMap.values())
-
-        return listSoal
+        return getSoal.map((soal) => ({
+            id: soal.id,
+            question: soal.question,
+            type: soal.type,
+            options: getOption.filter((option) => option.soal_id == soal.id)
+        }))
     }
 
     // Create Soal And Option
-    async createSoalAndOption(id: number, body: any) {
+    async createSoalAndOption(form_slug, body: any) {
+
         // Validasi
-        if (!body || (typeof body === 'object' && Object.keys(body).length === 0)) {
-            throw new BadRequestException('Request body tidak boleh kosong!')
+        const listSoal = Array.isArray(body) ? body : [body]
+        if (!body || listSoal.length === 0) {
+            throw new BadRequestException('Request body tidak valid!')
         }
 
-        const listSoal = Array.isArray(body) ? body : [body]
+        const optionTypes = ['radio', 'checkbox', 'rating']
 
-        if (listSoal.length === 0) throw new BadRequestException("Isi Yang Benar")
+        // Insert
+        const insert = await this.knexService.connection.transaction(async (trx) => {
+            return Promise.all(
+                listSoal.map(async ({ soal, options }) => {
 
-        // Proses Insert
-        const proses = await Promise.all(listSoal.map(async (list) => {
-            const soal = list.soal
-            const option_value = Array.isArray(list.option_value) ? list.option_value : [list.option_value]
-            const soal_option = list.soal_option
+                    // Insert Soal
+                    const [insertSoal] = await trx('soal')
+                        .insert({ form_id: form_slug.id, question: soal.question, type: soal.type })
+                        .returning(['id', 'question', 'type'])
 
-            const [insertSoal] = await this.knexService.connection("soal").insert({ form_id: id, question: soal.question, type: soal.type}).returning("*")
+                    // Jika Bukan Salah Satu dari option type langsung return saja wir
+                    if (!optionTypes.includes(soal.type)) return insertSoal
 
-            // Jika Radio, Checkbox, Rating
-            if(soal.type === "radio" || soal.type === "checkbox" || soal.type === "rating"){
-                const insert_option_value = await this.knexService.connection("option_value")
-                .insert(option_value)
-                .returning("*")
+                    // Insert Value
+                    const optionList = Array.isArray(options) ? options : (options ? [options] : [])
+                    const payloadOptionValue = optionList.map((option) => ({ value: option.value }))
+                    const insertOptionValue = await trx('option_value')
+                        .insert(payloadOptionValue)
+                        .returning('*')
 
-                const payload_insert_soal_option = insert_option_value.map((e) => {
-                    return {
+                    const payloadSoalOption = insertOptionValue.map((optionValue, idx) => ({
                         soal_id: insertSoal.id,
-                        option_value_id: e.id,
-                        is_correct: soal_option.is_correct
-                    }
-                })
-                const insert_soal_option = await this.knexService.connection("soal_option")
-                .insert(payload_insert_soal_option)
-                .returning("id")
-
-                const get = await this.knexService.connection("soal_option")
-                .join("option_value", "option_value.id", "soal_option.option_value_id")
-                .select({
-                    id: "soal_option.id",
-                    is_correct: "soal_option.is_correct",
-                    option_value_id: "option_value.id",
-                    option_value: "option_value.value"
-                })
-                .where("soal_option.soal_id", insertSoal.id)
-
-                return {
-                    soal: {
-                        id: insertSoal.id,
-                        question: insertSoal.question,
-                        type: insertSoal.type
-                    },
-                    options: get.map((e) => ({
-                        id: e.id,
-                        is_correct: e.is_correct,
-                        option_value_id: e.option_value_id,
-                        option_value: e.option_value
+                        option_value_id: optionValue.id,
+                        is_correct: optionList[idx]?.is_correct ?? false
                     }))
-                }
-            }
+                    const insertSoalOption = await trx('soal_option').insert(payloadSoalOption).returning(['id', 'is_correct'])
 
-            // Jika Bukan
-            return {
-                soal: insertSoal.id,
-                question: insertSoal.question,
-                type: insertSoal.type
-            }
-        }))
+                    return {
+                        soal: insertSoal,
+                        options: insertSoalOption.map((so, idx) => ({
+                            id: so.id,
+                            option_value_id: insertOptionValue[idx].id,
+                            option_value: insertOptionValue[idx].value,
+                            is_correct: so.is_correct
+                        })),
+                    }
+                }),
+            )
+        })
 
         return {
             message: `Berhasil Membuat ${listSoal.length} list soal`,
             data: {
-                form_id: id,
-                list_soal: proses
-            }
+                form_slug: form_slug,
+                list_soal: insert
+            },
         }
     }
 }
