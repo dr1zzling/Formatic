@@ -149,7 +149,7 @@ app.put('/user/forgot-password', async (req, res) => {
         const hashPassword = await bcrypt.hash(password, 10)
 
         const update = await pool.query(`
-            UPDATE users SET password = $1 WHERE usernaem = $2`,
+            UPDATE users SET password = $1 WHERE username = $2`,
         [hashPassword, username])
 
         return res.status(200).json({

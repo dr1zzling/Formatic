@@ -10,17 +10,17 @@ exports.seed = async function(knex) {
     {
       title: 'Soal Matematika 2026',
       status: 'public',
-      category_id: 1
+      category: 'ujian'
     },
     {
       title: 'Soal Pendidikan Pancasila 2026',
       status: 'private',
-      category_id: 1
+      category: 'ujian'
     },
     {
       title: 'Soal Bahasa Asing 2026',
       status: 'public',
-      category_id: 1
+      category: 'ujian'
     }
   ];
 
@@ -28,7 +28,7 @@ exports.seed = async function(knex) {
     title: item.title,
     slug: slugify(item.title, { lower: true, strict: true}),
     status: item.status,
-    category_id: item.category_id
+    category: item.category
   }))
 
   await knex('forms').insert(insertForm)

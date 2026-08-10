@@ -5,10 +5,11 @@ import { KnexModule } from 'src/database/knex.module';
 import { AuthModule } from 'src/guard/jwt.module';
 import { SubmitModule } from '../submit/submit.module';
 import { SoalModule } from 'src/soal/soal.module';
+import { ValidateIsCreator } from 'src/Pipe/validate.is.creator';
 
 @Module({
   imports: [KnexModule, AuthModule, SubmitModule, SoalModule],
   controllers: [FormController],
-  providers: [FormService],
+  providers: [FormService, ValidateIsCreator],
 })
 export class FormModule {}

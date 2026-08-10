@@ -9,7 +9,7 @@ exports.up = function(knex) {
     table.integer('form_id').unsigned().notNullable()
     table.enum('access_type', ['Creator', 'Collaborator'])
 
-    table.foreign('form_id').references('forms.id')
+    table.foreign('form_id').references('forms.id').onDelete('CASCADE')
   })
 };
 
