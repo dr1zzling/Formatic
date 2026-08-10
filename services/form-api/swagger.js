@@ -1,31 +1,25 @@
-const swaggerJsdoc = require("swagger-jsdoc")
+const swaggerJsdoc = require("swagger-jsdoc");
+const swaggerUi = require("swagger-ui-express");
+const express = require("express");
+
+const app = express();
+const PORT = 3001;
 
 const options = {
     definition: {
         openapi: "3.0.0",
 
         info: {
-            title: "Form API",
+            title: "Formatic Form API",
             version: "1.0.0",
-            description: "API untuk mengelola Form, Soal, dan Submit Form"
+            description: "API documentation for Formatic Form and Soal Service",
         },
 
         servers: [
             {
                 url: "http://localhost:3000",
-                description: "Local Development Server"
-            }
-        ],
-
-        tags: [
-            {
-                name: "Form",
-                description: "Endpoint untuk mengelola form"
+                description: "Local Development Server",
             },
-            {
-                name: "Soal",
-                description: "Endpoint untuk mengelola soal dan pilihan soal"
-            }
         ],
 
         components: {
@@ -33,73 +27,129 @@ const options = {
                 bearerAuth: {
                     type: "http",
                     scheme: "bearer",
-                    bearerFormat: "JWT"
-                }
+                    bearerFormat: "JWT",
+                    description: "Masukkan JWT token",
+                },
             },
 
             schemas: {
-                CreateFormRequest: {
-                    type: "object",
-                    required: ["title", "category_id"],
-                    properties: {
-                        title: {
-                            type: "string",
-                            example: "Form Pendaftaran Siswa"
-                        },
-                        category_id: {
-                            type: "string",
-                            example: "1"
-                        }
-                    }
-                },
 
-                FormData: {
+                // FORM
+
+                Form: {
                     type: "object",
                     properties: {
                         id: {
                             type: "integer",
-                            example: 1
-                        },
-                        slug: {
-                            type: "string",
-                            example: "form-pendaftaran-siswa-1750000000000"
+                            example: 1,
                         },
                         title: {
                             type: "string",
-                            example: "Form Pendaftaran Siswa"
+                            example: "Ujian Pemrograman",
+                        },
+                        slug: {
+                            type: "string",
+                            example: "ujian-pemrograman-1753850000000",
                         },
                         status: {
                             type: "string",
                             enum: ["public", "private"],
-                            example: "private"
+                            example: "private",
                         },
-                        category_id: {
-                            type: "integer",
-                            example: 1
-                        }
-                    }
+                        category: {
+                            type: "string",
+                            example: "ujian",
+                        },
+                        banner: {
+                            type: "string",
+                            example: "/uploads/banner-1753850000-123456789.png",
+                        },
+                    },
                 },
+
+                CreateFormResponse: {
+                    type: "object",
+                    properties: {
+                        message: {
+                            type: "string",
+                            example: "Berhasil Membuat Form",
+                        },
+                        data: {
+                            type: "object",
+                            properties: {
+                                user: {
+                                    type: "object",
+                                    properties: {
+                                        user_id: {
+                                            type: "integer",
+                                            example: 1,
+                                        },
+                                        username: {
+                                            type: "string",
+                                            example: "fanny",
+                                        },
+                                        access_type: {
+                                            type: "string",
+                                            example: "Creator",
+                                        },
+                                    },
+                                },
+                                form: {
+                                    type: "object",
+                                    properties: {
+                                        form_id: {
+                                            type: "integer",
+                                            example: 10,
+                                        },
+                                        form_title: {
+                                            type: "string",
+                                            example: "Ujian Pemrograman",
+                                        },
+                                        form_slug: {
+                                            type: "string",
+                                            example: "ujian-pemrograman-1753850000000",
+                                        },
+                                        form_status: {
+                                            type: "string",
+                                            example: "private",
+                                        },
+                                        form_banner: {
+                                            type: "string",
+                                            example: "/uploads/banner-1753850000-123456789.png",
+                                        },
+                                        category: {
+                                            type: "string",
+                                            example: "ujian",
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+
+                // SOAL
 
                 SoalOption: {
                     type: "object",
                     properties: {
                         id: {
                             type: "integer",
-                            example: 1
-                        },
-                        is_correct: {
-                            type: "boolean",
-                            example: true
+                            example: 1,
                         },
                         option_value_id: {
                             type: "integer",
-                            example: 1
+                            example: 1,
                         },
                         option_value: {
                             type: "string",
-                            example: "Jakarta"
-                        }
-                    }
+                            example: "A",
+                        },
+                        is_correct: {
+                            type: "boolean",
+                            example: true,
+                        },
+                    },
                 },
 
                 Soal: {
@@ -107,43 +157,34 @@ const options = {
                     properties: {
                         id: {
                             type: "integer",
-                            example: 1
+                            example: 1,
                         },
                         question: {
                             type: "string",
-                            example: "Apa ibu kota Indonesia?"
+                            example: "Apa kepanjangan dari HTML?",
                         },
                         type: {
                             type: "string",
                             example: "radio",
-                            enum: [
-                                "radio",
-                                "checkbox",
-                                "rating",
-                                "text",
-                                "file"
-                            ]
                         },
                         options: {
                             type: "array",
                             items: {
-                                $ref: "#/components/schemas/SoalOption"
-                            }
-                        }
-                    }
+                                $ref: "#/components/schemas/SoalOption",
+                            },
+                        },
+                    },
                 },
 
-                CreateSoalRequest: {
+                CreateSoal: {
                     type: "object",
-                    required: ["soal"],
                     properties: {
                         soal: {
                             type: "object",
-                            required: ["question", "type"],
                             properties: {
                                 question: {
                                     type: "string",
-                                    example: "Apa ibu kota Indonesia?"
+                                    example: "Apa kepanjangan dari HTML?",
                                 },
                                 type: {
                                     type: "string",
@@ -152,321 +193,306 @@ const options = {
                                         "checkbox",
                                         "rating",
                                         "text",
-                                        "file"
+                                        "file",
                                     ],
-                                    example: "radio"
-                                }
-                            }
+                                    example: "radio",
+                                },
+                            },
+                            required: ["question", "type"],
                         },
 
-                        option_value: {
+                        options: {
                             type: "array",
-                            description: "Digunakan untuk radio, checkbox, dan rating",
                             items: {
                                 type: "object",
                                 properties: {
                                     value: {
                                         type: "string",
-                                        example: "Jakarta"
-                                    }
-                                }
-                            }
+                                        example: "Hyper Text Markup Language",
+                                    },
+                                    is_correct: {
+                                        type: "boolean",
+                                        example: true,
+                                    },
+                                },
+                                required: ["value"],
+                            },
                         },
-
-                        soal_option: {
-                            type: "object",
-                            properties: {
-                                is_correct: {
-                                    type: "boolean",
-                                    example: true
-                                }
-                            }
-                        }
-                    }
+                    },
+                    required: ["soal"],
                 },
-
-                ErrorResponse: {
-                    type: "object",
-                    properties: {
-                        statusCode: {
-                            type: "integer",
-                            example: 400
-                        },
-                        message: {
-                            type: "string",
-                            example: "Isi Yang Benar"
-                        },
-                        error: {
-                            type: "string",
-                            example: "Bad Request"
-                        }
-                    }
-                }
-            }
+            },
         },
-
-        paths: {
-
-            //FORM
-
-            "/form": {
-                get: {
-                    tags: ["Form"],
-                    summary: "Mendapatkan seluruh form berdasarkan kategori",
-
-                    parameters: [
-                        {
-                            name: "category",
-                            in: "query",
-                            required: true,
-                            description: "Nama kategori form",
-                            schema: {
-                                type: "string"
-                            },
-                            example: "Ujian"
-                        }
-                    ],
-
-                    responses: {
-                        200: {
-                            description: "Berhasil mendapatkan seluruh form"
-                        },
-
-                        404: {
-                            description: "Tidak ada form dari kategori tersebut"
-                        }
-                    }
-                },
-
-                post: {
-                    tags: ["Form"],
-                    summary: "Membuat form baru",
-
-                    security: [
-                        {
-                            bearerAuth: []
-                        }
-                    ],
-
-                    requestBody: {
-                        required: true,
-
-                        content: {
-                            "application/json": {
-                                schema: {
-                                    $ref: "#/components/schemas/CreateFormRequest"
-                                }
-                            }
-                        }
-                    },
-
-                    responses: {
-                        201: {
-                            description: "Berhasil membuat form"
-                        },
-
-                        400: {
-                            description: "Data tidak lengkap"
-                        },
-
-                        401: {
-                            description: "Unauthorized"
-                        }
-                    }
-                }
-            },
-
-            //FORM BY SLUG
-
-            "/form/slug/": {
-                get: {
-                    tags: ["Form"],
-                    summary: "Mendapatkan form berdasarkan slug",
-
-                    parameters: [
-                        {
-                            name: "slug",
-                            in: "query",
-                            required: true,
-                            description: "Slug form",
-                            schema: {
-                                type: "string"
-                            },
-                            example: "form-pendaftaran-siswa-1750000000000"
-                        }
-                    ],
-
-                    responses: {
-                        200: {
-                            description: "Berhasil mendapatkan form"
-                        },
-
-                        404: {
-                            description: "Form tidak ditemukan"
-                        }
-                    }
-                }
-            },
-
-            //User Form
-
-            "/form/user": {
-                get: {
-                    tags: ["Form"],
-                    summary: "Mendapatkan form yang user terlibat",
-
-                    security: [
-                        {
-                            bearerAuth: []
-                        }
-                    ],
-
-                    responses: {
-                        200: {
-                            description: "Berhasil mendapatkan form user"
-                        },
-
-                        401: {
-                            description: "Unauthorized"
-                        }
-                    }
-                }
-            },
-
-            //Submit History
-
-            "/form/submit": {
-                get: {
-                    tags: ["Form"],
-                    summary: "Mendapatkan history submit form",
-
-                    security: [
-                        {
-                            bearerAuth: []
-                        }
-                    ],
-
-                    parameters: [
-                        {
-                            name: "form_id",
-                            in: "query",
-                            required: true,
-                            description: "ID form",
-                            schema: {
-                                type: "string"
-                            },
-                            example: "1"
-                        }
-                    ],
-
-                    responses: {
-                        200: {
-                            description: "Berhasil mendapatkan history form"
-                        },
-
-                        401: {
-                            description: "Unauthorized"
-                        },
-
-                        404: {
-                            description: "Data tidak ditemukan"
-                        }
-                    }
-                }
-            },
-
-            //SOAL
-
-            "/form/soal/{id}": {
-                get: {
-                    tags: ["Soal"],
-                    summary: "Mendapatkan seluruh soal dari form",
-
-                    parameters: [
-                        {
-                            name: "id",
-                            in: "path",
-                            required: true,
-                            description: "ID form",
-                            schema: {
-                                type: "integer"
-                            },
-                            example: 1
-                        }
-                    ],
-
-                    responses: {
-                        200: {
-                            description: "Berhasil mendapatkan soal",
-
-                            content: {
-                                "application/json": {
-                                    schema: {
-                                        type: "array",
-                                        items: {
-                                            $ref: "#/components/schemas/Soal"
-                                        }
-                                    }
-                                }
-                            }
-                        },
-
-                        404: {
-                            description: "Form tidak ditemukan atau tidak memiliki soal"
-                        }
-                    }
-                },
-
-                post: {
-                    tags: ["Soal"],
-                    summary: "Membuat soal dan pilihan soal",
-
-                    parameters: [
-                        {
-                            name: "id",
-                            in: "path",
-                            required: true,
-                            description: "ID form",
-                            schema: {
-                                type: "integer"
-                            },
-                            example: 1
-                        }
-                    ],
-
-                    requestBody: {
-                        required: true,
-
-                        content: {
-                            "application/json": {
-                                schema: {
-                                    $ref: "#/components/schemas/CreateSoalRequest"
-                                }
-                            }
-                        }
-                    },
-
-                    responses: {
-                        201: {
-                            description: "Berhasil membuat soal"
-                        },
-
-                        400: {
-                            description: "Request body kosong atau tidak valid"
-                        },
-
-                        404: {
-                            description: "Form tidak ditemukan"
-                        }
-                    }
-                }
-            }
-        }
     },
 
-    apis: []
-}
+    apis: [],
+};
 
-const swaggerSpec = swaggerJsdoc(options)
+const swaggerSpec = swaggerJsdoc(options);
 
-module.exports = swaggerSpec
+
+// GET ALL FORM
+
+
+swaggerSpec.paths = {
+
+    "/form": {
+        get: {
+            tags: ["Form"],
+            summary: "Mendapatkan seluruh form",
+            description: "Mengambil maksimal 10 form.",
+            responses: {
+                200: {
+                    description: "Berhasil mendapatkan seluruh form",
+                },
+                404: {
+                    description: "Tidak ada form",
+                },
+            },
+        },
+
+        post: {
+            tags: ["Form"],
+            summary: "Membuat form baru",
+            description:
+                "Membuat form baru dengan banner image. Endpoint ini membutuhkan JWT dan menggunakan multipart/form-data.",
+
+            security: [
+                {
+                    bearerAuth: [],
+                },
+            ],
+
+            requestBody: {
+                required: true,
+                content: {
+                    "multipart/form-data": {
+                        schema: {
+                            type: "object",
+                            required: ["title", "category", "banner"],
+                            properties: {
+                                title: {
+                                    type: "string",
+                                    example: "Ujian Pemrograman",
+                                },
+                                category: {
+                                    type: "string",
+                                    example: "ujian",
+                                },
+                                banner: {
+                                    type: "string",
+                                    format: "binary",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+
+            responses: {
+                201: {
+                    description: "Berhasil membuat form",
+                },
+                400: {
+                    description: "Judul dan kategori wajib diisi",
+                },
+                401: {
+                    description: "Unauthorized",
+                },
+            },
+        },
+
+        patch: {
+            tags: ["Form"],
+            summary: "Mengubah status form",
+            description: "Mengubah status form menjadi public atau private.",
+
+            security: [
+                {
+                    bearerAuth: [],
+                },
+            ],
+
+            parameters: [
+                {
+                    name: "form_slug",
+                    in: "query",
+                    required: true,
+                    description: "Slug form yang ingin diubah",
+                    schema: {
+                        type: "string",
+                    },
+                    example: "ujian-pemrograman-1753850000000",
+                },
+            ],
+
+            requestBody: {
+                required: true,
+                content: {
+                    "application/json": {
+                        schema: {
+                            type: "object",
+                            required: ["status"],
+                            properties: {
+                                status: {
+                                    type: "string",
+                                    enum: ["public", "private"],
+                                    example: "public",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+
+            responses: {
+                200: {
+                    description: "Berhasil mengubah status",
+                },
+                400: {
+                    description: "Status tidak valid",
+                },
+                401: {
+                    description: "Unauthorized",
+                },
+            },
+        },
+
+        delete: {
+            tags: ["Form"],
+            summary: "Menghapus form",
+
+            security: [
+                {
+                    bearerAuth: [],
+                },
+            ],
+
+            parameters: [
+                {
+                    name: "form_slug",
+                    in: "query",
+                    required: true,
+                    description: "Slug form yang ingin dihapus",
+                    schema: {
+                        type: "string",
+                    },
+                    example: "ujian-pemrograman-1753850000000",
+                },
+            ],
+
+            responses: {
+                200: {
+                    description: "Berhasil menghapus form",
+                },
+                401: {
+                    description: "Unauthorized",
+                },
+            },
+        },
+    },
+
+    // GET FORM BY CATEGORY
+
+    "/form/category": {
+        get: {
+            tags: ["Form"],
+            summary: "Mendapatkan form berdasarkan kategori",
+
+            parameters: [
+                {
+                    name: "category",
+                    in: "query",
+                    required: true,
+                    description: "Kategori form",
+                    schema: {
+                        type: "string",
+                    },
+                    example: "ujian",
+                },
+            ],
+
+            responses: {
+                200: {
+                    description: "Berhasil mendapatkan form berdasarkan kategori",
+                },
+                404: {
+                    description: "Tidak ada form dari kategori tersebut",
+                },
+            },
+        },
+    },
+
+    // GET FORM BY SLUG
+
+    "/form/slug/": {
+        get: {
+            tags: ["Form"],
+            summary: "Mendapatkan form berdasarkan slug",
+
+            parameters: [
+                {
+                    name: "slug",
+                    in: "query",
+                    required: true,
+                    description: "Slug form",
+                    schema: {
+                        type: "string",
+                    },
+                    example: "ujian-pemrograman-1753850000000",
+                },
+            ],
+
+            responses: {
+                200: {
+                    description: "Berhasil mendapatkan form",
+                },
+                404: {
+                    description: "Form tidak ditemukan",
+                },
+            },
+        },
+    },
+
+    // GET MY FORM
+
+    "/form/user": {
+        get: {
+            tags: ["Form"],
+            summary: "Mendapatkan form yang user terlibat",
+
+            security: [
+                {
+                    bearerAuth: [],
+                },
+            ],
+
+            responses: {
+                200: {
+                    description: "Berhasil mendapatkan form yang user terlibat",
+                },
+                401: {
+                    description: "Unauthorized",
+                },
+            },
+        },
+    },
+};
+
+
+// SWAGGER SERVER
+
+
+app.use(
+    "/api-docs",
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec)
+);
+
+app.get("/", (req, res) => {
+    res.redirect("/api-docs");
+});
+
+app.listen(PORT, () => {
+    console.log(`Swagger berjalan di http://localhost:${PORT}/api-docs`);
+});
