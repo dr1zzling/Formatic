@@ -1,7 +1,9 @@
 import axios from "axios";
 
-const USER_API_URL = "http://localhost:3000";
-const FORM_API_URL = "http://localhost:3001";
+// User API (auth) → port 3001
+// Form API → port 3000
+const USER_API_URL = "http://localhost:3001";
+const FORM_API_URL = "http://localhost:3000";
 
 const API_BASE_URL = FORM_API_URL;
 
@@ -53,6 +55,10 @@ export const authAPI = {
     }),
   register: (username, password) =>
     axios.post(`${USER_API_URL}/user/register`, { username, password }, {
+      headers: { "Content-Type": "application/json" },
+    }),
+  resetPassword: (username, password) =>
+    axios.put(`${USER_API_URL}/user/forgot-password`, { username, password }, {
       headers: { "Content-Type": "application/json" },
     }),
 };
