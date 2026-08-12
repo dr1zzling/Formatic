@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import Sidebar from "../../components/Sidebar";
 import api from "../../utils/api";
 import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2 } from "lucide-react";
+import "./responses.css";
 
 const QUESTION_TYPES = [
   { value: "radio",    label: "Pilihan Ganda" },
@@ -232,7 +233,7 @@ export default function FormEditor() {
             />
           )}
           {activeTab === "Jawaban" && (
-            <ResponsesTab formId={form?.id ?? form?.form_id} />
+            <ResponsesTab formId={form?.id ?? form?.form_id} form={form} />
           )}
           {activeTab === "Setelan" && (
             <SettingsTab form={form} onUpdateStatus={updateStatus} />
@@ -397,95 +398,244 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemo
 }
 
 /* ── Responses Tab ──────────────────────────────────────────── */
-function ResponsesTab({ formId }) {
-  const [responses, setResponses] = useState([]);
-  const [loading, setLoading]     = useState(true);
+function ResponsesTab({ formId, form }) {
+  const [responses, setResponses]   = useState([]);
+  const [questions, setQuestions]   = useState([]);
+  const [loading, setLoading]       = useState(true);
   const [activeSubTab, setActiveSubTab] = useState("Ringkasan");
 
   useEffect(() => {
     if (!formId) { setLoading(false); return; }
-    api.get(`/form/${formId}/submit`)
-      .then((res) => setResponses(res.data?.data ?? []))
-      .catch(() => setResponses([]))
-      .finally(() => setLoading(false));
+    Promise.all([
+      api.get(`/form/${formId}/submit`).catch(() => ({ data: { data: [] } })),
+    ]).then(([respRes]) => {
+      const data = respRes.data?.data ?? [];
+      setResponses(Array.isArray(data) ? data : []);
+    }).finally(() => setLoading(false));
   }, [formId]);
 
+  // Build per-question stats from responses
+  const questionStats = buildQuestionStats(responses);
   const total = responses.length;
+  const isPublic = form?.status === "public" || form?.form_status === "public";
+  const title = form?.title ?? form?.form_title ?? "Form";
 
   return (
-    <div className="flex-1 flex flex-col">
-      {/* Sub tabs */}
-      <div className="flex border-b border-gray-100 bg-white px-4 md:px-6 xl:px-8">
-        {["Ringkasan", "Pertanyaan", "Individual"].map((t) => (
-          <button
-            key={t}
-            onClick={() => setActiveSubTab(t)}
-            className={`px-4 py-3 text-sm font-medium border-b-2 transition whitespace-nowrap ${
-              activeSubTab === t ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            {t}
-          </button>
-        ))}
-        <div className="flex-1" />
-        <button className="flex items-center gap-1.5 px-4 py-2.5 my-1.5 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 rounded-xl hover:bg-green-100 transition self-center">
-          📊 Lihat di Spreadsheet
-        </button>
+    <div style={{ padding: "24px 32px 60px", minHeight: "100%", background: "linear-gradient(135deg,#ffffff 0%,#f5f9ff 55%,#edf5ff 100%)" }}>
+
+      {/* FORM HEADING */}
+      <div className="resp-form-heading">
+        <div className="resp-form-title-left">
+          <h2>{title}</h2>
+          <span className={`resp-status ${isPublic ? "" : "private"}`}>
+            {isPublic ? "Aktif" : "Draft"}
+          </span>
+        </div>
+        <div className="resp-heading-actions">
+          <button className="resp-export-btn">↓ Ekspor</button>
+          <button className="resp-view-btn">Lihat Form ↗</button>
+        </div>
       </div>
 
-      <div className="max-w-3xl mx-auto w-full py-6 px-4 space-y-5">
-        {/* Stats row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { icon: "📊", value: total, label: "Total Jawaban" },
-            { icon: "⏱", value: "—", label: "Rata-rata Waktu" },
-            { icon: "✅", value: total > 0 ? "100%" : "—", label: "Tingkat Selesai" },
-            { icon: "📅", value: "Hari Ini", label: new Date().toLocaleDateString("id-ID",{day:"2-digit",month:"short"}) },
-          ].map((s) => (
-            <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
-              <p className="text-2xl mb-1">{s.icon}</p>
-              <p className="font-bold text-gray-800 text-lg leading-tight">{s.value}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{s.label}</p>
-            </div>
+      {/* RESPONSE CONTAINER */}
+      <div className="response-container">
+
+        {/* SUB TABS */}
+        <div className="response-tabs">
+          {["Ringkasan", "Jawaban", "Responden"].map(t => (
+            <button
+              key={t}
+              className={`response-tab ${activeSubTab === t ? "active" : ""}`}
+              onClick={() => setActiveSubTab(t)}
+            >
+              {t}
+            </button>
           ))}
+          <button className="resp-date-filter">▣ Semua waktu ⌄</button>
         </div>
 
-        {loading ? (
-          <div className="text-center py-10">
-            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        {/* LOADING */}
+        {loading && (
+          <div className="resp-loading">
+            <div className="resp-spinner" />
+            <span style={{ fontSize: 12, color: "#7384a4" }}>Memuat respons...</span>
           </div>
-        ) : total === 0 ? (
-          <div className="text-center py-16 bg-white rounded-2xl border border-gray-100 shadow-sm">
-            <p className="text-5xl mb-3">📭</p>
-            <p className="font-semibold text-gray-700">Belum ada respons</p>
-            <p className="text-sm text-gray-400 mt-1">Bagikan link form untuk mulai mengumpulkan respons.</p>
+        )}
+
+        {/* EMPTY */}
+        {!loading && total === 0 && (
+          <div className="resp-empty">
+            <div style={{ fontSize: 40, marginBottom: 8 }}>📭</div>
+            <h4>Belum ada respons</h4>
+            <p>Bagikan link form untuk mulai mengumpulkan respons.</p>
           </div>
-        ) : (
-          responses.map((r, i) => (
-            <ResponseCard key={r.id ?? i} response={r} index={i} />
-          ))
+        )}
+
+        {/* CONTENT */}
+        {!loading && total > 0 && (
+          <>
+            {/* STATISTICS */}
+            <div className="statistics-grid">
+              <div className="stat-card">
+                <div className="stat-icon blue">♙</div>
+                <div>
+                  <p>Total Respon</p>
+                  <h3>{total}</h3>
+                  <span>responden</span>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon green">✓</div>
+                <div>
+                  <p>Tingkat Penyelesaian</p>
+                  <h3>100%</h3>
+                  <span>selesai</span>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon orange">◷</div>
+                <div>
+                  <p>Rata-rata Waktu</p>
+                  <h3>—</h3>
+                  <span>menit</span>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon purple">◔</div>
+                <div>
+                  <p>Selesai Hari Ini</p>
+                  <h3>{countToday(responses)}</h3>
+                  <span>responden</span>
+                </div>
+              </div>
+            </div>
+
+            {/* PER-QUESTION CARDS */}
+            {questionStats.map((q, qi) => (
+              <div className="question-card" key={q.soal_id ?? qi}>
+                <div className="question-header">
+                  <div>
+                    <h3>
+                      {qi + 1}. {q.question}
+                      <span className="required-badge">Wajib</span>
+                    </h3>
+                    <p>{total} respon</p>
+                  </div>
+                  <button className="detail-button">Lihat detail →</button>
+                </div>
+
+                {/* RADIO / CHECKBOX → donut + legend */}
+                {(q.type === "radio" || q.type === "checkbox") && q.options.length > 0 && (
+                  <div className="question-content">
+                    <div className="donut-wrapper">
+                      <div
+                        className="donut-chart"
+                        style={{ background: buildConicGradient(q.options, total) }}
+                      >
+                        <div className="donut-center">
+                          <strong>{total}</strong>
+                          <span>respon</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="answer-list">
+                      {q.options.map((opt, oi) => (
+                        <div className="answer-row" key={oi}>
+                          <span className={`dot ${DOT_COLORS[oi % DOT_COLORS.length]}`} />
+                          <span>{opt.value}</span>
+                          <strong>{opt.count} ({pct(opt.count, total)}%)</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* TEXT → list jawaban */}
+                {q.type === "text" && (
+                  <div className="text-answer-list">
+                    {q.textAnswers.length === 0
+                      ? <p style={{ fontSize: 12, color: "#8ca0ba" }}>Belum ada jawaban teks.</p>
+                      : q.textAnswers.map((t, ti) => (
+                          <div className="text-answer-item" key={ti}>{t}</div>
+                        ))
+                    }
+                  </div>
+                )}
+
+                {/* CHECKBOX with multiple options → bar chart */}
+                {q.type === "checkbox" && q.options.length === 0 && (
+                  <p style={{ fontSize: 12, color: "#8ca0ba", padding: "0 10px 10px" }}>Tidak ada opsi tersedia.</p>
+                )}
+              </div>
+            ))}
+          </>
         )}
       </div>
     </div>
   );
 }
 
-function ResponseCard({ response, index }) {
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-      <div className="flex items-center justify-between mb-3">
-        <p className="font-semibold text-gray-700 text-sm">Respons #{index + 1}</p>
-        <span className="text-xs text-gray-400">
-          {response.submitted_at ? new Date(response.submitted_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "—"}
-        </span>
-      </div>
-      {(response.answers ?? []).map((a, ai) => (
-        <div key={ai} className="text-xs text-gray-500 border-t border-gray-50 pt-2 mt-2">
-          <span className="font-semibold text-gray-700">{a.question}: </span>{a.answer ?? "—"}
-        </div>
-      ))}
-    </div>
-  );
+/* ── helpers ─────────────────────────────────────────────────── */
+const DOT_COLORS = ["blue-dot","green-dot","teal-dot","red-dot","purple-dot","orange-dot","gray-dot"];
+const BAR_COLORS = ["blue-bar","light-blue-bar","green-bar","orange-bar","purple-bar","teal-bar","red-bar"];
+
+function pct(count, total) {
+  if (!total) return 0;
+  return ((count / total) * 100).toFixed(1);
+}
+
+function countToday(responses) {
+  const today = new Date().toDateString();
+  return responses.filter(r => r.submitted_at && new Date(r.submitted_at).toDateString() === today).length;
+}
+
+function buildConicGradient(options, total) {
+  const COLORS = ["#3d91ef","#19c26b","#31b8b2","#ff626b","#a55be9","#f5a623","#9aa5b8"];
+  let deg = 0;
+  const stops = options.map((opt, i) => {
+    const share = total > 0 ? (opt.count / total) * 360 : 0;
+    const start = deg;
+    deg += share;
+    return `${COLORS[i % COLORS.length]} ${start}deg ${deg}deg`;
+  });
+  return `conic-gradient(${stops.join(", ")})`;
+}
+
+function buildQuestionStats(responses) {
+  if (!responses.length) return [];
+  // Kumpulkan semua soal dari setiap respons
+  const soalMap = new Map();
+  for (const resp of responses) {
+    const qs = resp.questions ?? resp.soal ?? [];
+    for (const q of qs) {
+      const id = q.soal_id ?? q.id;
+      if (!soalMap.has(id)) {
+        soalMap.set(id, {
+          soal_id: id,
+          question: q.question,
+          type: q.type,
+          options: (q.options ?? []).map(o => ({ ...o, count: 0 })),
+          textAnswers: [],
+        });
+      }
+      const entry = soalMap.get(id);
+      // Hitung pilihan yang dipilih
+      if (q.type === "radio" || q.type === "checkbox") {
+        for (const opt of (q.options ?? [])) {
+          if (opt.is_user_selected) {
+            const found = entry.options.find(o =>
+              o.soal_option_id === opt.soal_option_id || o.option_value === opt.option_value
+            );
+            if (found) found.count++;
+          }
+        }
+      }
+      if (q.type === "text" && q.user_answer_text) {
+        entry.textAnswers.push(q.user_answer_text);
+      }
+    }
+  }
+  return Array.from(soalMap.values());
 }
 
 /* ── Settings Tab ───────────────────────────────────────────── */

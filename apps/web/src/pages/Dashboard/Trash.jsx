@@ -65,7 +65,7 @@ export default function Trash() {
     <div className="flex h-screen overflow-hidden bg-[#F5F6FA]">
       <Sidebar />
 
-      <div className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-[52px] md:pt-0 pb-16 md:pb-0">
+      <div className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-[52px] md:pt-0 pb-16 md:pb-0" style={{ width: "calc(100% - 366px)" }}>
 
         {/* ── Header ─────────────────────────────────── */}
         <div className="px-6 md:px-8 xl:px-10 pt-6 pb-5 flex items-center justify-between gap-4 bg-[#F5F6FA]">

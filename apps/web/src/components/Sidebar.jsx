@@ -35,70 +35,76 @@ export default function Sidebar() {
 
   function logout() { localStorage.removeItem("token"); navigate("/login"); }
 
-  /* ── Shared nav content ──────────────────────────────── */
   const NavContent = ({ close }) => (
     <div className="flex flex-col h-full">
       {/* Brand */}
-      <div className="px-5 pt-7 pb-8">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center shrink-0">
-            <span className="text-base font-black text-[#1a3a6b]">F</span>
+      <div style={{ padding: "34px 24px 55px" }}>
+        <div className="flex items-center gap-3" style={{ paddingLeft: 10 }}>
+          <div style={{ width:38, height:38, background:"white", borderRadius:9, display:"flex", alignItems:"center", justifyContent:"center", fontSize:21, fontWeight:800, color:"#1251aa", flexShrink:0 }}>
+            F
           </div>
-          <span className="text-[17px] font-bold tracking-tight text-white">Formatic</span>
+          <span style={{ fontSize:22, fontWeight:700, color:"white" }}>Formatic</span>
         </div>
       </div>
 
       {/* Nav items */}
-      <nav className="flex-1 px-3 space-y-0.5">
+      <nav style={{ display:"flex", flexDirection:"column", gap:8, padding:"0 24px", flex:1 }}>
         {NAV.map(({ id, label, path, Icon }) => {
           const on = active({ id, path });
           return (
             <button
               key={id}
               onClick={() => { navigate(path); close?.(); }}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13.5px] font-medium transition-all duration-150 ${
-                on
-                  ? "bg-white/[0.18] text-white"
-                  : "text-white/60 hover:text-white hover:bg-white/[0.09]"
-              }`}
+              style={{
+                width:"100%", height:58, display:"flex", alignItems:"center", gap:18,
+                padding:"0 18px", borderRadius:9, border:"none", cursor:"pointer",
+                fontSize:16, fontWeight:500, transition:"0.2s ease",
+                background: on ? "linear-gradient(90deg, rgba(95,171,255,0.35), rgba(255,255,255,0.12))" : "transparent",
+                color: on ? "white" : "rgba(255,255,255,0.9)",
+              }}
+              onMouseEnter={e => { if (!on) e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+              onMouseLeave={e => { if (!on) e.currentTarget.style.background = "transparent"; }}
             >
-              <Icon size={17} strokeWidth={on ? 2.2 : 1.8} />
+              <Icon size={20} strokeWidth={on ? 2.2 : 1.8} style={{ flexShrink:0 }} />
               {label}
-              {on && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-white/80" />}
             </button>
           );
         })}
       </nav>
 
       {/* User */}
-      <div className="px-3 pb-5 relative">
-        <div className="h-px bg-white/10 mb-3 mx-1" />
+      <div style={{ marginTop:"auto", padding:"14px 24px", position:"relative" }}>
+        <div style={{ height:1, background:"rgba(255,255,255,0.15)", marginBottom:12 }} />
         <button
           onClick={() => setDropdown(v => !v)}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/[0.09] transition group"
+          style={{ width:"100%", display:"flex", alignItems:"center", gap:12, padding:"14px 8px", background:"transparent", border:"none", cursor:"pointer" }}
         >
-          <div className="w-8 h-8 rounded-full bg-white/20 ring-1 ring-white/30 flex items-center justify-center text-white text-sm font-bold shrink-0">
+          <div style={{ width:38, height:38, borderRadius:"50%", background:"#1663df", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, color:"white", flexShrink:0, fontSize:15 }}>
             {user.initial}
           </div>
-          <div className="flex-1 min-w-0 text-left">
-            <p className="text-[13px] font-semibold text-white truncate leading-tight">{user.username}</p>
-            <p className="text-[11px] text-white/45 leading-tight">Lihat profil</p>
+          <div style={{ display:"flex", flexDirection:"column", flex:1, textAlign:"left" }}>
+            <strong style={{ fontSize:14, color:"white", fontWeight:600 }}>{user.username}</strong>
+            <span style={{ fontSize:10, color:"rgba(255,255,255,0.65)", marginTop:3 }}>My Account</span>
           </div>
-          <ChevronUp size={14} className={`text-white/40 transition-transform shrink-0 ${dropdown ? "" : "rotate-180"}`} />
+          <ChevronUp size={16} style={{ color:"rgba(255,255,255,0.6)", transform: dropdown ? "" : "rotate(180deg)", transition:"0.2s", flexShrink:0 }} />
         </button>
 
         {dropdown && (
-          <div className="absolute bottom-[72px] left-3 right-3 bg-[#0d2657] border border-white/15 rounded-xl overflow-hidden shadow-2xl z-50">
+          <div style={{ position:"absolute", bottom:88, left:24, right:24, background:"#07245a", border:"1px solid rgba(255,255,255,0.15)", borderRadius:12, overflow:"hidden", boxShadow:"0 16px 40px rgba(0,0,0,0.25)", zIndex:50 }}>
             <button
               onClick={() => { navigate("/profile"); setDropdown(false); close?.(); }}
-              className="w-full flex items-center gap-2.5 px-4 py-3 text-[13px] text-white/75 hover:text-white hover:bg-white/[0.08] transition"
+              style={{ width:"100%", display:"flex", alignItems:"center", gap:10, padding:"12px 16px", background:"transparent", border:"none", cursor:"pointer", fontSize:13, color:"rgba(255,255,255,0.8)" }}
+              onMouseEnter={e => e.currentTarget.style.background="rgba(255,255,255,0.08)"}
+              onMouseLeave={e => e.currentTarget.style.background="transparent"}
             >
               <User size={14} /> Profil Saya
             </button>
-            <div className="h-px bg-white/10 mx-3" />
+            <div style={{ height:1, background:"rgba(255,255,255,0.1)", margin:"0 12px" }} />
             <button
               onClick={logout}
-              className="w-full flex items-center gap-2.5 px-4 py-3 text-[13px] text-red-400 hover:text-red-300 hover:bg-red-500/10 transition"
+              style={{ width:"100%", display:"flex", alignItems:"center", gap:10, padding:"12px 16px", background:"transparent", border:"none", cursor:"pointer", fontSize:13, color:"#fca5a5" }}
+              onMouseEnter={e => e.currentTarget.style.background="rgba(239,68,68,0.1)"}
+              onMouseLeave={e => e.currentTarget.style.background="transparent"}
             >
               <LogOut size={14} /> Keluar
             </button>
@@ -112,8 +118,8 @@ export default function Sidebar() {
     <>
       {/* ── Desktop ───────────────────────────────────── */}
       <aside
-        className="hidden md:flex w-[210px] xl:w-[220px] h-screen sticky top-0 shrink-0 flex-col"
-        style={{ background: "linear-gradient(175deg, #0f2d6b 0%, #1a4fa0 45%, #1e6fc7 100%)" }}
+        className="hidden md:flex h-screen sticky top-0 shrink-0 flex-col"
+        style={{ width: 366, minWidth: 366, background: "linear-gradient(180deg, #06245a 0%, #0a438f 48%, #257dc6 100%)" }}
       >
         <NavContent />
       </aside>
@@ -138,8 +144,8 @@ export default function Sidebar() {
       {mobileOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
           <div
-            className="w-[220px] h-full"
-            style={{ background: "linear-gradient(175deg, #0f2d6b 0%, #1a4fa0 45%, #1e6fc7 100%)" }}
+            className="w-[280px] h-full"
+            style={{ background: "linear-gradient(180deg, #06245a 0%, #0a438f 48%, #257dc6 100%)" }}
           >
             <NavContent close={() => setMobileOpen(false)} />
           </div>
