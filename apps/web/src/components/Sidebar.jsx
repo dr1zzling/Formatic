@@ -1,176 +1,173 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Home, FileText, Trash2, ChevronDown, LogOut, User } from "lucide-react";
+import { Home, FileText, Trash2, LogOut, User, ChevronUp, Menu, X } from "lucide-react";
 
-export default function Sidebar({ activeTab, onTabChange }) {
-  const location = useLocation();
+function getUser() {
+  const token = localStorage.getItem("token");
+  if (!token) return { username: "User", initial: "U" };
+  try {
+    const p = JSON.parse(atob(token.split(".")[1]));
+    const username = p.username || p.name || "User";
+    return { username, initial: username[0]?.toUpperCase() };
+  } catch { return { username: "User", initial: "U" }; }
+}
+
+const NAV = [
+  { id: "home",     label: "Home",    path: "/",         Icon: Home },
+  { id: "my-forms", label: "My Form", path: "/my-forms", Icon: FileText },
+  { id: "trash",    label: "Trash",   path: "/trash",    Icon: Trash2 },
+];
+
+export default function Sidebar() {
+  const loc      = useLocation();
   const navigate = useNavigate();
-  const [user, setUser] = useState({ name: "User" });
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [user, setUser]             = useState({ username: "User", initial: "U" });
+  const [dropdown, setDropdown]     = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        if (payload) {
-          const name = payload.username || payload.name || "User";
-          setUser({ name });
-        }
-      } catch (e) {
-        // Fallback to default
-      }
-    }
-  }, []);
+  useEffect(() => { setUser(getUser()); }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    navigate("/login");
-  };
+  function active(item) {
+    if (item.id === "home")     return loc.pathname === "/" || loc.pathname === "/home";
+    if (item.id === "my-forms") return loc.pathname.startsWith("/my-forms") || loc.pathname.startsWith("/form/");
+    return loc.pathname.startsWith(item.path);
+  }
 
-  const navItems = [
-    { id: "home",     label: "Home",    path: "/",         icon: Home },
-    { id: "my-forms", label: "My Form", path: "/my-forms", icon: FileText },
-    { id: "trash",    label: "Trash",   path: "/trash",    icon: Trash2 },
-  ];
+  function logout() { localStorage.removeItem("token"); navigate("/login"); }
 
-  const profileItem = { id: "profile", label: "Profil", path: "/profile", icon: User };
+  const NavContent = ({ close }) => (
+    <div className="flex flex-col h-full">
+      {/* Brand */}
+      <div style={{ padding: "34px 24px 55px" }}>
+        <div className="flex items-center gap-3" style={{ paddingLeft: 10 }}>
+          <div style={{ width:38, height:38, background:"white", borderRadius:9, display:"flex", alignItems:"center", justifyContent:"center", fontSize:21, fontWeight:800, color:"#1251aa", flexShrink:0 }}>
+            F
+          </div>
+          <span style={{ fontSize:22, fontWeight:700, color:"white" }}>Formatic</span>
+        </div>
+      </div>
 
-  const currentPath = location.pathname;
+      {/* Nav items */}
+      <nav style={{ display:"flex", flexDirection:"column", gap:8, padding:"0 24px", flex:1 }}>
+        {NAV.map(({ id, label, path, Icon }) => {
+          const on = active({ id, path });
+          return (
+            <button
+              key={id}
+              onClick={() => { navigate(path); close?.(); }}
+              style={{
+                width:"100%", height:58, display:"flex", alignItems:"center", gap:18,
+                padding:"0 18px", borderRadius:9, border:"none", cursor:"pointer",
+                fontSize:16, fontWeight:500, transition:"0.2s ease",
+                background: on ? "linear-gradient(90deg, rgba(95,171,255,0.35), rgba(255,255,255,0.12))" : "transparent",
+                color: on ? "white" : "rgba(255,255,255,0.9)",
+              }}
+              onMouseEnter={e => { if (!on) e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+              onMouseLeave={e => { if (!on) e.currentTarget.style.background = "transparent"; }}
+            >
+              <Icon size={20} strokeWidth={on ? 2.2 : 1.8} style={{ flexShrink:0 }} />
+              {label}
+            </button>
+          );
+        })}
+      </nav>
 
-  const isItemActive = (item) => {
-    if (activeTab !== undefined) return activeTab === item.id;
-    return (
-      currentPath === item.path ||
-      (item.id === "home" && currentPath === "/") ||
-      currentPath.startsWith(item.path === "/" ? "/home" : item.path)
-    );
-  };
+      {/* User */}
+      <div style={{ marginTop:"auto", padding:"14px 24px", position:"relative" }}>
+        <div style={{ height:1, background:"rgba(255,255,255,0.15)", marginBottom:12 }} />
+        <button
+          onClick={() => setDropdown(v => !v)}
+          style={{ width:"100%", display:"flex", alignItems:"center", gap:12, padding:"14px 8px", background:"transparent", border:"none", cursor:"pointer" }}
+        >
+          <div style={{ width:38, height:38, borderRadius:"50%", background:"#1663df", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, color:"white", flexShrink:0, fontSize:15 }}>
+            {user.initial}
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", flex:1, textAlign:"left" }}>
+            <strong style={{ fontSize:14, color:"white", fontWeight:600 }}>{user.username}</strong>
+            <span style={{ fontSize:10, color:"rgba(255,255,255,0.65)", marginTop:3 }}>My Account</span>
+          </div>
+          <ChevronUp size={16} style={{ color:"rgba(255,255,255,0.6)", transform: dropdown ? "" : "rotate(180deg)", transition:"0.2s", flexShrink:0 }} />
+        </button>
+
+        {dropdown && (
+          <div style={{ position:"absolute", bottom:88, left:24, right:24, background:"#07245a", border:"1px solid rgba(255,255,255,0.15)", borderRadius:12, overflow:"hidden", boxShadow:"0 16px 40px rgba(0,0,0,0.25)", zIndex:50 }}>
+            <button
+              onClick={() => { navigate("/profile"); setDropdown(false); close?.(); }}
+              style={{ width:"100%", display:"flex", alignItems:"center", gap:10, padding:"12px 16px", background:"transparent", border:"none", cursor:"pointer", fontSize:13, color:"rgba(255,255,255,0.8)" }}
+              onMouseEnter={e => e.currentTarget.style.background="rgba(255,255,255,0.08)"}
+              onMouseLeave={e => e.currentTarget.style.background="transparent"}
+            >
+              <User size={14} /> Profil Saya
+            </button>
+            <div style={{ height:1, background:"rgba(255,255,255,0.1)", margin:"0 12px" }} />
+            <button
+              onClick={logout}
+              style={{ width:"100%", display:"flex", alignItems:"center", gap:10, padding:"12px 16px", background:"transparent", border:"none", cursor:"pointer", fontSize:13, color:"#fca5a5" }}
+              onMouseEnter={e => e.currentTarget.style.background="rgba(239,68,68,0.1)"}
+              onMouseLeave={e => e.currentTarget.style.background="transparent"}
+            >
+              <LogOut size={14} /> Keluar
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <>
-      {/* ── Desktop sidebar ─────────────────────────────────── */}
-      <aside className="hidden md:flex w-64 h-screen sticky top-0 bg-gradient-to-b from-[#002673] via-[#005fb3] to-[#009bf5] text-white flex-col justify-between p-5 select-none shrink-0 shadow-xl">
-        {/* Brand */}
-        <div className="space-y-8">
-          <div className="flex items-center gap-3.5 px-2 pt-2">
-            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-md shrink-0">
-              <span className="text-2xl font-black text-[#002673]">F</span>
-            </div>
-            <span className="text-2xl font-bold tracking-tight text-white">Formatic</span>
-          </div>
-
-          {/* Nav */}
-          <nav className="space-y-2">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = isItemActive(item);
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    if (onTabChange) onTabChange(item.id);
-                    navigate(item.path);
-                  }}
-                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl font-medium text-sm transition-all duration-200 cursor-pointer ${
-                    isActive
-                      ? "bg-white/20 backdrop-blur-md text-white font-semibold shadow-inner"
-                      : "text-white/80 hover:bg-white/10 hover:text-white"
-                  }`}
-                >
-                  <Icon size={20} className={isActive ? "text-white" : "text-white/80"} />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* User footer */}
-        <div className="relative pt-4 border-t border-white/10">
-          <div
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="flex items-center justify-between p-2 rounded-xl hover:bg-white/10 cursor-pointer transition-all duration-200"
-          >
-            <div className="flex items-center gap-3 overflow-hidden">
-              <div className="w-10 h-10 rounded-full bg-blue-600 border border-white/20 flex items-center justify-center font-bold text-white shadow-md shrink-0">
-                {user.name.charAt(0).toUpperCase()}
-              </div>
-              <div className="flex flex-col truncate text-left">
-                <span className="text-sm font-semibold text-white leading-tight truncate">{user.name}</span>
-                <span className="text-xs text-white/60 truncate">Lihat profil</span>
-              </div>
-            </div>
-            <ChevronDown
-              size={18}
-              className={`text-white/80 transition-transform duration-200 shrink-0 ${isDropdownOpen ? "rotate-180" : ""}`}
-            />
-          </div>
-
-          {isDropdownOpen && (
-            <div className="absolute bottom-16 left-0 right-0 bg-[#003487] border border-white/20 rounded-xl p-2 shadow-2xl backdrop-blur-lg z-50">
-              <button
-                type="button"
-                onClick={() => { navigate("/profile"); setIsDropdownOpen(false); }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-white/80 hover:bg-white/10 hover:text-white rounded-lg transition-colors cursor-pointer"
-              >
-                <span>👤</span>
-                <span>Profil Saya</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-300 hover:bg-red-500/20 hover:text-red-200 rounded-lg transition-colors cursor-pointer"
-              >
-                <LogOut size={16} />
-                <span>Logout</span>
-              </button>
-            </div>
-          )}
-        </div>
+      {/* ── Desktop ───────────────────────────────────── */}
+      <aside
+        className="hidden md:flex h-screen sticky top-0 shrink-0 flex-col"
+        style={{ width: 366, minWidth: 366, background: "linear-gradient(180deg, #06245a 0%, #0a438f 48%, #257dc6 100%)" }}
+      >
+        <NavContent />
       </aside>
 
-      {/* ── Mobile bottom navbar ─────────────────────────────── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 safe-area-bottom">
-        {/* Floating pill container */}
-        <div className="mx-4 mb-4 bg-white rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] flex items-stretch overflow-hidden">
-          {[...navItems, profileItem].map((item) => {
-            const Icon = item.icon;
-            const isActive = isItemActive(item);
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  if (onTabChange && item.id !== "profile") onTabChange(item.id);
-                  navigate(item.path);
-                }}
-                className="flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-all duration-200 relative"
-              >
-                {/* Active background blob */}
-                {isActive && (
-                  <span
-                    className="absolute inset-x-2 inset-y-1.5 rounded-xl"
-                    style={{ background: "linear-gradient(135deg,#005fb3,#009bf5)", opacity: 0.12 }}
-                  />
-                )}
-                <Icon
-                  size={21}
-                  className={isActive ? "text-[#005fb3]" : "text-gray-400"}
-                  strokeWidth={isActive ? 2.2 : 1.7}
-                />
-                <span
-                  className={`text-[10px] font-semibold tracking-wide ${
-                    isActive ? "text-[#005fb3]" : "text-gray-400"
-                  }`}
-                >
-                  {item.label}
-                </span>
-              </button>
-            );
-          })}
+      {/* ── Mobile topbar ─────────────────────────────── */}
+      <header
+        className="md:hidden fixed top-0 inset-x-0 z-40 h-13 flex items-center justify-between px-4"
+        style={{ background: "linear-gradient(90deg, #0f2d6b, #1a4fa0)", height: 52 }}
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center">
+            <span className="text-[13px] font-black text-[#1a3a6b]">F</span>
+          </div>
+          <span className="text-[15px] font-bold text-white">Formatic</span>
         </div>
+        <button onClick={() => setMobileOpen(v => !v)} className="text-white/80 hover:text-white transition p-1">
+          {mobileOpen ? <X size={21} /> : <Menu size={21} />}
+        </button>
+      </header>
+
+      {/* ── Mobile drawer ─────────────────────────────── */}
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 z-50 flex">
+          <div
+            className="w-[280px] h-full"
+            style={{ background: "linear-gradient(180deg, #06245a 0%, #0a438f 48%, #257dc6 100%)" }}
+          >
+            <NavContent close={() => setMobileOpen(false)} />
+          </div>
+          <div className="flex-1 bg-black/50 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+        </div>
+      )}
+
+      {/* ── Mobile bottom nav ─────────────────────────── */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 flex bg-white/95 backdrop-blur border-t border-gray-200/80 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+        {[...NAV, { id: "profile", label: "Profil", path: "/profile", Icon: User }].map(({ id, label, path, Icon }) => {
+          const on = id === "profile" ? loc.pathname === "/profile" : active({ id, path });
+          return (
+            <button
+              key={id}
+              onClick={() => navigate(path)}
+              className="flex-1 flex flex-col items-center justify-center py-2.5 gap-1"
+            >
+              <Icon size={19} className={on ? "text-[#1a4fa0]" : "text-gray-400"} strokeWidth={on ? 2.2 : 1.7} />
+              <span className={`text-[10px] font-semibold ${on ? "text-[#1a4fa0]" : "text-gray-400"}`}>{label}</span>
+            </button>
+          );
+        })}
       </nav>
     </>
   );
