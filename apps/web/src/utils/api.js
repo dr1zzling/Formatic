@@ -1,9 +1,7 @@
 import axios from "axios";
 
-// User API (auth) → port 3001
-// Form API → port 3000
-const USER_API_URL = "http://localhost:3001";
-const FORM_API_URL = "http://localhost:3000";
+const USER_API_URL = "http://localhost:3000";
+const FORM_API_URL = "http://localhost:3001";
 
 const API_BASE_URL = FORM_API_URL;
 

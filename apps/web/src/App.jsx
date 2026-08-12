@@ -4,6 +4,7 @@ import Register   from "./pages/auth/Register";
 import Home       from "./pages/Dashboard/Home";
 import MyForms    from "./pages/Dashboard/MyForms";
 import FormEditor from "./pages/Dashboard/FormEditor";
+import FillForm   from "./pages/Dashboard/FillForm";
 import Trash      from "./pages/Dashboard/Trash";
 import Profile    from "./pages/Dashboard/Profile";
 
@@ -32,6 +33,7 @@ function App() {
         <Route path="/home"      element={<ProtectedRoute><Home /></ProtectedRoute>} />
         <Route path="/my-forms"  element={<ProtectedRoute><MyForms /></ProtectedRoute>} />
         <Route path="/form/:slug" element={<ProtectedRoute><FormEditor /></ProtectedRoute>} />
+        <Route path="/fill/:slug" element={<ProtectedRoute><FillForm /></ProtectedRoute>} />
         <Route path="/trash"     element={<ProtectedRoute><Trash /></ProtectedRoute>} />
         <Route path="/profile"   element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
