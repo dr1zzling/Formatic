@@ -65,9 +65,9 @@ export class FormController {
       }),
     )
     banner: Express.Multer.File,
-    @Body() body: { title: string; category: string },
+    @Body() body: { title: string; category: string, token_respon: string },
   ) {
-    if (!body.title || !body.category) {
+    if (!body.title || !body.category || !body.token_respon) {
       throw new BadRequestException('Judul dan kategori wajib diisi');
     }
 
@@ -104,54 +104,15 @@ export class FormController {
     return this.formService.getMyForm(req.user)
   }
 
-  // Get My Submit History
-  @Get('/submit')
+  // Update Role
+  @Post('/share')
   @UseGuards(JwtAuthGuard)
-  getFormSubmitByForm(
+  changeRole(
     @Request() req,
-    @Body('form_id', ValidateFormExist) form_id: string
-  ) {
-    return this.formService.getMySubmitForm(req.user, Number(form_id))
-  }
-
-  // Get All Respon By Form
-  @Get('/:form_id/submit')
-  @UseGuards(JwtAuthGuard)
-  getAllRespon(
-    @Request() req,
-    @Param('form_id', ValidateFormExist) form_id: string
-  ) {
-    return this.formService.getAllRespon(req.user, Number(form_id))
-  }
-
-  // Create Form Submit
-  @Post('/submit/:form_id')
-  @UseInterceptors(
-    FilesInterceptor('files', 10, {
-      storage: diskStorage({
-        destination: './uploads',
-        filename: (req, file, cb) => {
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          const ext = extname(file.originalname);
-          cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
-        },
-      }),
-    })
-  )
-  @UseGuards(JwtAuthGuard)
-  async createSubmitForm(
-    @Request() req,
-    @Param('form_id', ParseIntPipe, ValidateFormExist) form_id: number,
-    @Body() body: any,
-    @UploadedFiles() files: Express.Multer.File[]
-  ) {
-    let parsedBody = body;
-    if (typeof body === 'string') {
-      try { parsedBody = JSON.parse(body); } catch (e) { }
-    } else if (typeof body?.data === 'string') {
-      try { parsedBody = JSON.parse(body.data); } catch (e) { }
-    }
-    return this.submitService.createSubmitForm(req.user, form_id, parsedBody, files)
+    @Query('form_slug', ValidateFormExist) form_slug: string,
+    @Body('token_collab') token_collab: string
+  ){
+    return this.formService.changeRole(req.user, form_slug, token_collab)
   }
 
 }
