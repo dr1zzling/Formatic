@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Sidebar from "../../components/Sidebar";
 import api from "../../utils/api";
-import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2 } from "lucide-react";
+import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical } from "lucide-react";
 import "./responses.css";
 
 const QUESTION_TYPES = [
@@ -63,8 +63,22 @@ export default function FormEditor() {
   }
   function addOpt(qIdx) {
     setQuestions((prev) => prev.map((q, i) =>
-      i !== qIdx ? q : { ...q, options: [...q.options, { value: `Opsi ${q.options.length + 1}` }] }
+      i !== qIdx ? q : { ...q, options: [...q.options, { value: `Opsi ${q.options.length + 1}`, is_correct: false }] }
     ));
+  }
+  function toggleCorrect(qIdx, oIdx) {
+    setQuestions((prev) => prev.map((q, i) => {
+      if (i !== qIdx) return q;
+      const isRadio = q.type === "radio";
+      return {
+        ...q,
+        options: q.options.map((o, j) => {
+          if (j === oIdx) return { ...o, is_correct: !o.is_correct };
+          const other = o.is_correct && isRadio;
+          return other ? { ...o, is_correct: false } : o;
+        }),
+      };
+    }));
   }
   function removeOpt(qIdx, oIdx) {
     setQuestions((prev) => prev.map((q, i) =>
@@ -72,6 +86,15 @@ export default function FormEditor() {
     ));
   }
   function removeQ(idx) { setQuestions((prev) => prev.filter((_, i) => i !== idx)); }
+  function reorderQ(from, to) {
+    if (from === to) return;
+    setQuestions((prev) => {
+      const arr = [...prev];
+      const [item] = arr.splice(from, 1);
+      arr.splice(to, 0, item);
+      return arr;
+    });
+  }
   function duplicateQ(idx) {
     setQuestions((prev) => {
       const c = [...prev];
@@ -90,10 +113,12 @@ export default function FormEditor() {
         const hasOpts = ["radio", "checkbox"].includes(q.type);
         return {
           soal: { question: q.question, type: q.type },
-          option_value: hasOpts
-            ? q.options.filter((o) => o.value.trim()).map((o) => ({ value: o.value }))
-            : [{ value: "" }],
-          soal_option: { is_correct: false },
+          options: hasOpts
+            ? q.options.filter((o) => o.value.trim()).map((o) => ({
+                value: o.value,
+                is_correct: Boolean(o.is_correct),
+              }))
+            : [],
         };
       });
       await api.post("/form/soal", payload, { params: { form_slug: slug } });
@@ -126,26 +151,26 @@ export default function FormEditor() {
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(""), 3000); }
 
   if (loading) return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "#f8f9fc" }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
       <Sidebar />
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <div className="w-10 h-10 border-2 border-[#1a4fa0] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-gray-500 text-[13px]">Memuat form...</p>
+          <p className="text-gray-500 text-sm">Memuat form...</p>
         </div>
       </div>
     </div>
   );
 
   if (error && !form) return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "#f8f9fc" }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
       <Sidebar />
       <div className="flex-1 flex items-center justify-center text-center px-4">
         <div>
           <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center text-2xl mx-auto mb-4">😕</div>
           <p className="font-semibold text-gray-700">{error}</p>
           <button onClick={() => navigate("/my-forms")} className="mt-4 px-5 py-2.5 rounded-xl text-white text-sm font-semibold"
-            style={{ background: "linear-gradient(135deg, #1a4fa0, #1e6fc7)" }}>Kembali</button>
+            style={{ backgroundColor: "#1a4fa0" }}>Kembali</button>
         </div>
       </div>
     </div>
@@ -154,44 +179,44 @@ export default function FormEditor() {
   const isPublished = form?.status === "public" || form?.form_status === "public";
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "#f8f9fc" }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
       <Sidebar />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden pt-[52px] md:pt-0">
         {/* ── Top Bar ───────────────────────────────────── */}
-        <header className="flex items-center gap-3 px-4 md:px-6 xl:px-8 py-3 border-b border-gray-100 bg-white shrink-0" style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-          <button onClick={() => navigate("/my-forms")} className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600 transition shrink-0">
-            <ArrowLeft size={18} />
+        <header className="flex items-center gap-3 px-4 md:px-6 xl:px-9 py-3.5 border-b border-[#dae6f1] bg-white/95 backdrop-blur shrink-0" style={{ boxShadow: "0 1px 0 rgba(23,64,120,0.04), 0 6px 18px rgba(23,64,120,0.05)" }}>
+          <button onClick={() => navigate("/my-forms")} className="w-10 h-10 rounded-xl hover:bg-[#eef5fb] flex items-center justify-center text-gray-500 hover:text-[#1a4fa0] transition-all">
+            <ArrowLeft size={19} />
           </button>
           <div className="flex-1 min-w-0">
-            <h1 className="font-bold text-gray-900 truncate text-[14px]">
+            <h1 className="font-bold text-gray-900 truncate text-[17px] leading-tight">
               {form?.title ?? form?.form_title ?? "Form"}
             </h1>
-            <p className="text-[11px] text-gray-400 hidden sm:block">{form?.category}</p>
+            <p className="text-[12.5px] text-gray-400 hidden sm:block">{form?.category}</p>
           </div>
-          <div className="flex items-center gap-1.5">
-            <button onClick={copyLink} title="Salin link" className="hidden sm:flex w-8 h-8 rounded-lg items-center justify-center text-gray-400 hover:bg-gray-100 transition">
-              <Link2 size={15} />
+          <div className="flex items-center gap-2">
+            <button onClick={copyLink} title="Salin link" className="hidden sm:flex w-10 h-10 rounded-xl items-center justify-center text-gray-400 hover:bg-[#eef5fb] hover:text-[#1a4fa0] transition-all">
+              <Link2 size={17} />
             </button>
-            <button onClick={() => setShowDelete(true)} className="hidden sm:flex w-8 h-8 rounded-lg items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-400 transition">
-              <Trash2 size={15} />
+            <button onClick={() => setShowDelete(true)} className="hidden sm:flex w-10 h-10 rounded-xl items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all">
+              <Trash2 size={17} />
             </button>
             <button
               onClick={() => updateStatus(isPublished ? "private" : "public")}
-              className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border transition ${
+              className={`hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold border transition-all ${
                 isPublished
                   ? "border-green-200 text-green-700 bg-green-50 hover:bg-green-100"
                   : "border-gray-200 text-gray-500 bg-white hover:bg-gray-50"
               }`}
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${isPublished ? "bg-green-500" : "bg-gray-400"}`} />
+              <span className={`w-2 h-2 rounded-full ${isPublished ? "bg-green-500" : "bg-gray-400"}`} />
               {isPublished ? "Published" : "Draft"}
             </button>
             <button
               onClick={saveQuestions}
               disabled={saving}
-              className="px-4 py-2 rounded-lg text-white text-[13px] font-semibold hover:opacity-90 disabled:opacity-60 transition"
-              style={{ background: "linear-gradient(135deg, #1a4fa0, #1e6fc7)" }}
+              className="px-5 py-2.5 rounded-xl text-white text-[13.5px] font-semibold hover:opacity-90 disabled:opacity-60 transition-all shadow-[0_6px_16px_rgba(26,79,160,0.28)]"
+              style={{ backgroundColor: "#1a4fa0" }}
             >
               {saving ? "Menyimpan..." : "Simpan"}
             </button>
@@ -199,20 +224,20 @@ export default function FormEditor() {
         </header>
 
         {/* ── Tabs ──────────────────────────────────────── */}
-        <div className="flex px-4 md:px-6 xl:px-8 border-b border-gray-100 bg-white shrink-0 overflow-x-auto">
+        <div className="flex gap-1 px-4 md:px-6 xl:px-9 border-b border-[#dae6f1] bg-white/95 backdrop-blur shrink-0 overflow-x-auto">
           {TABS.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2.5 text-[13.5px] font-medium border-b-2 transition whitespace-nowrap ${
+              className={`px-4 py-3 text-[14.5px] font-semibold border-b-2 transition-all whitespace-nowrap -mb-px ${
                 activeTab === tab
                   ? "border-[#1a4fa0] text-[#1a4fa0]"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  : "border-transparent text-gray-400 hover:text-gray-600"
               }`}
             >
               {tab}
               {tab === "Pertanyaan" && questions.length > 0 && (
-                <span className="ml-1.5 bg-blue-100 text-blue-600 text-[11px] px-1.5 py-0.5 rounded-full font-semibold">
+                <span className="ml-2 bg-[#eaf1fb] text-[#1a4fa0] text-[12px] px-2 py-0.5 rounded-full font-bold">
                   {questions.length}
                 </span>
               )}
@@ -229,6 +254,8 @@ export default function FormEditor() {
               onUpdateQ={updateQ} onUpdateOpt={updateOpt}
               onAddOpt={addOpt} onRemoveOpt={removeOpt}
               onRemoveQ={removeQ} onDuplicateQ={duplicateQ}
+              onToggleCorrect={toggleCorrect}
+              onReorder={reorderQ}
               onCopyLink={copyLink}
             />
           )}
@@ -243,7 +270,7 @@ export default function FormEditor() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-sm px-5 py-2.5 rounded-xl shadow-lg z-50">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-sm px-5 py-3 rounded-xl shadow-lg z-50">
           ✅ {toast}
         </div>
       )}
@@ -269,128 +296,218 @@ export default function FormEditor() {
 }
 
 /* ── Pertanyaan Tab ─────────────────────────────────────────── */
-function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ, onUpdateOpt, onAddOpt, onRemoveOpt, onRemoveQ, onDuplicateQ, onCopyLink }) {
+function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ, onUpdateOpt, onAddOpt, onRemoveOpt, onRemoveQ, onDuplicateQ, onToggleCorrect, onReorder, onCopyLink }) {
+  const [dragFrom, setDragFrom]   = useState(null);
+  const [dragOver, setDragOver]   = useState(null);
   return (
-    <div className="max-w-2xl mx-auto py-6 px-4 space-y-4">
+    <div className="max-w-3xl mx-auto py-8 px-4 md:px-6 xl:px-8 space-y-5" style={{ paddingBottom: 80 }}>
       {/* Form header card */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 border-l-4 border-l-blue-500">
-        <h2 className="text-xl font-bold text-gray-800 mb-1">
+      <div className="bg-white rounded-2xl shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-7 border border-[#e5eef7]">
+        <h2 className="text-[22px] font-extrabold text-[#102f56] mb-1 tracking-tight leading-snug">
           {form?.title ?? form?.form_title}
         </h2>
-        <p className="text-xs text-gray-400 mb-3">{form?.category}</p>
+        <p className="text-[13px] text-gray-400 mb-4">{form?.category}</p>
         <textarea
           placeholder="Deskripsi form (opsional)..."
           rows={2}
-          className="w-full text-sm text-gray-500 resize-none outline-none border-b border-dashed border-gray-200 pb-2 bg-transparent"
+          className="w-full text-[15px] text-gray-500 resize-none outline-none border-b border-dashed border-gray-200 pb-2 bg-transparent focus:border-[#1a4fa0] transition-colors"
         />
-        <div className="mt-3 flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2">
-          <span className="text-xs text-blue-500 truncate flex-1">{window.location.origin}/fill/{slug}</span>
-          <button onClick={onCopyLink} className="text-xs text-blue-600 font-semibold hover:underline shrink-0 flex items-center gap-1">
-            <Share2 size={12} /> Salin
+        <div className="mt-4 flex items-center gap-3 bg-[#eef5fb] rounded-xl px-4 py-3">
+          <span className="text-[13.5px] text-[#1a4fa0] font-medium truncate flex-1">{window.location.origin}/fill/{slug}</span>
+          <button onClick={onCopyLink} className="text-[13px] text-white font-semibold px-3.5 py-2 rounded-lg hover:opacity-90 transition-all shrink-0 flex items-center gap-1.5" style={{ backgroundColor: "#1a4fa0" }}>
+            <Share2 size={14} /> Salin
           </button>
         </div>
       </div>
 
       {error && (
-        <div className="px-4 py-2.5 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">{error}</div>
+        <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">{error}</div>
       )}
 
       {questions.length === 0 && (
-        <div className="text-center py-10">
-          <p className="text-4xl mb-2">📝</p>
-          <p className="text-gray-500 text-sm">Belum ada pertanyaan. Tambahkan pertanyaan pertama!</p>
+        <div className="text-center py-14 bg-white/60 rounded-2xl border border-dashed border-[#d6e4ef]">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[#eef5fb] flex items-center justify-center text-[#1a4fa0]">
+            <FileQuestion size={30} />
+          </div>
+          <p className="text-[#102f56] font-bold text-[16px] mb-1">Belum ada pertanyaan</p>
+          <p className="text-gray-400 text-[13.5px]">Tambahkan pertanyaan pertama untuk memulai.</p>
         </div>
       )}
 
       {questions.map((q, qIdx) => (
-        <QuestionCard
+        <div
           key={q.id ?? `new-${qIdx}`}
-          question={q}
-          index={qIdx}
-          onUpdate={(f, v) => onUpdateQ(qIdx, f, v)}
-          onUpdateOpt={(oIdx, v) => onUpdateOpt(qIdx, oIdx, v)}
-          onAddOpt={() => onAddOpt(qIdx)}
-          onRemoveOpt={(oIdx) => onRemoveOpt(qIdx, oIdx)}
-          onRemove={() => onRemoveQ(qIdx)}
-          onDuplicate={() => onDuplicateQ(qIdx)}
-        />
+          onDragOver={(e) => { e.preventDefault(); if (dragFrom !== null) setDragOver(qIdx); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            if (dragFrom !== null && dragFrom !== qIdx) onReorder(dragFrom, qIdx);
+            setDragFrom(null);
+            setDragOver(null);
+          }}
+          className={`transition-all rounded-2xl ${dragOver === qIdx && dragFrom !== null && dragFrom !== qIdx ? "ring-2 ring-[#1a4fa0]/50 translate-y-0.5" : ""}`}
+        >
+          <QuestionCard
+            question={q}
+            index={qIdx}
+            onUpdate={(f, v) => onUpdateQ(qIdx, f, v)}
+            onUpdateOpt={(oIdx, v) => onUpdateOpt(qIdx, oIdx, v)}
+            onAddOpt={() => onAddOpt(qIdx)}
+            onRemoveOpt={(oIdx) => onRemoveOpt(qIdx, oIdx)}
+            onToggleCorrect={(oIdx) => onToggleCorrect(qIdx, oIdx)}
+            onRemove={() => onRemoveQ(qIdx)}
+            onDuplicate={() => onDuplicateQ(qIdx)}
+            onDragHandleStart={() => setDragFrom(qIdx)}
+            onDragHandleEnd={() => { setDragFrom(null); setDragOver(null); }}
+          />
+        </div>
       ))}
 
       <button
         onClick={onAddQuestion}
-        className="w-full py-3.5 rounded-2xl border-2 border-dashed border-gray-200 text-gray-400 hover:border-blue-400 hover:text-blue-500 text-sm font-medium transition flex items-center justify-center gap-2"
+        className="w-full py-4 rounded-2xl border-2 border-dashed border-[#c7d8e8] text-[#1a4fa0] hover:border-[#1a4fa0] hover:bg-white text-[15px] font-semibold transition-all flex items-center justify-center gap-2"
       >
-        <Plus size={18} /> Tambah Pertanyaan
+        <ListPlus size={20} /> Tambah Pertanyaan
       </button>
     </div>
   );
 }
 
 /* ── Question Card ──────────────────────────────────────────── */
-function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemoveOpt, onRemove, onDuplicate }) {
+function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemoveOpt, onToggleCorrect, onRemove, onDuplicate, onDragHandleStart, onDragHandleEnd }) {
   const hasOptions = ["radio", "checkbox"].includes(question.type);
+  const isNew = question._new;
   return (
-    <div className={`bg-white rounded-2xl border shadow-sm p-5 transition ${question._new ? "border-blue-400 ring-1 ring-blue-200" : "border-gray-100"}`}>
-      <div className="flex items-start gap-3 mb-3">
-        <span className="text-xs font-bold text-gray-400 mt-3 shrink-0 w-5 text-right">{index + 1}.</span>
+    <div className={`bg-white rounded-2xl border shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-6 transition-all hover:shadow-[0_14px_40px_rgba(23,64,120,0.12)] ${
+      isNew ? "border-[#1a4fa0]/50 ring-1 ring-[#1a4fa0]/10" : "border-[#e5eef7]"
+    }`}>
+      <div className="flex items-center gap-3 mb-5">
+        <button
+          type="button"
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/plain", String(index));
+            onDragHandleStart?.();
+          }}
+          onDragEnd={() => onDragHandleEnd?.()}
+          title="Tarik untuk urutkan soal"
+          className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-[#1a4fa0] transition-colors"
+        >
+          <GripVertical size={18} />
+        </button>
+        <span className="w-9 h-9 rounded-xl bg-[#eef5fb] text-[#1a4fa0] text-[14px] font-extrabold flex items-center justify-center shrink-0">
+          {index + 1}
+        </span>
         <input
           type="text"
           value={question.question}
           onChange={(e) => onUpdate("question", e.target.value)}
           placeholder="Masukkan pertanyaan..."
-          readOnly={!question._new}
-          className="flex-1 text-sm font-medium text-gray-700 outline-none border-b border-dashed border-gray-200 pb-1.5 focus:border-blue-400 transition bg-transparent"
+          readOnly={!isNew}
+          className="flex-1 text-[16px] font-semibold text-[#102f56] outline-none border-b border-dashed border-gray-200 pb-1.5 focus:border-[#1a4fa0] transition-colors bg-transparent"
         />
         <select
           value={question.type}
           onChange={(e) => onUpdate("type", e.target.value)}
-          disabled={!question._new}
-          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white outline-none disabled:opacity-60 shrink-0"
+          disabled={!isNew}
+          className="text-[13.5px] border border-[#d9e5f0] rounded-xl px-3.5 py-2.5 bg-white outline-none disabled:opacity-60 shrink-0 font-medium text-gray-700 shadow-sm focus:border-[#1a4fa0]"
         >
           {QUESTION_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
       </div>
 
       {hasOptions && (
-        <div className="space-y-2 mb-3 ml-8">
+        <div className="space-y-3 mb-3 ml-2">
+          <p className="text-[12.5px] text-gray-500 ml-1">
+            {question.type === "checkbox" ? "Klik kotak untuk menandai jawaban benar" : "Klik lingkaran untuk menandai jawaban benar"}
+          </p>
           {question.options.map((opt, oIdx) => (
-            <div key={oIdx} className="flex items-center gap-2">
-              <span className="text-gray-300 text-sm">{question.type === "checkbox" ? "□" : "○"}</span>
+            <div key={oIdx} className="group flex items-center gap-3">
+              <button
+                title="Tandai jawaban benar"
+                onClick={() => onToggleCorrect(oIdx)}
+                className={`inline-grid place-items-center shrink-0 border-2 transition-all duration-150 active:scale-90 will-change-transform ${
+                  question.type === "checkbox" ? "w-7 h-7 rounded-[8px]" : "w-7 h-7 rounded-full"
+                } ${
+                  opt.is_correct
+                    ? "bg-green-500 border-green-500 text-white"
+                    : "bg-[#eef2f6] border-[#5b6c7e] hover:border-green-500 hover:bg-green-50"
+                }`}
+              >
+                {opt.is_correct && (
+                  question.type === "checkbox"
+                    ? <Check size={16} strokeWidth={3} />
+                    : <span className="block w-3 h-3 rounded-full bg-white" />
+                )}
+              </button>
               <input
                 type="text"
                 value={opt.value}
                 onChange={(e) => onUpdateOpt(oIdx, e.target.value)}
-                readOnly={!question._new}
-                className="flex-1 text-sm text-gray-600 outline-none border-b border-dashed border-gray-100 focus:border-blue-300 transition bg-transparent"
+                readOnly={!isNew}
+                className="flex-1 text-[15px] text-gray-700 outline-none border-b border-dashed border-gray-100 focus:border-[#1a4fa0] transition-colors bg-transparent py-1"
               />
-              {question._new && (
-                <button onClick={() => onRemoveOpt(oIdx)} className="text-gray-300 hover:text-red-400 text-xs transition">✕</button>
+              {isNew && (
+                <button onClick={() => onRemoveOpt(oIdx)} className="w-8 h-8 rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-all flex items-center justify-center shrink-0">
+                  ✕
+                </button>
               )}
             </div>
           ))}
-          {question._new && (
-            <button onClick={onAddOpt} className="text-xs text-gray-400 hover:text-blue-500 flex items-center gap-1 ml-5 mt-1 transition">
-              <Plus size={12} /> Tambah opsi
+          {isNew && (
+            <button onClick={onAddOpt} className="text-[14px] font-medium text-gray-400 hover:text-[#1a4fa0] flex items-center gap-2 ml-1 mt-2 transition-colors">
+              <Plus size={16} /> Tambah opsi
             </button>
           )}
         </div>
       )}
 
       {question.type === "text" && (
-        <div className="ml-8 mb-3">
-          <input disabled placeholder="Jawaban teks pendek..." className="w-full text-sm text-gray-300 border-b border-dashed border-gray-100 outline-none bg-transparent" />
+        <div className="ml-2 mb-4">
+          <input
+            type="text"
+            value={question.placeholder ?? ""}
+            onChange={(e) => onUpdate("placeholder", e.target.value)}
+            placeholder="Tulis jawabanmu"
+            readOnly={!isNew}
+            className="w-full text-[15px] text-gray-500 outline-none border-b border-dashed border-gray-100 focus:border-[#1a4fa0] transition-colors bg-transparent py-1"
+          />
         </div>
       )}
       {question.type === "file" && (
-        <div className="ml-8 mb-3 text-sm text-gray-400 flex items-center gap-2">📎 Pengguna dapat mengunggah file</div>
+        <div className="ml-2 mb-4">
+          {isNew ? (
+            <label className="flex flex-col sm:flex-row items-center justify-center gap-2 w-full rounded-xl border-2 border-dashed border-[#c3d4e4] bg-[#f7fafd] py-4 px-4 cursor-pointer hover:border-[#1a4fa0] hover:bg-[#f0f6fe] transition-all">
+              {question.file
+                ? <>
+                    <FileText size={18} className="text-[#1a4fa0] shrink-0" />
+                    <span className="text-[13.5px] font-semibold text-[#102f56] truncate">{question.file.name}</span>
+                    <span className="text-[12px] text-gray-400 shrink-0">Klik untuk ganti file</span>
+                  </>
+                : <>
+                    <UploadCloud size={18} className="text-[#1a4fa0] shrink-0" />
+                    <span className="text-[13.5px] font-semibold text-gray-500">Unggah file contoh (pratinjau)</span>
+                  </>
+              }
+              <input type="file" className="hidden" onChange={(e) => onUpdate("file", e.target.files?.[0])} />
+            </label>
+          ) : (
+            <div className="flex items-center gap-2.5 text-[14px] text-gray-400">
+              <span className="w-9 h-9 rounded-xl bg-[#eef5fb] grid place-items-center">📎</span>
+              Pengguna dapat mengunggah file
+            </div>
+          )}
+        </div>
       )}
 
-      <div className="flex items-center justify-end gap-1 mt-3 pt-3 border-t border-gray-50">
-        <button title="Duplikat" onClick={onDuplicate} className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 transition"><Copy size={14} /></button>
-        <button title="Hapus" onClick={onRemove} className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-400 transition"><Trash2 size={14} /></button>
-        <label className="flex items-center gap-1.5 text-xs text-gray-400 ml-2 cursor-pointer select-none">
-          <input type="checkbox" checked={question.required} onChange={(e) => onUpdate("required", e.target.checked)} className="accent-blue-500" />
-          Wajib
+      <div className="flex items-center justify-between gap-2 mt-5 pt-4 border-t border-[#eef3f8]">
+        <div className="flex items-center gap-1">
+          <button title="Duplikat" onClick={onDuplicate} className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-400 hover:bg-[#eef5fb] hover:text-[#1a4fa0] transition-all"><Copy size={16} /></button>
+          <button title="Hapus" onClick={onRemove} className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all"><Trash2 size={16} /></button>
+        </div>
+        <label className="flex items-center gap-2 text-[13.5px] font-medium text-gray-500 cursor-pointer select-none">
+          Wajib diisi
+          <input type="checkbox" checked={question.required} onChange={(e) => onUpdate("required", e.target.checked)} className="w-4.5 h-4.5 accent-[#1a4fa0]" style={{ width: 18, height: 18 }} />
         </label>
       </div>
     </div>
@@ -400,18 +517,22 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemo
 /* ── Responses Tab ──────────────────────────────────────────── */
 function ResponsesTab({ formId, form }) {
   const [responses, setResponses]   = useState([]);
-  const [questions, setQuestions]   = useState([]);
   const [loading, setLoading]       = useState(true);
   const [activeSubTab, setActiveSubTab] = useState("Ringkasan");
 
   useEffect(() => {
-    if (!formId) { setLoading(false); return; }
-    Promise.all([
-      api.get(`/form/${formId}/submit`).catch(() => ({ data: { data: [] } })),
-    ]).then(([respRes]) => {
-      const data = respRes.data?.data ?? [];
-      setResponses(Array.isArray(data) ? data : []);
-    }).finally(() => setLoading(false));
+    (async () => {
+      try {
+        if (!formId) return;
+        const [respRes] = await Promise.all([
+          api.get(`/form/${formId}/submit`).catch(() => ({ data: { data: [] } })),
+        ]);
+        const data = respRes.data?.data ?? [];
+        setResponses(Array.isArray(data) ? data : []);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [formId]);
 
   // Build per-question stats from responses
@@ -577,7 +698,6 @@ function ResponsesTab({ formId, form }) {
 
 /* ── helpers ─────────────────────────────────────────────────── */
 const DOT_COLORS = ["blue-dot","green-dot","teal-dot","red-dot","purple-dot","orange-dot","gray-dot"];
-const BAR_COLORS = ["blue-bar","light-blue-bar","green-bar","orange-bar","purple-bar","teal-bar","red-bar"];
 
 function pct(count, total) {
   if (!total) return 0;
@@ -643,7 +763,7 @@ function SettingsTab({ form, onUpdateStatus }) {
   const isPublic = form?.status === "public" || form?.form_status === "public";
 
   return (
-    <div className="max-w-2xl mx-auto py-6 px-4 space-y-3">
+    <div className="max-w-2xl mx-auto py-8 px-4 space-y-4">
       {/* Jadikan semua kuis */}
       <SettingRow
         icon="🏆"
@@ -664,10 +784,10 @@ function SettingsTab({ form, onUpdateStatus }) {
       />
 
       {/* Status */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center justify-between gap-4">
+      <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-6 flex items-center justify-between gap-4">
         <div>
-          <p className="font-semibold text-gray-700 text-sm">Status Publikasi</p>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <p className="font-bold text-gray-700 text-[15px]">Status Publikasi</p>
+          <p className="text-[13px] text-gray-400 mt-1">
             {isPublic ? "Form dapat diisi oleh siapa saja dengan link." : "Form bersifat privat."}
           </p>
         </div>
@@ -675,20 +795,20 @@ function SettingsTab({ form, onUpdateStatus }) {
       </div>
 
       {/* Default section */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Default</p>
+      <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-6">
+        <p className="text-[13px] font-bold text-gray-400 uppercase tracking-wide mb-3">Default</p>
         <div className="space-y-1">
           <div className="flex items-center justify-between py-3 border-b border-gray-50">
             <div>
-              <p className="text-sm text-gray-700 font-medium">Formulir default</p>
-              <p className="text-xs text-gray-400">Gunakan pengaturan untuk formulir ini dan formulir baru</p>
+              <p className="text-[14.5px] text-gray-700 font-semibold">Formulir default</p>
+              <p className="text-[13px] text-gray-400">Gunakan pengaturan untuk formulir ini dan formulir baru</p>
             </div>
             <Toggle />
           </div>
           <div className="flex items-center justify-between py-3">
             <div>
-              <p className="text-sm text-gray-700 font-medium">Pertanyaan default</p>
-              <p className="text-xs text-gray-400">Gunakan pengaturan sebagai pertanyaan baru</p>
+              <p className="text-[14.5px] text-gray-700 font-semibold">Pertanyaan default</p>
+              <p className="text-[13px] text-gray-400">Gunakan pengaturan sebagai pertanyaan baru</p>
             </div>
             <Toggle />
           </div>
@@ -700,12 +820,12 @@ function SettingsTab({ form, onUpdateStatus }) {
 
 function SettingRow({ icon, title, desc }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center justify-between gap-4">
-      <div className="flex items-center gap-3">
-        <span className="text-xl">{icon}</span>
+    <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-6 flex items-center justify-between gap-4">
+      <div className="flex items-center gap-4">
+        <span className="w-11 h-11 rounded-xl bg-[#eef5fb] flex items-center justify-center text-xl">{icon}</span>
         <div>
-          <p className="font-semibold text-gray-700 text-sm">{title}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
+          <p className="font-bold text-gray-700 text-[15px]">{title}</p>
+          <p className="text-[13px] text-gray-400 mt-0.5">{desc}</p>
         </div>
       </div>
       <Toggle />
@@ -723,10 +843,10 @@ function Toggle({ value, onChange }) {
   return (
     <button
       onClick={handleClick}
-      className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${on ? "" : "bg-gray-200"}`}
-      style={on ? { background: "linear-gradient(90deg,#005fb3,#009bf5)" } : {}}
+      className={`w-12 h-7 rounded-full relative transition-colors shrink-0 ${on ? "" : "bg-gray-200"}`}
+      style={on ? { backgroundColor: "#1a4fa0" } : {}}
     >
-      <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${on ? "left-5" : "left-0.5"}`} />
+      <span className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
     </button>
   );
 }
