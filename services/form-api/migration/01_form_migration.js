@@ -9,7 +9,7 @@ exports.up = function(knex) {
     table.string('title').notNullable()
     table.text('token_respon').nullable()
     table.text('token_collab').notNullable()
-    table.enum('category', ['ujian', 'survey']).notNullable()
+    table.enum('category', ['ujian', 'survei']).notNullable()
     table.enum('status', ['public', 'private']).defaultTo('public')
     table.text('banner').notNullable()
   })

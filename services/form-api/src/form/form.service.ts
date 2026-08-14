@@ -1,8 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { KnexService } from 'src/database/knex.service';
-import { SubmitService } from '../submit/submit.service';
-import { SoalService } from 'src/soal/soal.service';
-import { ValidateIsCreator } from 'src/Pipe/validate.is.creator';
+import { KnexService } from '../database/knex.service';
+import { SoalService } from '../soal/soal.service';
+import { ValidateIsCreator } from '../Pipe/validate.is.creator';
 import * as crypto from 'crypto'
 const slugify = require('slugify')
 
@@ -10,7 +9,6 @@ const slugify = require('slugify')
 export class FormService {
   constructor(
     private knexService: KnexService, 
-    private submitService: SubmitService, 
     private soalService: SoalService,
     private isCreator: ValidateIsCreator
   ) {}
@@ -181,7 +179,7 @@ export class FormService {
     }
   }
 
-  // Update to collaborator
+  // Jadi collaborator
   async changeRole(req: { id: number, username: string}, form_id, token_collab: string){
     const isCreator = await this.isCreator.isCreator(req.id, form_id.id)
     if(isCreator == 'Collaborator' || isCreator == 'Creator') throw new UnauthorizedException("Anda sudah menjadi bagian dari form ini")

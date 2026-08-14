@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { SoalService } from './soal.service';
-import { ValidateFormExist } from 'src/Pipe/validate.form.exist';
-import { JwtAuthGuard } from 'src/guard/jwt.auth.guard';
+import { ValidateFormExist } from '../Pipe/validate.form.exist';
+import { JwtAuthGuard } from '../guard/jwt.auth.guard';
 
 @Controller('form/soal')
 export class SoalController {
