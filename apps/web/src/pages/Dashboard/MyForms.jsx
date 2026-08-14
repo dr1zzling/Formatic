@@ -3,9 +3,24 @@ import { useNavigate } from "react-router-dom";
 import Sidebar from "../../components/Sidebar";
 import api from "../../utils/api";
 
-const FORM_API = "http://localhost:3001";
+const FORM_API = "http://localhost:3000";
 
 const CATEGORIES = ["All", "Survey", "Quiz / Ujian"];
+
+const DUMMY_FORMS = [
+  { form_id: 1, form_title: "Kuesioner Pelaksanaan Program Makan Bergizi Gratis (MBG)", form_slug: "dummy-mbg",      category: "survey", form_status: "public",  form_banner: null,
+    image: "https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=900&q=80" },
+  { form_id: 2, form_title: "Customer UX Quiz",                                          form_slug: "dummy-ux",       category: "ujian",  form_status: "public",  form_banner: null,
+    image: "https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=900&q=80" },
+  { form_id: 3, form_title: "Student Feedback Form",                                     form_slug: "dummy-feedback", category: "survey", form_status: "private", form_banner: null,
+    image: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=900&q=80" },
+  { form_id: 4, form_title: "Product Research Quiz",                                     form_slug: "dummy-product",  category: "ujian",  form_status: "public",  form_banner: null,
+    image: "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=900&q=80" },
+  { form_id: 5, form_title: "Event Registration Form",                                   form_slug: "dummy-event",    category: "survey", form_status: "private", form_banner: null,
+    image: "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?auto=format&fit=crop&w=900&q=80" },
+  { form_id: 6, form_title: "Employee Satisfaction Survey",                              form_slug: "dummy-employee", category: "survey", form_status: "public",  form_banner: null,
+    image: "https://images.unsplash.com/photo-1521737711867-e3b97375f902?auto=format&fit=crop&w=900&q=80" },
+];
 
 function getUsername() {
   try {
@@ -154,8 +169,9 @@ export default function MyForms() {
     setLoading(true);
     try {
       const res = await api.get("/form/user");
-      setForms(res.data?.data?.forms ?? []);
-    } catch { setForms([]); }
+      const data = res.data?.data?.forms ?? [];
+      setForms(data.length ? data : DUMMY_FORMS);
+    } catch { setForms(DUMMY_FORMS); }
     finally { setLoading(false); }
   }
 
@@ -256,12 +272,12 @@ export default function MyForms() {
                     {/* Image */}
                     <div className={`relative w-full overflow-hidden bg-[#dcecf4] ${large ? "h-[178px]" : "h-[145px]"}`}>
                       {banner ? (
-                        <img
-                          src={`${FORM_API}${banner}`}
-                          alt={form.form_title}
+                        <img src={`${FORM_API}${banner}`} alt={form.form_title}
                           className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
-                          onError={e => { e.target.style.display = "none"; }}
-                        />
+                          onError={e => { e.target.style.display = "none"; }} />
+                      ) : form.image ? (
+                        <img src={form.image} alt={form.form_title}
+                          className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300" />
                       ) : (
                         <div className="w-full h-full grid place-items-center text-4xl opacity-50"
                           style={{ background: cat === "ujian" ? "linear-gradient(135deg,#ede9fe,#ddd6fe)" : "linear-gradient(135deg,#dbeafe,#bfdbfe)" }}>

@@ -3,7 +3,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import Sidebar from "../../components/Sidebar";
 import api from "../../utils/api";
 import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical } from "lucide-react";
-import "./responses.css";
 
 const QUESTION_TYPES = [
   { value: "radio",    label: "Pilihan Ganda" },
@@ -12,6 +11,43 @@ const QUESTION_TYPES = [
   { value: "file",     label: "Unggah File" },
 ];
 const TABS = ["Pertanyaan", "Jawaban", "Setelan"];
+
+/* ── DUMMY DATA ───────────────────────────────────────────────── */
+const DUMMY_FORM = {
+  title: "Kuesioner Pelaksanaan Program Makan Bergizi Gratis (MBG)",
+  category: "survey", status: "public",
+};
+const DUMMY_QUESTIONS = [
+  { id: 1, question: "Kelas", type: "radio", required: true, options: [
+    { id: 1, value: "X",   is_correct: false }, { id: 2, value: "XI",  is_correct: false }, { id: 3, value: "XII", is_correct: false },
+  ]},
+  { id: 2, question: "Apakah sekolah Anda mendapatkan program MBG?", type: "radio", required: true, options: [
+    { id: 4, value: "Ya", is_correct: false }, { id: 5, value: "Tidak", is_correct: false },
+  ]},
+  { id: 3, question: "Apakah pembagian MBG sudah merata ke semua siswa?", type: "radio", required: true, options: [
+    { id: 6, value: "Ya", is_correct: false }, { id: 7, value: "Tidak", is_correct: false },
+  ]},
+  { id: 4, question: "Bagaimana pendapat Anda tentang kualitas makanan MBG?", type: "text", required: true, options: [] },
+];
+const DUMMY_RESPONSES = {
+  total: 10,
+  submittedAt: new Date().toISOString(),
+  questions: [
+    { soal_id: 1, question: "Kelas", type: "radio", options: [
+      { value: "X",   count: 4 }, { value: "XI", count: 5 }, { value: "XII", count: 1 },
+    ], textAnswers: [] },
+    { soal_id: 2, question: "Apakah sekolah Anda mendapatkan program MBG?", type: "radio", options: [
+      { value: "Ya", count: 9 }, { value: "Tidak", count: 1 },
+    ], textAnswers: [] },
+    { soal_id: 3, question: "Apakah pembagian MBG sudah merata ke semua siswa?", type: "radio", options: [
+      { value: "Ya", count: 7 }, { value: "Tidak", count: 3 },
+    ], textAnswers: [] },
+    { soal_id: 4, question: "Bagaimana pendapat Anda tentang kualitas makanan MBG?", type: "text", options: [], textAnswers: [
+      "Makanan enak dan bergizi", "Cukup baik tapi porsinya kurang", "Sangat membantu siswa kurang mampu",
+      "Perlu ditingkatkan variasi menunya", "Bagus, semoga terus berlanjut",
+    ]},
+  ],
+};
 
 export default function FormEditor() {
   const { slug } = useParams();
@@ -33,16 +69,25 @@ export default function FormEditor() {
     try {
       const res = await api.get("/form/slug", { params: { slug } });
       const f   = res.data?.data;
-      setForm(f);
-      setQuestions(
-        (f?.soal ?? []).map((s) => ({
-          id: s.id, question: s.question, type: s.type, required: true,
-          options: (s.options ?? []).map((o) => ({
-            id: o.id, value: o.option_value, is_correct: o.is_correct,
-          })),
-        }))
-      );
-    } catch { setError("Form tidak ditemukan."); }
+      if (f) {
+        setForm(f);
+        setQuestions(
+          (f?.soal ?? []).map((s) => ({
+            id: s.id, question: s.question, type: s.type, required: true,
+            options: (s.options ?? []).map((o) => ({
+              id: o.id, value: o.option_value, is_correct: o.is_correct,
+            })),
+          }))
+        );
+      } else {
+        setForm(DUMMY_FORM);
+        setQuestions(DUMMY_QUESTIONS);
+      }
+    } catch {
+      // Fallback ke dummy supaya tampilan tetap bisa dilihat
+      setForm(DUMMY_FORM);
+      setQuestions(DUMMY_QUESTIONS);
+    }
     finally { setLoading(false); }
   }
 
@@ -542,53 +587,55 @@ function ResponsesTab({ formId, form }) {
   const title = form?.title ?? form?.form_title ?? "Form";
 
   return (
-    <div style={{ padding: "24px 32px 60px", minHeight: "100%", background: "linear-gradient(135deg,#ffffff 0%,#f5f9ff 55%,#edf5ff 100%)" }}>
+    <div className="min-h-full px-8 py-6 pb-16" style={{ background: "linear-gradient(135deg,#ffffff 0%,#f5f9ff 55%,#edf5ff 100%)" }}>
 
       {/* FORM HEADING */}
-      <div className="resp-form-heading">
-        <div className="resp-form-title-left">
-          <h2>{title}</h2>
-          <span className={`resp-status ${isPublic ? "" : "private"}`}>
+      <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap">
+          <h2 className="m-0 text-[17px] font-bold text-[#142d63]">{title}</h2>
+          <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${isPublic ? "bg-[#e3f7ef] text-[#16a66b]" : "bg-[#f1f2f5] text-[#7284a3]"}`}>
             {isPublic ? "Aktif" : "Draft"}
           </span>
         </div>
-        <div className="resp-heading-actions">
-          <button className="resp-export-btn">↓ Ekspor</button>
-          <button className="resp-view-btn">Lihat Form ↗</button>
+        <div className="flex gap-3">
+          <button className="h-[39px] px-5 rounded-lg bg-[#eef5ff] text-[#075ee0] text-[12px] font-semibold border-none cursor-pointer hover:bg-[#daeaff] transition-colors">↓ Ekspor</button>
+          <button className="h-[39px] px-5 rounded-lg bg-[#075ee0] text-white text-[12px] font-semibold border-none cursor-pointer hover:bg-[#0550c0] transition-colors">Lihat Form ↗</button>
         </div>
       </div>
 
       {/* RESPONSE CONTAINER */}
-      <div className="response-container">
+      <div className="bg-white/90 rounded-[13px] border border-[#e5ebf4] shadow-[0_4px_20px_rgba(30,70,120,0.04)] overflow-hidden">
 
         {/* SUB TABS */}
-        <div className="response-tabs">
+        <div className="h-[60px] flex items-center px-[22px] gap-9 border-b border-[#edf1f7] overflow-x-auto">
           {["Ringkasan", "Jawaban", "Responden"].map(t => (
-            <button
-              key={t}
-              className={`response-tab ${activeSubTab === t ? "active" : ""}`}
-              onClick={() => setActiveSubTab(t)}
-            >
+            <button key={t} onClick={() => setActiveSubTab(t)}
+              className={`relative h-[60px] flex items-center text-[13px] font-semibold border-none bg-transparent cursor-pointer transition-colors whitespace-nowrap ${
+                activeSubTab === t ? "text-[#075ee0]" : "text-[#63759b] hover:text-[#075ee0]"
+              }`}>
               {t}
+              {activeSubTab === t && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#075ee0] rounded-t" />}
             </button>
           ))}
-          <button className="resp-date-filter">▣ Semua waktu ⌄</button>
+          <button className="ml-auto h-9 px-[14px] border border-[#e0e7f2] rounded-lg bg-white text-[#4c6189] text-[11px] cursor-pointer whitespace-nowrap">
+            ▣ Semua waktu ⌄
+          </button>
         </div>
 
         {/* LOADING */}
         {loading && (
-          <div className="resp-loading">
-            <div className="resp-spinner" />
-            <span style={{ fontSize: 12, color: "#7384a4" }}>Memuat respons...</span>
+          <div className="flex flex-col items-center gap-3 py-16">
+            <div className="w-8 h-8 border-[3px] border-[#dce8f7] border-t-[#075ee0] rounded-full animate-spin" />
+            <span className="text-[12px] text-[#7384a4]">Memuat respons...</span>
           </div>
         )}
 
         {/* EMPTY */}
         {!loading && total === 0 && (
-          <div className="resp-empty">
-            <div style={{ fontSize: 40, marginBottom: 8 }}>📭</div>
-            <h4>Belum ada respons</h4>
-            <p>Bagikan link form untuk mulai mengumpulkan respons.</p>
+          <div className="py-16 text-center text-[#7384a4]">
+            <div className="text-[40px] mb-2">📭</div>
+            <h4 className="m-0 mb-1 text-[15px] font-bold text-[#142d63]">Belum ada respons</h4>
+            <p className="m-0 text-[12px]">Bagikan link form untuk mulai mengumpulkan respons.</p>
           </div>
         )}
 
@@ -596,96 +643,75 @@ function ResponsesTab({ formId, form }) {
         {!loading && total > 0 && (
           <>
             {/* STATISTICS */}
-            <div className="statistics-grid">
-              <div className="stat-card">
-                <div className="stat-icon blue">♙</div>
-                <div>
-                  <p>Total Respon</p>
-                  <h3>{total}</h3>
-                  <span>responden</span>
+            <div className="grid grid-cols-4 gap-[15px] p-[22px] pb-[10px] max-[900px]:grid-cols-2">
+              {[
+                { icon: "♙", color: "bg-[#edf4ff] text-[#075ee0]", label: "Total Respon",         value: total,              sub: "responden" },
+                { icon: "✓", color: "bg-[#eafaf3] text-[#18ae70]", label: "Tingkat Penyelesaian",  value: "100%",             sub: "selesai" },
+                { icon: "◷", color: "bg-[#fff5e8] text-[#ee941c]", label: "Rata-rata Waktu",       value: "—",                sub: "menit" },
+                { icon: "◔", color: "bg-[#f5edff] text-[#8e4de7]", label: "Selesai Hari Ini",      value: countToday(responses), sub: "responden" },
+              ].map((s, i) => (
+                <div key={i} className="min-h-[110px] border border-[#e7edf6] rounded-xl p-[17px] flex items-center gap-[15px] bg-white">
+                  <div className={`w-[43px] h-[43px] shrink-0 flex items-center justify-center rounded-[9px] text-[20px] ${s.color}`}>{s.icon}</div>
+                  <div>
+                    <p className="m-0 mb-1 text-[10px] text-[#64779d]">{s.label}</p>
+                    <h3 className="m-0 text-[23px] font-bold text-[#142d63]">{s.value}</h3>
+                    <span className="text-[10px] text-[#8190ad]">{s.sub}</span>
+                  </div>
                 </div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-icon green">✓</div>
-                <div>
-                  <p>Tingkat Penyelesaian</p>
-                  <h3>100%</h3>
-                  <span>selesai</span>
-                </div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-icon orange">◷</div>
-                <div>
-                  <p>Rata-rata Waktu</p>
-                  <h3>—</h3>
-                  <span>menit</span>
-                </div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-icon purple">◔</div>
-                <div>
-                  <p>Selesai Hari Ini</p>
-                  <h3>{countToday(responses)}</h3>
-                  <span>responden</span>
-                </div>
-              </div>
+              ))}
             </div>
 
             {/* PER-QUESTION CARDS */}
             {questionStats.map((q, qi) => (
-              <div className="question-card" key={q.soal_id ?? qi}>
-                <div className="question-header">
+              <div key={q.soal_id ?? qi} className="mx-[22px] mb-4 p-[22px] border border-[#e7edf6] rounded-xl bg-white">
+                <div className="flex justify-between items-start gap-4 mb-5">
                   <div>
-                    <h3>
+                    <h3 className="m-0 text-[14px] font-semibold text-[#142d63] flex items-center gap-2 flex-wrap">
                       {qi + 1}. {q.question}
-                      <span className="required-badge">Wajib</span>
+                      <span className="px-2 py-1 rounded-full bg-[#edf4ff] text-[#075ee0] text-[9px] font-bold">Wajib</span>
                     </h3>
-                    <p>{total} respon</p>
+                    <p className="mt-1 mb-0 text-[10px] text-[#7384a4]">{total} respon</p>
                   </div>
-                  <button className="detail-button">Lihat detail →</button>
+                  <button className="shrink-0 px-3.5 py-2.5 rounded-lg bg-[#eef5ff] text-[#075ee0] text-[11px] font-semibold border-none cursor-pointer hover:bg-[#daeaff] transition-colors">
+                    Lihat detail →
+                  </button>
                 </div>
 
-                {/* RADIO / CHECKBOX → donut + legend */}
+                {/* RADIO/CHECKBOX → donut */}
                 {(q.type === "radio" || q.type === "checkbox") && q.options.length > 0 && (
-                  <div className="question-content">
-                    <div className="donut-wrapper">
-                      <div
-                        className="donut-chart"
-                        style={{ background: buildConicGradient(q.options, total) }}
-                      >
-                        <div className="donut-center">
-                          <strong>{total}</strong>
-                          <span>respon</span>
+                  <div className="flex items-center gap-[50px] pl-2 flex-wrap">
+                    <div className="shrink-0 flex justify-center">
+                      <div className="relative w-[138px] h-[138px] rounded-full flex items-center justify-center"
+                        style={{ background: buildConicGradient(q.options, total) }}>
+                        <div className="absolute w-[82px] h-[82px] rounded-full bg-white" />
+                        <div className="relative z-10 flex flex-col items-center">
+                          <strong className="text-[21px] font-bold text-[#142d63]">{total}</strong>
+                          <span className="text-[9px] text-[#7183a3]">respon</span>
                         </div>
                       </div>
                     </div>
-                    <div className="answer-list">
+                    <div className="flex-1 min-w-[200px] flex flex-col gap-3">
                       {q.options.map((opt, oi) => (
-                        <div className="answer-row" key={oi}>
-                          <span className={`dot ${DOT_COLORS[oi % DOT_COLORS.length]}`} />
+                        <div key={oi} className="grid gap-2 text-[11px] text-[#50658d]" style={{ gridTemplateColumns: "12px 1fr auto" }}>
+                          <span className="w-2.5 h-2.5 rounded-full mt-0.5 shrink-0" style={{ background: CHART_COLORS[oi % CHART_COLORS.length] }} />
                           <span>{opt.value}</span>
-                          <strong>{opt.count} ({pct(opt.count, total)}%)</strong>
+                          <strong className="text-[#142d63] text-[11px]">{opt.count} ({pct(opt.count, total)}%)</strong>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* TEXT → list jawaban */}
+                {/* TEXT answers */}
                 {q.type === "text" && (
-                  <div className="text-answer-list">
+                  <div className="flex flex-col gap-2.5 px-2">
                     {q.textAnswers.length === 0
-                      ? <p style={{ fontSize: 12, color: "#8ca0ba" }}>Belum ada jawaban teks.</p>
+                      ? <p className="text-[12px] text-[#8ca0ba]">Belum ada jawaban teks.</p>
                       : q.textAnswers.map((t, ti) => (
-                          <div className="text-answer-item" key={ti}>{t}</div>
+                          <div key={ti} className="px-4 py-3 bg-[#f7faff] border border-[#e8eef7] rounded-lg text-[12px] text-[#3a5280] leading-relaxed">{t}</div>
                         ))
                     }
                   </div>
-                )}
-
-                {/* CHECKBOX with multiple options → bar chart */}
-                {q.type === "checkbox" && q.options.length === 0 && (
-                  <p style={{ fontSize: 12, color: "#8ca0ba", padding: "0 10px 10px" }}>Tidak ada opsi tersedia.</p>
                 )}
               </div>
             ))}
@@ -697,7 +723,8 @@ function ResponsesTab({ formId, form }) {
 }
 
 /* ── helpers ─────────────────────────────────────────────────── */
-const DOT_COLORS = ["blue-dot","green-dot","teal-dot","red-dot","purple-dot","orange-dot","gray-dot"];
+const CHART_COLORS = ["#3d91ef","#19c26b","#31b8b2","#ff626b","#a55be9","#f5a623","#9aa5b8"];
+const DOT_COLORS   = CHART_COLORS; // backward compat
 
 function pct(count, total) {
   if (!total) return 0;

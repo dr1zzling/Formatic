@@ -1,11 +1,26 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../utils/api";
-import "../Dashboard Design/home.css";
+import { Bell, HelpCircle, Plus, ArrowRight, FileText, Search } from "lucide-react";
 
 const FORM_API = "http://localhost:3000";
 
-/* ── helpers ─────────────────────────────────────────────────── */
+/* ── DUMMY DATA ───────────────────────────────────────────────── */
+const DUMMY_MY_FORMS = [
+  { form_id: 1, form_title: "Kuesioner Pelaksanaan Program MBG", form_slug: "dummy-1", category: "survey", form_status: "public"  },
+  { form_id: 2, form_title: "Ujian Matematika Semester 1",        form_slug: "dummy-2", category: "ujian",  form_status: "public"  },
+  { form_id: 3, form_title: "Survey Kepuasan Kantin",             form_slug: "dummy-3", category: "survey", form_status: "private" },
+  { form_id: 4, form_title: "Quiz Bahasa Inggris Bab 3",          form_slug: "dummy-4", category: "ujian",  form_status: "public"  },
+];
+
+const DUMMY_HISTORY = [
+  { form_id: "h1", form_title: "Survey Kepuasan Layanan Sekolah", form_slug: "survey-kepuasan", category: "survey", submitted_at: "2026-08-13T09:00:00Z" },
+  { form_id: "h2", form_title: "Quiz Pengetahuan Umum",            form_slug: "quiz-umum",       category: "ujian",  submitted_at: "2026-08-12T14:30:00Z" },
+  { form_id: "h3", form_title: "Form Pendaftaran Seminar",         form_slug: "seminar",         category: "survey", submitted_at: "2026-08-11T11:00:00Z" },
+  { form_id: "h4", form_title: "Evaluasi Pembelajaran Siswa",      form_slug: "evaluasi",        category: "ujian",  submitted_at: "2026-08-10T08:15:00Z" },
+];
+
+/* ── Helpers ──────────────────────────────────────────────────── */
 function getUsername() {
   try {
     const p = JSON.parse(atob(localStorage.getItem("token").split(".")[1]));
@@ -13,114 +28,119 @@ function getUsername() {
   } catch { return "User"; }
 }
 
-function getInitial(name) {
-  return (name || "U")[0].toUpperCase();
+function timeAgo(dateStr) {
+  if (!dateStr) return "—";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const d = Math.floor(diff / 86400000);
+  if (d === 0) return "Hari ini";
+  if (d === 1) return "Kemarin";
+  return `${d} hari lalu`;
 }
 
-/* ── Icon component (dari desain kamu, tidak diubah) ─────────── */
-function Icon({ name, size = 20 }) {
-  const common = {
-    width: size, height: size, viewBox: "0 0 24 24",
-    fill: "none", stroke: "currentColor", strokeWidth: "1.8",
-    strokeLinecap: "round", strokeLinejoin: "round",
-  };
-  switch (name) {
-    case "home":   return <svg {...common}><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg>;
-    case "form":   return <svg {...common}><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h4"/></svg>;
-    case "trash":  return <svg {...common}><path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 14h10l1-14"/><path d="M9 7V4h6v3"/></svg>;
-    case "search": return <svg {...common}><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg>;
-    case "bell":   return <svg {...common}><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>;
-    case "help":   return <svg {...common}><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.4 2.4 0 1 1 4.2 1.6c-.9.9-2 1.3-2 2.7"/><path d="M12 17h.01"/></svg>;
-    case "plus":   return <svg {...common}><path d="M12 5v14"/><path d="M5 12h14"/></svg>;
-    case "arrow":  return <svg {...common}><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>;
-    case "file":   return <svg {...common}><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h5"/></svg>;
-    case "chart":  return <svg {...common}><path d="M4 19V5"/><path d="M4 19h16"/><path d="M7 15v-3"/><path d="M11 15V8"/><path d="M15 15v-5"/><path d="M19 15V6"/></svg>;
-    case "chevron":return <svg {...common}><path d="m7 9 5 5 5-5"/></svg>;
-    default:       return null;
-  }
-}
-
-/* ── Sidebar ─────────────────────────────────────────────────── */
+/* ── Sidebar ──────────────────────────────────────────────────── */
 function AppSidebar({ activeMenu, setActiveMenu }) {
-  const navigate  = useNavigate();
-  const username  = getUsername();
-  const initial   = getInitial(username);
+  const navigate = useNavigate();
 
-  function go(menu, path) {
-    setActiveMenu(menu);
-    navigate(path);
-  }
+  function go(menu, path) { setActiveMenu(menu); navigate(path); }
+
+  const items = [
+    { id: "home",   label: "Home",    path: "/",
+      icon: <><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></> },
+    { id: "myform", label: "My Form", path: "/my-forms",
+      icon: <><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h4"/></> },
+    { id: "trash",  label: "Trash",   path: "/trash",
+      icon: <><path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 14h10l1-14"/><path d="M9 7V4h6v3"/></> },
+  ];
+
+  const username = getUsername();
+  const initial  = username[0]?.toUpperCase();
 
   return (
-    <aside className="sidebar">
-      <div className="brand">
-        <div className="brand-logo">F</div>
-        <span>Formatic</span>
+    <aside className="w-[366px] min-w-[366px] h-screen fixed left-0 top-0 flex flex-col z-20"
+      style={{ background: "linear-gradient(180deg,#06245a 0%,#0a438f 48%,#257dc6 100%)" }}>
+      {/* Brand */}
+      <div className="flex items-center gap-3 px-8 pt-9 pb-14">
+        <div className="w-[38px] h-[38px] flex items-center justify-center bg-white rounded-[9px] text-[#1251aa] text-[21px] font-extrabold shrink-0">F</div>
+        <span className="text-[22px] font-bold text-white">Formatic</span>
       </div>
-      <nav className="sidebar-menu">
-        <button className={`sidebar-item ${activeMenu === "home"   ? "active" : ""}`} onClick={() => go("home",   "/")}>
-          <Icon name="home"  size={20} /><span>Home</span>
-        </button>
-        <button className={`sidebar-item ${activeMenu === "myform" ? "active" : ""}`} onClick={() => go("myform", "/my-forms")}>
-          <Icon name="form"  size={20} /><span>My Form</span>
-        </button>
-        <button className={`sidebar-item ${activeMenu === "trash"  ? "active" : ""}`} onClick={() => go("trash",  "/trash")}>
-          <Icon name="trash" size={20} /><span>Trash</span>
-        </button>
+
+      {/* Nav */}
+      <nav className="flex flex-col gap-2 px-6 flex-1">
+        {items.map(item => {
+          const on = activeMenu === item.id;
+          return (
+            <button key={item.id} onClick={() => go(item.id, item.path)}
+              className={`w-full h-[58px] flex items-center gap-[18px] px-[18px] rounded-[9px] text-[16px] font-medium transition-all border-none cursor-pointer ${
+                on ? "text-white" : "text-white/90 hover:bg-white/10"
+              }`}
+              style={on ? { background: "linear-gradient(90deg,rgba(95,171,255,0.35),rgba(255,255,255,0.12))" } : {}}>
+              <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                {item.icon}
+              </svg>
+              {item.label}
+            </button>
+          );
+        })}
       </nav>
-      <div className="sidebar-profile">
-        <div className="profile-avatar">{initial}</div>
-        <div className="profile-info">
-          <strong>{username}</strong>
-          <span>My Account</span>
+
+      {/* Profile */}
+      <div className="flex items-center gap-3 px-6 py-4 cursor-pointer" onClick={() => navigate("/profile")}>
+        <div className="w-[38px] h-[38px] rounded-full bg-[#1663df] flex items-center justify-center font-bold text-white shrink-0 text-[15px]">
+          {initial}
         </div>
-        <Icon name="chevron" size={16} />
+        <div className="flex flex-col flex-1">
+          <strong className="text-[14px] text-white font-semibold">{username}</strong>
+          <span className="text-[10px] text-white/65 mt-0.5">My Account</span>
+        </div>
+        <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)"
+          strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m7 9 5 5 5-5"/>
+        </svg>
       </div>
     </aside>
   );
 }
 
-/* ── Header ──────────────────────────────────────────────────── */
+/* ── Header ───────────────────────────────────────────────────── */
 function Header({ username }) {
-  const initial = getInitial(username);
   return (
-    <header className="top-header">
+    <header className="flex items-start justify-between mb-7">
       <div>
-        <h1>Hi, {username}! 👋</h1>
-        <p>Fill out forms, give responses, and share your feedback.</p>
+        <h1 className="m-0 text-[30px] font-bold text-[#102f68] leading-tight">Hi, {username}! 👋</h1>
+        <p className="mt-2 text-[14px] text-[#8195b2]">Fill out forms, give responses, and share your feedback.</p>
       </div>
-      <div className="header-actions">
-        <button className="header-icon"><Icon name="bell" size={20} /></button>
-        <button className="header-icon"><Icon name="help" size={20} /></button>
-        <div className="header-avatar">{initial}</div>
+      <div className="flex items-center gap-4">
+        <button className="w-[38px] h-[38px] flex items-center justify-center text-[#143b75] bg-transparent border-none cursor-pointer"><Bell size={20} /></button>
+        <button className="w-[38px] h-[38px] flex items-center justify-center text-[#143b75] bg-transparent border-none cursor-pointer"><HelpCircle size={20} /></button>
+        <div className="w-[39px] h-[39px] rounded-full bg-[#1458d1] text-white text-[14px] font-bold flex items-center justify-center">
+          {username[0]?.toUpperCase()}
+        </div>
       </div>
     </header>
   );
 }
 
-/* ── Search + Filter ─────────────────────────────────────────── */
+/* ── Search + Filter ──────────────────────────────────────────── */
 function SearchFilter({ search, setSearch, category, setCategory }) {
-  const categories = ["All", "Public", "Quiz", "Survey", "Other"];
+  const categories = ["All", "Public", "Quiz", "Survey"];
   return (
-    <div className="search-filter">
-      <div className="search-box">
-        <Icon name="search" size={19} />
-        <input
-          type="text"
-          placeholder="Search forms or templates..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
+    <div className="mb-7">
+      <div className="h-12 flex items-center gap-3 px-[17px] bg-white border border-[#dce7f5] rounded-lg shadow-[0_3px_12px_rgba(35,83,145,0.04)] text-[#5280b5] mb-[14px]">
+        <Search size={19} className="shrink-0" />
+        <input type="text" placeholder="Search forms or templates..."
+          value={search} onChange={e => setSearch(e.target.value)}
+          className="flex-1 outline-none border-none bg-transparent text-[13px] text-[#173d72] placeholder:text-[#9aacbf]" />
       </div>
-      <div className="category-list">
+      <div className="flex gap-3 flex-wrap">
         {categories.map(item => (
-          <button
-            key={item}
-            className={`category-button ${category === item ? "selected" : ""}`}
-            onClick={() => setCategory(item)}
-          >
+          <button key={item} onClick={() => setCategory(item)}
+            className={`min-w-[76px] h-[35px] px-[17px] flex items-center justify-center gap-1 border rounded-full text-[12px] font-medium transition-all ${
+              category === item
+                ? "bg-[#0c3978] border-[#0c3978] text-white"
+                : "bg-white border-[#d9e6f6] text-[#193c70] hover:border-[#3d91b2]"
+            }`}>
             {item}
-            {item === "Other" && <Icon name="chevron" size={14} />}
           </button>
         ))}
       </div>
@@ -128,287 +148,209 @@ function SearchFilter({ search, setSearch, category, setCategory }) {
   );
 }
 
-/* ── Create Form Card ────────────────────────────────────────── */
+/* ── Create Form Card ─────────────────────────────────────────── */
 function CreateFormCard({ onCreateClick }) {
   return (
-    <section className="create-card">
-      <div className="create-content">
-        <span className="small-label">FORM MAKER</span>
-        <h2>Buat Form<br />Semudah Ini</h2>
-        <p>Buat form yang menarik, bagikan ke siapapun,<br />dan dapatkan respons dengan mudah.</p>
-        <button className="create-button" onClick={onCreateClick}>
-          <Icon name="plus" size={19} /> Create Form
+    <section className="relative flex items-center min-h-[355px] px-[45px] py-[42px] bg-white border border-[#e0eaf6] rounded-xl overflow-hidden shadow-[0_8px_25px_rgba(35,83,145,0.08)]"
+      style={{ background: "radial-gradient(circle at 85% 50%,rgba(84,164,255,0.14),transparent 32%),linear-gradient(135deg,#ffffff 0%,#f2f8ff 100%)" }}>
+      <div className="relative z-10">
+        <span className="text-[10px] font-bold tracking-[1px] text-[#3d8ad1] uppercase">FORM MAKER</span>
+        <h2 className="mt-3 mb-4 text-[29px] font-bold leading-[1.22] text-[#103b86]">Buat Form<br />Semudah Ini</h2>
+        <p className="m-0 text-[#7088a8] text-[13px] leading-relaxed">Buat form yang menarik, bagikan ke siapapun,<br />dan dapatkan respons dengan mudah.</p>
+        <button onClick={onCreateClick}
+          className="mt-6 h-11 inline-flex items-center gap-2 px-5 rounded-[7px] bg-[#1261df] text-white text-[13px] font-semibold border-none cursor-pointer shadow-[0_8px_17px_rgba(18,97,223,0.2)] hover:opacity-90 transition-opacity">
+          <Plus size={19} /> Create Form
         </button>
       </div>
-      <div className="form-illustration">
-        <div className="browser-window">
-          <div className="browser-top"><span /><span /><span /></div>
-          <div className="fake-form">
-            <div className="fake-line large" />
-            <div className="fake-line" />
-            <div className="fake-question"><span className="fake-radio" /><div><span /><span /></div></div>
-            <div className="fake-question"><span className="fake-checkbox">✓</span><div><span /><span /></div></div>
-            <div className="fake-question"><span className="fake-radio" /><div><span /><span /></div></div>
+      {/* Illustration */}
+      <div className="absolute right-[35px] top-[42px] w-[42%] h-[270px]">
+        <div className="absolute right-[45px] top-[15px] w-[250px] h-[220px] rounded-xl bg-white shadow-[0_18px_30px_rgba(25,84,150,0.16)] overflow-hidden rotate-[5deg]">
+          <div className="h-[29px] flex items-center gap-[5px] px-[11px] bg-[#1760ce]">
+            {[0,1,2].map(i => <span key={i} className="w-[7px] h-[7px] rounded-full bg-white/70" />)}
+          </div>
+          <div className="p-[17px]">
+            <div className="h-2 w-4/5 rounded bg-[#dce8f7] mb-2.5" />
+            <div className="h-2 w-[55%] rounded bg-[#dce8f7] mb-2.5" />
+            {[0,1,2].map(i => (
+              <div key={i} className="flex items-center gap-2 p-2.5 mt-2 rounded-md bg-[#f5f8fc]">
+                <span className={`w-3 h-3 flex items-center justify-center border-2 border-[#5596d8] text-[#1767ce] text-[7px] ${i===1?"rounded-[3px] bg-[#e3f2ff]":"rounded-full"}`}>
+                  {i===1?"✓":""}
+                </span>
+                <div className="flex-1">
+                  <span className="block h-[5px] rounded bg-[#dce7f3] mb-1" />
+                  <span className="block h-[5px] w-3/4 rounded bg-[#dce7f3]" />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-        <div className="floating-check">✓</div>
+        <div className="absolute left-[15px] bottom-[20px] w-11 h-11 rounded-full bg-[#30bd76] text-white text-[20px] flex items-center justify-center shadow-[0_8px_18px_rgba(48,189,118,0.25)]">✓</div>
       </div>
     </section>
   );
 }
 
-/* ── Activity Card (dari /form/user) ─────────────────────────── */
+/* ── Activity Card ────────────────────────────────────────────── */
 function ActivityCard({ forms, loading }) {
   const navigate = useNavigate();
+  const CAT_STYLE = {
+    ujian:   "bg-[#eee7ff] text-[#7850d9]",
+    survey:  "bg-[#e9f2ff] text-[#1768df]",
+    default: "bg-[#e5faee] text-[#21a964]",
+  };
   return (
-    <section className="activity-card">
-      <div className="section-heading">
-        <h3>Aktivitas Terbaru</h3>
-        <button onClick={() => navigate("/my-forms")}>View all</button>
+    <section className="bg-white border border-[#e0eaf6] rounded-xl shadow-[0_8px_25px_rgba(35,83,145,0.08)] p-6 min-h-[355px] flex flex-col">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="m-0 text-[16px] font-bold text-[#17366d]">Aktivitas Terbaru</h3>
+        <button onClick={() => navigate("/my-forms")} className="bg-transparent border-none text-[#1764d6] text-[11px] font-semibold cursor-pointer">View all</button>
       </div>
-
-      <div className="activity-list">
+      <div className="flex flex-col gap-3 flex-1">
         {loading && [...Array(4)].map((_, i) => (
-          <div className="skeleton-row" key={i}>
-            <div className="skeleton skeleton-icon" />
-            <div className="skeleton-lines">
-              <div className="skeleton skeleton-line" style={{ width: "70%" }} />
-              <div className="skeleton skeleton-line" style={{ width: "45%" }} />
+          <div key={i} className="flex items-center gap-3 py-2">
+            <div className="w-[42px] h-[42px] rounded-[9px] bg-[#e8f0fb] animate-pulse shrink-0" />
+            <div className="flex-1 space-y-2">
+              <div className="h-3 w-[70%] rounded bg-[#e8f0fb] animate-pulse" />
+              <div className="h-2.5 w-[45%] rounded bg-[#e8f0fb] animate-pulse" />
             </div>
           </div>
         ))}
-
-        {!loading && forms.slice(0, 4).map((form, i) => {
+        {!loading && forms.slice(0,4).map((form, i) => {
           const cat = form.category ?? "default";
+          const style = CAT_STYLE[cat] ?? CAT_STYLE.default;
           return (
-            <div
-              className="activity-row"
-              key={form.form_id ?? i}
-              onClick={() => navigate(`/form/${form.form_slug}`)}
-              style={{ cursor: "pointer" }}
-            >
-              <div className={`activity-icon ${cat}`}>
-                <Icon name="file" size={20} />
+            <div key={form.form_id ?? i} onClick={() => navigate(`/form/${form.form_slug}`)}
+              className="flex items-center gap-3 cursor-pointer group">
+              <div className={`w-[42px] h-[42px] flex items-center justify-center rounded-[9px] shrink-0 ${style}`}>
+                <FileText size={20} />
               </div>
-              <div className="activity-details">
-                <strong>{form.form_title ?? "Untitled"}</strong>
-                <span>{form.category ?? "—"} &nbsp;•&nbsp; 0 responses</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-semibold text-[#17366d] truncate group-hover:text-[#1764d6] transition-colors">{form.form_title ?? "Untitled"}</p>
+                <p className="text-[10px] text-[#8ca0ba] mt-1">{form.category ?? "—"} &nbsp;•&nbsp; 0 responses</p>
               </div>
             </div>
           );
         })}
-
         {!loading && forms.length === 0 && (
-          <p style={{ fontSize: 12, color: "#8ca0ba", margin: "12px 0" }}>Belum ada aktivitas.</p>
+          <p className="text-[12px] text-[#8ca0ba] my-3">Belum ada aktivitas.</p>
         )}
       </div>
-
-      <button className="activity-footer" onClick={() => navigate("/my-forms")}>
+      <button onClick={() => navigate("/my-forms")}
+        className="w-full h-[38px] mt-4 px-[14px] flex items-center justify-between rounded-[7px] bg-[#f0f6ff] text-[#1764d6] text-[11px] border-none cursor-pointer hover:bg-[#e3efff] transition-colors">
         <span>View all activity</span>
-        <Icon name="arrow" size={17} />
+        <ArrowRight size={17} />
       </button>
     </section>
   );
 }
 
-/* ── Recommended (dari /form/user, tampil 4 teratas) ─────────── */
-function RecommendedForms({ forms, loading }) {
+/* ── History Pengerjaan ───────────────────────────────────────── */
+function HistoryPengerjaan({ loading }) {
   const navigate = useNavigate();
+  const CAT_STYLE = {
+    ujian:   "bg-[#eee7ff] text-[#7b51d6]",
+    survey:  "bg-[#eaf2ff] text-[#246de0]",
+    default: "bg-[#e6f9ed] text-[#25af67]",
+  };
   return (
-    <section className="recommended-card">
-      <div className="section-heading">
-        <h3>Rekomendasi Form Untukmu</h3>
-        <button onClick={() => navigate("/my-forms")}>View all</button>
+    <section className="bg-white border border-[#e0eaf6] rounded-xl shadow-[0_8px_25px_rgba(35,83,145,0.08)] p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="m-0 text-[16px] font-bold text-[#17366d]">History Pengerjaan</h3>
+        <button className="bg-transparent border-none text-[#1764d6] text-[11px] font-semibold cursor-pointer">View all</button>
       </div>
-      <div className="recommended-list">
+      <div className="flex flex-col divide-y divide-[#edf2f8]">
         {loading && [...Array(4)].map((_, i) => (
-          <div className="skeleton-row" key={i}>
-            <div className="skeleton skeleton-icon" />
-            <div className="skeleton-lines">
-              <div className="skeleton skeleton-line" style={{ width: "65%" }} />
-              <div className="skeleton skeleton-line" style={{ width: "40%" }} />
+          <div key={i} className="flex items-center gap-3 py-4">
+            <div className="w-[38px] h-[38px] rounded-lg bg-[#e8f0fb] animate-pulse shrink-0" />
+            <div className="flex-1 space-y-2">
+              <div className="h-3 w-[65%] rounded bg-[#e8f0fb] animate-pulse" />
+              <div className="h-2.5 w-[40%] rounded bg-[#e8f0fb] animate-pulse" />
             </div>
           </div>
         ))}
-
-        {!loading && forms.slice(0, 4).map((form, i) => {
-          const cat = form.category ?? "default";
+        {!loading && DUMMY_HISTORY.map((form, i) => {
+          const cat   = form.category ?? "default";
+          const style = CAT_STYLE[cat] ?? CAT_STYLE.default;
           return (
-            <article
-              className="recommended-item"
-              key={form.form_id ?? i}
-              onClick={() => navigate(`/form/${form.form_slug}`)}
-            >
-              <div className={`recommend-icon ${cat}`}>
-                <Icon name="file" size={19} />
+            <article key={form.form_id ?? i}
+              onClick={() => navigate(`/fill/${form.form_slug}`)}
+              className="flex items-center gap-3 py-[14px] cursor-pointer hover:bg-[#f7faff] transition-colors first:pt-0 last:pb-0">
+              <div className={`w-[38px] h-[38px] flex items-center justify-center rounded-lg shrink-0 ${style}`}>
+                <FileText size={17} />
               </div>
-              <div className="recommended-content">
-                <strong>{form.form_title ?? "Untitled"}</strong>
-                <p>{form.category ?? "—"}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-semibold text-[#17366d] truncate">{form.form_title}</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-[10px] text-[#8ba0bb]">{cat}</span>
+                  <span className="text-[10px] text-[#c5d2de]">·</span>
+                  <span className="text-[10px] text-[#8ba0bb]">{timeAgo(form.submitted_at)}</span>
+                </div>
               </div>
-              <div className="recommend-response">
-                <strong>0</strong>
-                <span>responses</span>
+              <div className="flex flex-col items-end shrink-0">
+                <span className="text-[11px] font-semibold text-[#1764d6]">{timeAgo(form.submitted_at)}</span>
+                <span className="text-[9px] text-[#8da0b9] mt-0.5">terakhir dikerjakan</span>
               </div>
             </article>
           );
         })}
-
-        {!loading && forms.length === 0 && (
-          <p style={{ fontSize: 12, color: "#8ca0ba", padding: "12px 0" }}>Belum ada form.</p>
-        )}
       </div>
     </section>
   );
 }
 
-/* ── Manage Card ─────────────────────────────────────────────── */
+/* ── Manage Forms Card ────────────────────────────────────────── */
 function ManageFormsCard({ totalForms }) {
   const navigate = useNavigate();
   return (
-    <section className="manage-card">
-      <div className="manage-content">
-        <span className="small-label">FORM MANAGEMENT</span>
-        <h2>Kelola Semua Form<br />Dalam Satu Tempat</h2>
-        <p>Pantau respons, lihat statistik, dan kelola form<br />dengan praktis dan efisien.</p>
-        <button className="outline-button" onClick={() => navigate("/my-forms")}>
-          Go to My Form <Icon name="arrow" size={18} />
+    <section className="relative flex items-center min-h-[315px] px-[38px] py-[35px] bg-white border border-[#e0eaf6] rounded-xl overflow-hidden shadow-[0_8px_25px_rgba(35,83,145,0.08)]"
+      style={{ background: "radial-gradient(circle at 82% 45%,rgba(93,174,255,0.14),transparent 35%),linear-gradient(135deg,#ffffff,#f0f7ff)" }}>
+      <div className="relative z-10">
+        <span className="text-[10px] font-bold tracking-[1px] text-[#3d8ad1] uppercase">FORM MANAGEMENT</span>
+        <h2 className="mt-3 mb-4 text-[26px] font-bold leading-[1.22] text-[#103b86]">Kelola Semua Form<br />Dalam Satu Tempat</h2>
+        <p className="m-0 text-[#7088a8] text-[13px] leading-relaxed">Pantau respons, lihat statistik, dan kelola form<br />dengan praktis dan efisien.</p>
+        <button onClick={() => navigate("/my-forms")}
+          className="mt-[22px] h-[42px] inline-flex items-center gap-[11px] px-[18px] border border-[#1b67dc] rounded-[7px] bg-white text-[#155dc4] text-[12px] font-semibold cursor-pointer hover:bg-[#f0f7ff] transition-colors">
+          Go to My Form <ArrowRight size={18} />
         </button>
       </div>
-      <div className="analytics-illustration">
-        <div className="analytics-window">
-          <div className="analytics-top"><span /><span /><span /></div>
-          <div className="analytics-body">
-            <div className="pie-chart"><div className="pie-center" /></div>
-            <div className="chart-lines"><span /><span /><span /><span /></div>
-            <div className="bar-chart"><i /><i /><i /><i /><i /></div>
+      {/* Analytics illustration */}
+      <div className="absolute right-[30px] top-[28px] w-[44%] h-[260px]">
+        <div className="absolute right-[30px] top-[15px] w-[250px] h-[215px] rounded-xl bg-white shadow-[0_18px_30px_rgba(31,89,151,0.14)] overflow-hidden rotate-[2deg]">
+          <div className="h-[27px] flex items-center gap-[5px] px-[11px] bg-[#1b63cc]">
+            {[0,1,2].map(i => <span key={i} className="w-[7px] h-[7px] rounded-full bg-white/70" />)}
+          </div>
+          <div className="relative h-[calc(100%-27px)] p-[17px]">
+            <div className="w-[76px] h-[76px] rounded-full relative"
+              style={{ background: "conic-gradient(#2772dc 0 62%,#6db8ee 62% 82%,#c9e5fb 82% 100%)" }}>
+              <div className="w-[34px] h-[34px] absolute top-[21px] left-[21px] rounded-full bg-white" />
+            </div>
+            <div className="absolute left-[110px] top-[18px] w-[90px] space-y-[9px]">
+              {["85%","65%","75%","45%"].map((w,i) => <span key={i} className="block h-1.5 rounded bg-[#e1ebf7]" style={{width:w}} />)}
+            </div>
+            <div className="absolute left-5 right-5 bottom-4 h-[60px] flex items-end gap-[9px]">
+              {[35,60,45,80,68].map((h,i) => (
+                <span key={i} className="flex-1 block rounded-t bg-[#78b5ef]" style={{height:`${h}%`}} />
+              ))}
+            </div>
           </div>
         </div>
-        <div className="response-badge">
-          <span>Total Forms</span>
-          <strong>{totalForms}</strong>
-          <small>↗ aktif</small>
+        <div className="absolute right-0 bottom-[23px] w-[130px] p-3 rounded-[9px] bg-white shadow-[0_10px_25px_rgba(35,83,145,0.14)]">
+          <span className="block text-[8px] text-[#879bb5]">Total Forms</span>
+          <strong className="block mt-1 text-[18px] text-[#173b78]">{totalForms}</strong>
+          <small className="text-[#2eb56e] text-[9px]">↗ aktif</small>
         </div>
       </div>
     </section>
   );
 }
 
-/* ── Form Preview Grid (dari GET /form & GET /form/category) ─── */
-function FormPreviewGrid({ search, category, navigate }) {
-  const [forms, setForms]     = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState("");
-
-  useEffect(() => { load(); }, [category]);
-
-  async function load() {
-    setLoading(true); setError("");
-    try {
-      let res;
-      if (category === "All" || category === "Public" || category === "Other") {
-        res = await api.get("/form");
-      } else {
-        const catMap = { Quiz: "ujian", Survey: "survey" };
-        res = await api.get("/form/category", { params: { category: catMap[category] ?? category.toLowerCase() } });
-      }
-      setForms(res.data?.data ?? []);
-    } catch { setError("Gagal memuat form."); setForms([]); }
-    finally { setLoading(false); }
-  }
-
-  const filtered = forms.filter(f => {
-    const title = (f.title ?? f.form_title ?? "").toLowerCase();
-    const desc  = (f.description ?? "").toLowerCase();
-    const q     = search.toLowerCase();
-    return title.includes(q) || desc.includes(q);
-  });
-
-  return (
-    <section className="preview-section">
-      <div className="section-heading">
-        <h3>Recommended Forms</h3>
-        <button>View all</button>
-      </div>
-
-      {loading && (
-        <div className="preview-grid">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} style={{ minHeight: 180, borderRadius: 11, overflow: "hidden", border: "1px solid #dfebf7", background: "white", display: "flex" }}>
-              <div className="skeleton" style={{ width: "42%", flexShrink: 0 }} />
-              <div style={{ padding: 20, flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
-                <div className="skeleton" style={{ height: 10, width: "30%", borderRadius: 4 }} />
-                <div className="skeleton" style={{ height: 14, width: "80%", borderRadius: 4 }} />
-                <div className="skeleton" style={{ height: 10, width: "60%", borderRadius: 4 }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {!loading && error && (
-        <div style={{ padding: "40px 0", textAlign: "center", color: "#8ca0ba", fontSize: 13 }}>
-          {error} — pastikan backend berjalan di port 3000.
-        </div>
-      )}
-
-      {!loading && !error && filtered.length === 0 && (
-        <div style={{ padding: "40px 0", textAlign: "center", color: "#8ca0ba", fontSize: 13 }}>
-          Belum ada form tersedia.
-        </div>
-      )}
-
-      {!loading && !error && filtered.length > 0 && (
-        <div className="preview-grid">
-          {filtered.map((form, i) => {
-            const title    = form.title ?? form.form_title ?? "Untitled";
-            const banner   = form.banner ?? form.form_banner;
-            const category = form.category ?? "";
-            const status   = form.status ?? form.form_status ?? "private";
-
-            return (
-              <article
-                className={`preview-form-card ${i % 2 === 0 ? "large" : "small"}`}
-                key={form.id ?? form.form_id ?? i}
-                onClick={() => navigate(`/form/${form.slug ?? form.form_slug}`)}
-              >
-                <div
-                  className="preview-image"
-                  style={banner
-                    ? { backgroundImage: `url(${FORM_API}${banner})` }
-                    : { background: "linear-gradient(135deg,#dce8f7,#b3d1f0)" }
-                  }
-                />
-                <div className="preview-info">
-                  <span className="public-badge">{status}</span>
-                  <h4>{title}</h4>
-                  <p>{category}</p>
-                  <div className="preview-meta">
-                    <span>0 responses</span>
-                    <button onClick={e => e.stopPropagation()}>
-                      <Icon name="arrow" size={15} />
-                    </button>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
-    </section>
-  );
-}
-
-/* ── Main export ─────────────────────────────────────────────── */
+/* ── Main ─────────────────────────────────────────────────────── */
 export default function Home() {
-  const navigate    = useNavigate();
-  const username    = getUsername();
+  const navigate = useNavigate();
+  const username = getUsername();
 
   const [activeMenu, setActiveMenu] = useState("home");
   const [search, setSearch]         = useState("");
   const [category, setCategory]     = useState("All");
-
-  // Data untuk Activity + Recommended (form milik user)
   const [myForms, setMyForms]       = useState([]);
   const [myLoading, setMyLoading]   = useState(true);
 
@@ -417,32 +359,33 @@ export default function Home() {
   async function loadMyForms() {
     setMyLoading(true);
     try {
-      const res = await api.get("/form/user");
-      setMyForms(res.data?.data?.forms ?? []);
-    } catch { setMyForms([]); }
+      const res  = await api.get("/form/user");
+      const data = res.data?.data?.forms ?? [];
+      setMyForms(data.length ? data : DUMMY_MY_FORMS);
+    } catch { setMyForms(DUMMY_MY_FORMS); }
     finally { setMyLoading(false); }
   }
 
   return (
-    <div className="home-page">
+    <div className="min-h-screen flex"
+      style={{ background: "radial-gradient(circle at 85% 10%,rgba(93,174,255,0.1),transparent 28%),#f5f9ff" }}>
+
       <AppSidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
 
-      <main className="main-content">
+      <main className="flex-1 min-w-0 ml-[366px] px-11 py-9 pb-16 max-[1300px]:px-8 max-[800px]:px-5 max-[800px]:py-7">
         <Header username={username} />
 
         <SearchFilter
-          search={search}   setSearch={setSearch}
+          search={search} setSearch={setSearch}
           category={category} setCategory={setCategory}
         />
 
-        <div className="dashboard-grid">
+        <div className="grid grid-cols-[minmax(0,1.75fr)_minmax(310px,0.9fr)] gap-5 items-stretch max-[1050px]:grid-cols-1">
           <CreateFormCard onCreateClick={() => navigate("/my-forms")} />
           <ActivityCard forms={myForms} loading={myLoading} />
-          <RecommendedForms forms={myForms} loading={myLoading} />
+          <HistoryPengerjaan loading={myLoading} />
           <ManageFormsCard totalForms={myForms.length} />
         </div>
-
-        <FormPreviewGrid search={search} category={category} navigate={navigate} />
       </main>
     </div>
   );

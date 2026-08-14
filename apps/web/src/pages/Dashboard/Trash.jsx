@@ -15,6 +15,14 @@ const SCHEMES = [
   "linear-gradient(135deg,#ffe4e6,#fecdd3)",
 ];
 
+const DUMMY_TRASH = [
+  { form_id: 1, form_title: "Survey Kepuasan Layanan Sekolah",    form_slug: "d1", category: "survey", form_status: "private", form_banner: null },
+  { form_id: 2, form_title: "Quiz Pengetahuan Umum",               form_slug: "d2", category: "ujian",  form_status: "private", form_banner: null },
+  { form_id: 3, form_title: "Form Pendaftaran Seminar Nasional",   form_slug: "d3", category: "survey", form_status: "private", form_banner: null },
+  { form_id: 4, form_title: "Evaluasi Pembelajaran Siswa",         form_slug: "d4", category: "survey", form_status: "private", form_banner: null },
+  { form_id: 5, form_title: "Pendataan Kegiatan Ekstrakurikuler",  form_slug: "d5", category: "ujian",  form_status: "private", form_banner: null },
+];
+
 function getUser() {
   try { const p = JSON.parse(atob(localStorage.getItem("token").split(".")[1])); return p.username || p.name || "User"; }
   catch { return "User"; }
@@ -35,8 +43,9 @@ export default function Trash() {
     setLoading(true);
     try {
       const res = await api.get("/form/user");
-      setForms(res.data?.data?.forms ?? []);
-    } catch { setForms([]); }
+      const data = res.data?.data?.forms ?? [];
+      setForms(data.length ? data : DUMMY_TRASH);
+    } catch { setForms(DUMMY_TRASH); }
     finally { setLoading(false); }
   }
 
