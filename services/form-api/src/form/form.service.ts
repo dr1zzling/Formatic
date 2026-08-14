@@ -1,15 +1,14 @@
 import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { KnexService } from 'src/database/knex.service';
-import { SubmitService } from '../submit/submit.service';
-import { SoalService } from 'src/soal/soal.service';
-import { ValidateIsCreator } from 'src/Pipe/validate.is.creator';
+import { KnexService } from '../database/knex.service';
+import { SoalService } from '../soal/soal.service';
+import { ValidateIsCreator } from '../Pipe/validate.is.creator';
+import * as crypto from 'crypto'
 const slugify = require('slugify')
 
 @Injectable()
 export class FormService {
   constructor(
     private knexService: KnexService, 
-    private submitService: SubmitService, 
     private soalService: SoalService,
     private isCreator: ValidateIsCreator
   ) {}
@@ -80,6 +79,8 @@ export class FormService {
         form_title: 'forms.title',
         form_status: 'forms.status',
         form_banner: 'forms.banner',
+        token_respon: 'forms.token_respon',
+        token_collab: 'forms.token_collab',
         category: 'forms.category',
       })
       .where('user_form.user_id', data.id)
@@ -95,10 +96,11 @@ export class FormService {
   }
 
   // Create Form
-  async create(user: { id: number, username: string }, body: { title: string, category: string }, banner: Express.Multer.File) {
+  async create(user: { id: number, username: string }, body: { title: string, category: string, token_respon: string }, banner: Express.Multer.File) {
     const slug = slugify(body.title, { lower: true, strict: true })
     const finalSlug = `${slug}-${Date.now()}`
     const bannerPath = `/uploads/${banner.filename}`
+    const tokenCollab = await crypto.randomBytes(64).toString('hex')
 
     const formResult = await this.knexService.connection.transaction(async (trx) => {
       await trx('file_upload').insert({ file_path: bannerPath })
@@ -110,6 +112,8 @@ export class FormService {
           status: 'private',
           category: body.category,
           banner: bannerPath,
+          token_respon: body.token_respon,
+          token_collab: tokenCollab
         })
         .returning('*')
 
@@ -138,6 +142,8 @@ export class FormService {
           form_slug: finalSlug,
           form_status: 'private',
           form_banner: bannerPath,
+          token_collab: formResult.token_collab,
+          token_respon: formResult.token_respon,
           category: body.category,
         },
       },
@@ -147,6 +153,7 @@ export class FormService {
   // Update Form Public
   async updateForm(req: {id: number }, form_id, status: string ){
     const isCreator = await this.isCreator.isCreator(req.id, form_id.id)
+    if(isCreator != 'Creator') throw new UnauthorizedException("Anda Tidak Berhak Menghapus Form Ini")
     const validateStatus = ['public', 'private']
 
     if(!validateStatus.includes(status)) throw new BadRequestException("Isi Yang Benar")
@@ -162,6 +169,7 @@ export class FormService {
   // Delete Form
   async deleteForm(req: { id: number}, form_id) {
     const isCreator = await this.isCreator.isCreator(req.id, form_id.id)
+    if(isCreator != 'Creator') throw new UnauthorizedException("Anda Tidak Berhak Menghapus Form Ini")
     const deleteForm = await this.knexService.connection("forms")
     .delete()
     .where("id", form_id.id)
@@ -171,16 +179,31 @@ export class FormService {
     }
   }
 
-  // Get My Submit History
-  async getMySubmitForm(req: { id: number, username: string }, form_id: number) {
-    return this.submitService.getMySubmitForm(req, form_id)
+  // Jadi collaborator
+  async changeRole(req: { id: number, username: string}, form_id, token_collab: string){
+    const isCreator = await this.isCreator.isCreator(req.id, form_id.id)
+    if(isCreator == 'Collaborator' || isCreator == 'Creator') throw new UnauthorizedException("Anda sudah menjadi bagian dari form ini")
+
+    // Get Form
+    if(form_id.token_collab != token_collab) throw new BadRequestException("Token Salah")
+    
+    const changeRole = await this.knexService.connection("user_form")
+    .insert({
+      user_id: req.id,
+      form_id: form_id.id,
+      access_type: 'Collaborator'
+    })
+    .returning("access_type")
+
+    return {
+      message: "Selamat Anda Sekarang Collaborator",
+      data: {
+        user_id: req.id,
+        username: req.username,
+        access_type: changeRole.access_type,
+        ...form_id,
+      }
+    }
   }
 
-  async getAllRespon(req: { id: number, username: string }, form_id: number) {
-    return this.submitService.getAllSubmitByForm(req, form_id)
-  }
-
-  async createSubmit(req: { id: number, username: string }, form_id: number, body: any) {
-    return this.submitService.createSubmitForm(req, form_id, body)
-  }
 }

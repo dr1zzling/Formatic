@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { SoalService } from './soal.service';
 import { SoalController } from './soal.controller';
-import { KnexModule } from 'src/database/knex.module';
+import { KnexModule } from '../database/knex.module';
 
 @Module({
   imports: [KnexModule],
