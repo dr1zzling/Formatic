@@ -3,167 +3,156 @@ import '../../../core/theme/app_colors.dart';
 
 class FormCard extends StatelessWidget {
   final String title;
-  final int questions;
-  final String responses;
-  final String badge;
-  final bool hasImage;
+  final String category;
+  final String status;
+  final int responses;
+  final int gradientIndex;
+  final VoidCallback? onTap;
+  final VoidCallback? onFill;
 
   const FormCard({
     super.key,
     required this.title,
-    required this.questions,
+    required this.category,
+    required this.status,
     required this.responses,
-    required this.badge,
-    required this.hasImage,
+    required this.gradientIndex,
+    this.onTap,
+    this.onFill,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 4,
-                      ),
+    final gradient = AppColors.cardGradients[gradientIndex % AppColors.cardGradients.length];
+    final isPublic = status.toLowerCase() == 'public';
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFF3F4F6)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header gradient + status badge
+            Container(
+              height: 128,
+              decoration: BoxDecoration(gradient: gradient),
+              child: Stack(
+                children: [
+                  Center(
+                    child: Icon(
+                      Icons.description_outlined,
+                      size: 56,
+                      color: Colors.black.withOpacity(0.12),
+                    ),
+                  ),
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(12),
+                        color: isPublic
+                            ? const Color(0xFFDCFCE7)
+                            : const Color(0xFFF3F4F6),
+                        borderRadius: BorderRadius.circular(50),
                       ),
                       child: Text(
-                        badge,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                        status.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: isPublic
+                              ? const Color(0xFF15803D)
+                              : const Color(0xFF6B7280),
                         ),
-                      ),
-                    ),
-                    const Spacer(),
-                    Icon(
-                      Icons.more_vert,
-                      color: AppColors.textSecondary,
-                      size: 20,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.help_outline,
-                      size: 16,
-                      color: AppColors.textSecondary,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '$questions Questions',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    const Icon(
-                      Icons.people_outline,
-                      size: 16,
-                      color: AppColors.textSecondary,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '$responses Responses',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          if (hasImage)
-            Container(
-              height: 120,
-              margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(12),
-                image: const DecorationImage(
-                  image: NetworkImage(
-                    'https://via.placeholder.com/300x120/FF69B4/FFFFFF?text=Chart',
-                  ),
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-          if (!hasImage)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: AppColors.background,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.star_border,
-                        color: AppColors.primary,
-                        size: 28,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Container(
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: AppColors.background,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.thumb_up_outlined,
-                        color: AppColors.primary,
-                        size: 28,
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-        ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (category.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(50),
+                      ),
+                      child: Text(
+                        category,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2563EB),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 6),
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1F2937),
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '$responses Responses',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF9CA3AF),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: onFill,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            gradient: AppColors.primaryGradient,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'Fill Form',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

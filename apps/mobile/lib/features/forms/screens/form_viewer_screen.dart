@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/form_service.dart';
 
@@ -16,11 +17,14 @@ class FormViewerScreen extends StatefulWidget {
 
 class _FormViewerScreenState extends State<FormViewerScreen> {
   bool _isLoading = true;
-  String _errorMessage = '';
-  
+  bool _isSubmitting = false;
+  bool _submitted = false;
+  String _error = '';
+
   String _formTitle = '';
   String _category = '';
-  int _formId = 0;
+  String _formStatus = '';
+  int? _formId;
   List<Map<String, dynamic>> _questions = [];
 
   @override
@@ -32,309 +36,780 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
   Future<void> _loadForm() async {
     setState(() {
       _isLoading = true;
-      _errorMessage = '';
+      _error = '';
     });
 
-    try {
-      final result = await FormService.getFormBySlug(widget.slug);
-      
-      if (result['success']) {
-        final data = result['data']['data'];
-        
-        // Get form questions
-        final formId = data['form_id'];
-        final questionsResult = await FormService.getFormQuestions(formId);
-        
-        if (questionsResult['success']) {
-          final questionsData = questionsResult['data']['data'];
-          final listSoal = questionsData['list_soal'] as List;
-          
-          setState(() {
-            _formId = formId;
-            _formTitle = data['form_title'] ?? 'Untitled Form';
-            _category = questionsData['category'] ?? '';
-            _questions = listSoal.asMap().entries.map((entry) {
-              final index = entry.key;
-              final soal = entry.value;
-              return {
-                'id': soal['id'],
-                'number': index + 1,
-                'question': soal['question'],
-                'type': soal['type'],
-                'typeDisplay': _mapQuestionType(soal['type']),
-                'options': soal['options'] ?? [],
-                'answer': null, // For storing user's answer
-              };
-            }).toList();
-            _isLoading = false;
-          });
-        } else {
-          setState(() {
-            _errorMessage = questionsResult['message'] ?? 'Failed to load questions';
-            _isLoading = false;
-          });
-        }
-      } else {
-        setState(() {
-          _errorMessage = result['message'] ?? 'Failed to load form';
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
+    final result = await FormService.getFormBySlug(widget.slug);
+
+    if (!mounted) return;
+
+    if (result['success']) {
+      final data = result['data'] is Map
+          ? result['data']['data'] is Map
+              ? Map<String, dynamic>.from(result['data']['data'] as Map)
+              : <String, dynamic>{}
+          : <String, dynamic>{};
+
+      final List<dynamic> listSoal =
+          data['soal'] is List ? data['soal'] : <dynamic>[];
+
       setState(() {
-        _errorMessage = 'Error: ${e.toString()}';
+        _formTitle = (data['title'] ?? data['form_title'] ?? 'Untitled Form')
+            .toString();
+        _formId = int.tryParse('${data['form_id'] ?? data['id'] ?? ''}');
+        _category = _categoryName(data['category'], data['category_id']);
+        _formStatus = (data['status'] ?? data['form_status'] ?? '').toString();
+        _questions = listSoal.asMap().entries.map((entry) {
+          final index = entry.key;
+          final soal = entry.value is Map
+              ? Map<String, dynamic>.from(entry.value as Map)
+              : <String, dynamic>{};
+          return {
+            'id': soal['id'],
+            'number': index + 1,
+            'question': soal['question'] ?? '',
+            'type': soal['type'] ?? 'text',
+            'options': soal['options'] is List ? soal['options'] : [],
+            'answer': null,
+            'file': null,
+          };
+        }).toList();
+        _isLoading = false;
+      });
+    } else {
+      setState(() {
+        _error = result['message'] ?? 'Form tidak ditemukan atau tidak tersedia.';
         _isLoading = false;
       });
     }
   }
 
-  String _mapQuestionType(String type) {
-    switch (type.toLowerCase()) {
-      case 'radio':
-        return 'Single Choice';
-      case 'checkbox':
-        return 'Multiple Choice';
-      case 'text':
-        return 'Text Answer';
-      case 'file':
-        return 'File Upload';
-      case 'rating':
-        return 'Rating';
-      default:
-        return type;
+  String _categoryName(dynamic category, dynamic categoryId) {
+    if (category is String && category.isNotEmpty) return category;
+    if (categoryId == 1) return 'Quiz';
+    if (categoryId == 2) return 'Survey';
+    return '';
+  }
+
+  Future<void> _pickFile(Map<String, dynamic> question, int index) async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (picked != null && mounted) {
+      setState(() {
+        _questions[index]['answer'] = picked.name;
+        _questions[index]['file'] = picked;
+      });
     }
   }
 
-  void _handleSubmit() {
-    // Check if all required questions are answered
-    bool hasUnanswered = _questions.any((q) => q['answer'] == null);
-    
-    if (hasUnanswered) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please answer all questions before submitting'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+  void _removeFile(int index) {
+    setState(() {
+      _questions[index]['answer'] = null;
+      _questions[index]['file'] = null;
+    });
+  }
+
+  Future<void> _handleSubmit() async {
+    if (_formId == null) {
+      _showError('Form tidak valid, silakan muat ulang.');
       return;
     }
 
-    // Show submission not available message
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Submission Not Available'),
-        content: const Text(
-          'Form submission feature is coming soon!\n\n'
-          'Backend team is working on the submission endpoint.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
+    for (final q in _questions) {
+      final val = q['answer'];
+      if (val == null || (val is List && val.isEmpty)) {
+        _showError('Pertanyaan "${q['question']}" wajib diisi.');
+        return;
+      }
+    }
+
+    setState(() => _isSubmitting = true);
+
+    final answers = <Map<String, dynamic>>[];
+    final files = <XFile>[];
+
+    for (final q in _questions) {
+      final type = q['type'] as String;
+      final soalId = q['id'];
+
+      if (type == 'text') {
+        answers.add({'jawaban': {'soal_id': soalId, 'answer_text': q['answer']}});
+      } else if (type == 'file') {
+        final file = q['file'] as XFile;
+        files.add(file);
+        answers.add({'jawaban': {'soal_id': soalId, 'file_name': file.name}});
+      } else {
+        answers.add({
+          'jawaban': {'soal_id': soalId, 'soal_option_id': q['answer']},
+        });
+      }
+    }
+
+    final result = await FormService.submitForm(
+      formId: _formId!,
+      answers: answers,
+      files: files,
+    );
+
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    if (result['success']) {
+      setState(() => _submitted = true);
+    } else {
+      _showError(result['message'] ?? 'Gagal mengirim jawaban. Coba lagi.');
+    }
+  }
+
+  void _showError(String message) {
+    setState(() => _error = message);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.error,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    Widget body;
+
+    if (_isLoading) {
+      body = const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 32,
+              height: 32,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                color: AppColors.primary,
+              ),
+            ),
+            SizedBox(height: 12),
+            Text(
+              'Memuat form...',
+              style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+            ),
+          ],
+        ),
+      );
+    } else if (_error.isNotEmpty && _formTitle.isEmpty) {
+      body = _buildErrorState();
+    } else if (_submitted) {
+      body = _buildSubmittedState();
+    } else {
+      body = _buildContent();
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-        ),
-        title: const Text(
-          'Fill Form',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
+      appBar: _isLoading || (_error.isNotEmpty && _formTitle.isEmpty)
+          ? null
+          : _buildHeader(),
+      body: SafeArea(
+        child: _submitted || (_error.isNotEmpty && _formTitle.isEmpty)
+            ? body
+            : body,
+      ),
+    );
+  }
+
+  PreferredSizeWidget? _buildHeader() {
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(60),
+      child: Container(
+        color: Colors.white,
+        child: SafeArea(
+          bottom: false,
+          child: Row(
+            children: [
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.arrow_back, color: Color(0xFF9CA3AF)),
+              ),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _formTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1F2937),
+                      ),
+                    ),
+                    if (_category.isNotEmpty)
+                      Text(
+                        _category,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF9CA3AF),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                margin: const EdgeInsets.only(right: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _formStatus == 'public'
+                      ? const Color(0xFFDCFCE7)
+                      : const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(50),
+                ),
+                child: Text(
+                  (_formStatus.isEmpty ? 'private' : _formStatus).toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: _formStatus == 'public'
+                        ? const Color(0xFF15803D)
+                        : const Color(0xFF6B7280),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : _errorMessage.isNotEmpty
-              ? _buildErrorState()
-              : _buildContent(),
     );
   }
 
   Widget _buildErrorState() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 64, color: AppColors.error),
-            const SizedBox(height: 16),
+            const Text('😕', style: TextStyle(fontSize: 44)),
+            const SizedBox(height: 12),
             Text(
-              _errorMessage,
+              _error,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                fontSize: 16,
-                color: AppColors.textSecondary,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1F2937),
               ),
             ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _loadForm,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+            const SizedBox(height: 16),
+            GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                decoration: BoxDecoration(
+                  gradient: AppColors.primaryGradient,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Kembali ke Beranda',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
               ),
-              child: const Text('Retry'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubmittedState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Container(
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.check_circle, size: 56, color: Color(0xFF22C55E)),
+              const SizedBox(height: 16),
+              const Text(
+                'Jawaban Terkirim!',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1F2937),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text.rich(
+                TextSpan(
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF6B7280),
+                  ),
+                  children: [
+                    const TextSpan(text: 'Terima kasih telah mengisi '),
+                    TextSpan(
+                      text: _formTitle,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF374151),
+                      ),
+                    ),
+                  ],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: AppColors.primaryGradient,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'Kembali ke Beranda',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildContent() {
-    return Column(
-      children: [
-        // Form Header
-        Container(
-          width: double.infinity,
-          color: Colors.white,
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                _formTitle,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      _category,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    '${_questions.length} Questions',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // Questions List
-        Expanded(
-          child: _questions.isEmpty
-              ? _buildEmptyState()
-              : ListView.builder(
-                  padding: const EdgeInsets.all(20),
-                  itemCount: _questions.length,
-                  itemBuilder: (context, index) {
-                    final question = _questions[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: _buildQuestionCard(question, index),
-                    );
-                  },
-                ),
-        ),
-
-        // Submit Button
-        if (_questions.isNotEmpty)
+    return Container(
+      color: AppColors.background,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
+        children: [
+          // Form intro card
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFF3F4F6)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -4),
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
-            child: ElevatedButton(
-              onPressed: _handleSubmit,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _formTitle,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1F2937),
+                  ),
                 ),
-                elevation: 0,
+                const SizedBox(height: 4),
+                Text(
+                  '${_questions.length} pertanyaan',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF9CA3AF),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          if (_error.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFECACA)),
               ),
-              child: const Text(
-                'Submit Form',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('⚠️', style: TextStyle(fontSize: 13)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _error,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFFDC2626),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 12),
+
+          if (_questions.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 48),
+              child: Column(
+                children: [
+                  Text('📝', style: TextStyle(fontSize: 36)),
+                  SizedBox(height: 12),
+                  Text(
+                    'Form ini belum memiliki pertanyaan.',
+                    style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            ...List.generate(_questions.length, (index) {
+              final q = _questions[index];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _QuestionField(
+                  question: q,
+                  index: index,
+                  onAnswer: (v) => setState(() => _questions[index]['answer'] = v),
+                  onToggleCheckbox: (optId) {
+                    final current = _questions[index]['answer'];
+                    final list = current is List
+                        ? List<int>.from(current)
+                        : <int>[];
+                    if (list.contains(optId)) {
+                      list.remove(optId);
+                    } else {
+                      list.add(optId);
+                    }
+                    setState(() => _questions[index]['answer'] = list);
+                  },
+                  onFile: () => _pickFile(q, index),
+                  onRemoveFile: () => _removeFile(index),
+                ),
+              );
+            }),
+            const SizedBox(height: 8),
+            // Submit button
+            GestureDetector(
+              onTap: _isSubmitting ? null : _handleSubmit,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  gradient: AppColors.primaryGradient,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Kirim Jawaban',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                            SizedBox(width: 4),
+                            Icon(
+                              Icons.chevron_right,
+                              size: 18,
+                              color: Colors.white,
+                            ),
+                          ],
+                        ),
                 ),
               ),
             ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _QuestionField extends StatelessWidget {
+  final Map<String, dynamic> question;
+  final int index;
+  final void Function(dynamic value) onAnswer;
+  final void Function(int optId) onToggleCheckbox;
+  final VoidCallback onFile;
+  final VoidCallback onRemoveFile;
+
+  const _QuestionField({
+    required this.question,
+    required this.index,
+    required this.onAnswer,
+    required this.onToggleCheckbox,
+    required this.onFile,
+    required this.onRemoveFile,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final type = (question['type'] as String? ?? 'text');
+    final options = (question['options'] as List? ?? [])
+        .map((o) => Map<String, dynamic>.from(o as Map))
+        .toList();
+    final answer = question['answer'];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF3F4F6)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
-      ],
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text.rich(
+            TextSpan(
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1F2937),
+              ),
+              children: [
+                TextSpan(
+                  text: '${index + 1}. ',
+                  style: const TextStyle(
+                    color: Color(0xFF9CA3AF),
+                    fontWeight: FontWeight.normal,
+                  ),
+                ),
+                TextSpan(text: '${question['question'] ?? ''}'),
+                const TextSpan(
+                  text: ' *',
+                  style: TextStyle(color: Color(0xFFEF4444)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          if (type == 'radio') ...[
+            ...options.asMap().entries.map((entry) {
+              final oIdx = entry.key;
+              final opt = entry.value;
+              final selected = answer == opt['id'];
+              return _optionRow(
+                isCheckbox: false,
+                selected: selected,
+                value: opt['option_value'] ?? opt['value'],
+                index: oIdx,
+                onTap: () => onAnswer(opt['id']),
+              );
+            }),
+          ] else if (type == 'checkbox') ...[
+            ...options.asMap().entries.map((entry) {
+              final oIdx = entry.key;
+              final opt = entry.value;
+              final selected = (answer is List) && answer.contains(opt['id']);
+              return _optionRow(
+                isCheckbox: true,
+                selected: selected,
+                value: opt['option_value'] ?? opt['value'],
+                index: oIdx,
+                onTap: () => onToggleCheckbox(opt['id']),
+              );
+            }),
+          ] else if (type == 'text') ...[
+            TextField(
+              maxLines: 3,
+              style: const TextStyle(fontSize: 14),
+              onChanged: onAnswer,
+              decoration: InputDecoration(
+                hintText: 'Tulis jawaban Anda di sini...',
+                hintStyle: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF9CA3AF),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.all(14),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF60A5FA), width: 2),
+                ),
+              ),
+            ),
+          ] else if (type == 'file') ...[
+            _FileUploadField(
+              file: question['file'],
+              fileName: question['answer']?.toString(),
+              onPick: onFile,
+              onRemove: onRemoveFile,
+            ),
+          ] else if (type == 'rating') ...[
+            Wrap(
+              spacing: 8,
+              children: options.asMap().entries.map((entry) {
+                final oIdx = entry.key;
+                final opt = entry.value;
+                final selected = answer == opt['id'];
+                return GestureDetector(
+                  onTap: () => onAnswer(opt['id']),
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: selected ? const Color(0xFF3B82F6) : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: selected
+                            ? const Color(0xFF3B82F6)
+                            : const Color(0xFFE5E7EB),
+                        width: 2,
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        opt['option_value'] != null
+                            ? opt['option_value'].toString()
+                            : '${oIdx + 1}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: selected
+                              ? Colors.white
+                              : const Color(0xFF4B5563),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+  Widget _optionRow({
+    required bool isCheckbox,
+    required bool selected,
+    required dynamic value,
+    required int index,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFEFF6FF) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected
+                ? const Color(0xFF93C5FD)
+                : const Color(0xFFF3F4F6),
+          ),
+        ),
+        child: Row(
           children: [
-            Icon(
-              Icons.quiz_outlined,
-              size: 80,
-              color: AppColors.textSecondary.withOpacity(0.5),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'No Questions',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textSecondary,
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: isCheckbox ? BoxShape.rectangle : BoxShape.circle,
+                borderRadius: isCheckbox
+                    ? BorderRadius.circular(5)
+                    : null,
+                border: Border.all(
+                  color: selected
+                      ? const Color(0xFF3B82F6)
+                      : const Color(0xFFD1D5DB),
+                  width: 2,
+                ),
+                color: selected && isCheckbox
+                    ? const Color(0xFF3B82F6)
+                    : Colors.white,
               ),
+              child: selected && isCheckbox
+                  ? const Icon(Icons.check, size: 13, color: Colors.white)
+                  : (selected
+                      ? Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF3B82F6),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        )
+                      : null),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'This form doesn\'t have any questions yet',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary.withOpacity(0.7),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                value == null || value.toString().isEmpty
+                    ? 'Opsi ${index + 1}'
+                    : value.toString(),
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF374151),
+                ),
               ),
             ),
           ],
@@ -342,270 +817,112 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
       ),
     );
   }
+}
 
-  Widget _buildQuestionCard(Map<String, dynamic> question, int index) {
-    final options = question['options'] as List? ?? [];
-    final type = question['type'] as String;
+class _FileUploadField extends StatelessWidget {
+  final XFile? file;
+  final String? fileName;
+  final VoidCallback onPick;
+  final VoidCallback onRemove;
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Question number and type
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Q${question['number']}',
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
+  const _FileUploadField({
+    this.file,
+    this.fileName,
+    required this.onPick,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (file != null) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEFF6FF),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF93C5FD)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFFDBEAFE),
+                borderRadius: BorderRadius.circular(8),
               ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  question['typeDisplay'],
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
-          // Question text
-          Text(
-            question['question'],
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textPrimary,
-              height: 1.5,
+              child: const Center(child: Text('📎', style: TextStyle(fontSize: 16))),
             ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // Answer input based on type
-          if (type == 'radio' && options.isNotEmpty)
-            _buildRadioOptions(question, options, index)
-          else if (type == 'checkbox' && options.isNotEmpty)
-            _buildCheckboxOptions(question, options, index)
-          else if (type == 'text')
-            _buildTextInput(question, index)
-          else if (type == 'file')
-            _buildFileUpload(question, index)
-          else if (type == 'rating')
-            _buildRatingInput(question, index),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRadioOptions(Map<String, dynamic> question, List options, int index) {
-    return Column(
-      children: options.map((option) {
-        final optionValue = option['option_value'] ?? '';
-        final isSelected = question['answer'] == optionValue;
-
-        return InkWell(
-          onTap: () {
-            setState(() {
-              _questions[index]['answer'] = optionValue;
-            });
-          },
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isSelected ? AppColors.primary.withOpacity(0.1) : AppColors.background,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: isSelected ? AppColors.primary : AppColors.inputBorder,
-                width: isSelected ? 2 : 1,
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    optionValue,
-                    style: TextStyle(
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    fileName ?? (file?.name ?? 'file'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
                       fontSize: 14,
-                      color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF1F2937),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildCheckboxOptions(Map<String, dynamic> question, List options, int index) {
-    List<String> selectedValues = (question['answer'] as List<String>?) ?? [];
-
-    return Column(
-      children: options.map((option) {
-        final optionValue = option['option_value'] ?? '';
-        final isSelected = selectedValues.contains(optionValue);
-
-        return InkWell(
-          onTap: () {
-            setState(() {
-              if (isSelected) {
-                selectedValues.remove(optionValue);
-              } else {
-                selectedValues.add(optionValue);
-              }
-              _questions[index]['answer'] = selectedValues;
-            });
-          },
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isSelected ? AppColors.primary.withOpacity(0.1) : AppColors.background,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: isSelected ? AppColors.primary : AppColors.inputBorder,
-                width: isSelected ? 2 : 1,
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  isSelected ? Icons.check_box : Icons.check_box_outline_blank,
-                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    optionValue,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  Text(
+                    'Terpilih',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF9CA3AF),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildTextInput(Map<String, dynamic> question, int index) {
-    return TextField(
-      maxLines: 4,
-      decoration: InputDecoration(
-        hintText: 'Type your answer here...',
-        filled: true,
-        fillColor: AppColors.background,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.inputBorder),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.inputBorder),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
-        ),
-      ),
-      onChanged: (value) {
-        _questions[index]['answer'] = value;
-      },
-    );
-  }
-
-  Widget _buildFileUpload(Map<String, dynamic> question, int index) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.inputBorder, style: BorderStyle.solid),
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.upload_file, size: 40, color: AppColors.textSecondary),
-          const SizedBox(height: 12),
-          const Text(
-            'File upload coming soon',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
+            GestureDetector(
+              onTap: onRemove,
+              child: const Padding(
+                padding: EdgeInsets.all(6),
+                child: Icon(Icons.close, size: 16, color: Color(0xFF9CA3AF)),
+              ),
             ),
+          ],
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: onPick,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: const Color(0xFFE5E7EB),
+            width: 2,
           ),
-        ],
+        ),
+        child: const Column(
+          children: [
+            Icon(Icons.upload_outlined, size: 24, color: Color(0xFF9CA3AF)),
+            SizedBox(height: 8),
+            Text(
+              'Klik untuk unggah file',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF6B7280),
+              ),
+            ),
+            SizedBox(height: 2),
+            Text(
+              'Semua format file diterima',
+              style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+            ),
+          ],
+        ),
       ),
-    );
-  }
-
-  Widget _buildRatingInput(Map<String, dynamic> question, int index) {
-    int selectedRating = question['answer'] ?? 0;
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(5, (starIndex) {
-        final rating = starIndex + 1;
-        return IconButton(
-          onPressed: () {
-            setState(() {
-              _questions[index]['answer'] = rating;
-            });
-          },
-          icon: Icon(
-            rating <= selectedRating ? Icons.star : Icons.star_border,
-            color: rating <= selectedRating ? Colors.amber : AppColors.textSecondary,
-            size: 32,
-          ),
-        );
-      }),
     );
   }
 }

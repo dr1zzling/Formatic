@@ -1,9 +1,22 @@
+import 'package:flutter/foundation.dart';
+
 class ApiConfig {
-  // Base URLs - Using localhost for web
-  // For Android Emulator: use 10.0.2.2
-  // For Physical Device: use computer IP (10.10.18.61)
-  static const String userApiBaseUrl = 'http://localhost:3001';
-  static const String formApiBaseUrl = 'http://localhost:3000';
+  // Base URLs - Using localhost for web & desktop.
+  // For Android Emulator, 10.0.2.2 maps to the host machine's localhost.
+  // For Physical Device: use computer IP (10.10.18.61) instead.
+  static String get userApiBaseUrl {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:3000';
+    }
+    return 'http://localhost:3000';
+  }
+
+  static String get formApiBaseUrl {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:3001';
+    }
+    return 'http://localhost:3001';
+  }
   
   // User API Endpoints
   static const String loginEndpoint = '/user/login';

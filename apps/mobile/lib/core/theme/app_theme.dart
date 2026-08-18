@@ -7,16 +7,16 @@ class AppTheme {
       primaryColor: AppColors.primary,
       scaffoldBackgroundColor: AppColors.background,
       fontFamily: 'Inter',
-      
+
       colorScheme: const ColorScheme.light(
         primary: AppColors.primary,
         secondary: AppColors.primaryDark,
         surface: AppColors.surface,
         error: AppColors.error,
       ),
-      
+
       appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
         elevation: 0,
         iconTheme: IconThemeData(color: AppColors.textPrimary),
         titleTextStyle: TextStyle(
@@ -25,7 +25,7 @@ class AppTheme {
           fontWeight: FontWeight.w600,
         ),
       ),
-      
+
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.inputFill,
@@ -39,7 +39,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+          borderSide: const BorderSide(color: AppColors.primaryLight, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -51,7 +51,7 @@ class AppTheme {
           fontSize: 14,
         ),
       ),
-      
+
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
@@ -67,17 +67,17 @@ class AppTheme {
           ),
         ),
       ),
-      
+
       textTheme: const TextTheme(
         displayLarge: TextStyle(
           fontSize: 32,
           fontWeight: FontWeight.bold,
-          color: AppColors.textPrimary,
+          color: AppColors.navy,
         ),
         displayMedium: TextStyle(
           fontSize: 24,
           fontWeight: FontWeight.bold,
-          color: AppColors.textPrimary,
+          color: AppColors.navy,
         ),
         bodyLarge: TextStyle(
           fontSize: 16,

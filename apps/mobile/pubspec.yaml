@@ -44,6 +44,10 @@ dependencies:
   # State Management
   provider: ^6.1.1
 
+  # Image Picker
+  image_picker: ^1.1.2
+  http_parser: ^4.0.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

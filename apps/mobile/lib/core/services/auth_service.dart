@@ -90,6 +90,41 @@ class AuthService {
     }
   }
 
+  // Forgot password (reset password via username)
+  static Future<Map<String, dynamic>> forgotPassword({
+    required String username,
+    required String password,
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.userApiBaseUrl}/user/forgot-password');
+
+      final response = await http.put(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'username': username,
+          'password': password,
+        }),
+      ).timeout(ApiConfig.timeout);
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {'success': true, 'message': data['message'] ?? 'Password berhasil diubah'};
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Gagal mengubah password',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Connection error: ${e.toString()}',
+      };
+    }
+  }
+
   // Logout
   static Future<bool> logout() async {
     return await StorageService.clearAll();

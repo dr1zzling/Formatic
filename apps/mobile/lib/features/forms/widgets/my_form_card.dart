@@ -23,6 +23,8 @@ class MyFormCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCreator = role.toLowerCase() == 'creator';
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -46,7 +48,7 @@ class MyFormCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: role == 'CREATOR'
+                    color: isCreator
                         ? AppColors.primary.withOpacity(0.15)
                         : AppColors.textSecondary.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(8),
@@ -54,7 +56,7 @@ class MyFormCard extends StatelessWidget {
                   child: Text(
                     role,
                     style: TextStyle(
-                      color: role == 'CREATOR' ? AppColors.primary : AppColors.textSecondary,
+                      color: isCreator ? AppColors.primary : AppColors.textSecondary,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
