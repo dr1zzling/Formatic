@@ -24,11 +24,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
       _isLoading = true;
     });
 
-    // For now, show message that history feature needs backend
-    // In real implementation, this would fetch from submission history endpoint
-    
     await Future.delayed(const Duration(milliseconds: 500));
-    
+
     setState(() {
       _historyItems = [];
       _isLoading = false;
@@ -42,33 +39,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: Row(
                 children: [
-                  Text(
+                  const Text(
                     'History',
-                    style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                      fontFamily: 'Plus Jakarta Sans',
+                    ),
                   ),
                   const Spacer(),
                   IconButton(
-                    onPressed: () {
-                      _showInfoDialog();
-                    },
-                    icon: const Icon(Icons.info_outline),
+                    onPressed: _showInfoDialog,
+                    icon: Icon(Icons.info_outline, color: AppColors.blueButton),
                   ),
                 ],
               ),
             ),
-
-            // Content
+            const SizedBox(height: 16),
             Expanded(
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                  ? const Center(child: CircularProgressIndicator(color: AppColors.blueAccent))
                   : _historyItems.isEmpty
                       ? _buildEmptyState(context)
                       : RefreshIndicator(
@@ -103,11 +98,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
       builder: (context) => AlertDialog(
         title: const Row(
           children: [
-            Icon(Icons.info_outline, color: AppColors.primary),
+            Icon(Icons.info_outline, color: AppColors.blueAccent),
             SizedBox(width: 12),
             Text('History Feature'),
           ],
         ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         content: const Text(
           'Form submission history feature requires backend endpoints:\n\n'
           '• GET /form/:id/responses\n'
@@ -120,7 +116,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Got it'),
+            child: Text('Got it', style: TextStyle(color: AppColors.blueAccent)),
           ),
         ],
       ),
@@ -138,29 +134,33 @@ class _HistoryScreenState extends State<HistoryScreen> {
               width: 120,
               height: 120,
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
+                color: AppColors.blueAccent.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.history,
                 size: 60,
-                color: AppColors.primary,
+                color: AppColors.blueAccent,
               ),
             ),
             const SizedBox(height: 24),
-            Text(
+            const Text(
               'No History Yet',
-              style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+                fontFamily: 'Plus Jakarta Sans',
+              ),
             ),
             const SizedBox(height: 12),
             Text(
               'Your form submission history will\nappear here once backend endpoints\nare available',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontSize: 15,
-                  ),
+              style: TextStyle(
+                fontSize: 15,
+                color: AppColors.textSecondary,
+                fontFamily: 'Plus Jakarta Sans',
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -169,8 +169,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
               icon: const Icon(Icons.info_outline),
               label: const Text('Learn More'),
               style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                side: const BorderSide(color: AppColors.primary),
+                foregroundColor: AppColors.blueAccent,
+                side: const BorderSide(color: AppColors.blueAccent),
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
             ),

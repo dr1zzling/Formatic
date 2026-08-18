@@ -24,7 +24,6 @@ class AuthService {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
-        // Save token and username
         await StorageService.saveToken(data['token']);
         await StorageService.saveUsername(username);
         
@@ -67,7 +66,6 @@ class AuthService {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 201) {
-        // Save token and username
         await StorageService.saveToken(data['token']);
         await StorageService.saveUsername(username);
         
@@ -90,31 +88,34 @@ class AuthService {
     }
   }
 
-  // Forgot password (reset password via username)
-  static Future<Map<String, dynamic>> forgotPassword({
+  // Forgot password / Reset password
+  static Future<Map<String, dynamic>> resetPassword({
     required String username,
-    required String password,
+    required String newPassword,
   }) async {
     try {
-      final url = Uri.parse('${ApiConfig.userApiBaseUrl}/user/forgot-password');
-
+      final url = Uri.parse('${ApiConfig.userApiBaseUrl}${ApiConfig.forgotPasswordEndpoint}');
+      
       final response = await http.put(
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'username': username,
-          'password': password,
+          'password': newPassword,
         }),
       ).timeout(ApiConfig.timeout);
 
       final data = jsonDecode(response.body);
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return {'success': true, 'message': data['message'] ?? 'Password berhasil diubah'};
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Password updated successfully',
+        };
       } else {
         return {
           'success': false,
-          'message': data['message'] ?? 'Gagal mengubah password',
+          'message': data['message'] ?? 'Failed to update password',
         };
       }
     } catch (e) {

@@ -15,37 +15,65 @@ class HistoryCard extends StatelessWidget {
     required this.responses,
   });
 
+  Color _getTypeColor() {
+    switch (type.toLowerCase()) {
+      case 'ujian':
+      case 'exam':
+        return AppColors.catUjian;
+      case 'survey':
+        return AppColors.catSurvey;
+      default:
+        return AppColors.catDefault;
+    }
+  }
+
+  Color _getTypeBgColor() {
+    switch (type.toLowerCase()) {
+      case 'ujian':
+      case 'exam':
+        return AppColors.catUjianBg;
+      case 'survey':
+        return AppColors.catSurveyBg;
+      default:
+        return AppColors.catDefaultBg;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final typeColor = _getTypeColor();
+    final typeBg = _getTypeBgColor();
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.cardBorder),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+            color: AppColors.cardShadow,
+            blurRadius: 12,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+              color: typeBg,
+              borderRadius: BorderRadius.circular(9),
             ),
             child: Icon(
               Icons.description_outlined,
-              color: AppColors.primary,
-              size: 24,
+              color: typeColor,
+              size: 20,
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -53,7 +81,7 @@ class HistoryCard extends StatelessWidget {
                 Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 16,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
@@ -64,26 +92,26 @@ class HistoryCard extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      date,
-                      style: const TextStyle(
-                        fontSize: 13,
+                      type,
+                      style: TextStyle(
+                        fontSize: 11,
                         color: AppColors.textSecondary,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     Container(
-                      width: 4,
-                      height: 4,
-                      decoration: const BoxDecoration(
-                        color: AppColors.textSecondary,
+                      width: 3,
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: AppColors.textHint,
                         shape: BoxShape.circle,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     Text(
-                      '$responses responses',
-                      style: const TextStyle(
-                        fontSize: 13,
+                      date,
+                      style: TextStyle(
+                        fontSize: 11,
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -94,7 +122,8 @@ class HistoryCard extends StatelessWidget {
           ),
           Icon(
             Icons.chevron_right,
-            color: AppColors.textSecondary,
+            color: AppColors.textHint,
+            size: 18,
           ),
         ],
       ),

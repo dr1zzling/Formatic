@@ -23,20 +23,19 @@ class MyFormCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isCreator = role.toLowerCase() == 'creator';
-
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.cardBorder),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              color: AppColors.cardShadow,
+              blurRadius: 12,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -48,24 +47,25 @@ class MyFormCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: isCreator
-                        ? AppColors.primary.withOpacity(0.15)
-                        : AppColors.textSecondary.withOpacity(0.15),
+                    color: role == 'CREATOR'
+                        ? AppColors.blueAccent.withOpacity(0.1)
+                        : AppColors.textSecondary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     role,
                     style: TextStyle(
-                      color: isCreator ? AppColors.primary : AppColors.textSecondary,
+                      color: role == 'CREATOR' ? AppColors.blueAccent : AppColors.textSecondary,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
+                      fontFamily: 'Plus Jakarta Sans',
                     ),
                   ),
                 ),
                 const Spacer(),
                 Icon(
                   Icons.more_vert,
-                  color: AppColors.textSecondary,
+                  color: AppColors.textHint,
                   size: 20,
                 ),
               ],
@@ -74,72 +74,79 @@ class MyFormCard extends StatelessWidget {
             Text(
               title,
               style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
+                fontFamily: 'Plus Jakarta Sans',
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Icon(
                   Icons.help_outline,
-                  size: 16,
+                  size: 14,
                   color: AppColors.textSecondary,
                 ),
                 const SizedBox(width: 4),
                 Text(
                   '$questions Questions',
-                  style: const TextStyle(
-                    fontSize: 13,
+                  style: TextStyle(
+                    fontSize: 12,
                     color: AppColors.textSecondary,
+                    fontFamily: 'Plus Jakarta Sans',
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 14),
                 if (responses != null) ...[
                   Icon(
                     Icons.people_outline,
-                    size: 16,
+                    size: 14,
                     color: AppColors.textSecondary,
                   ),
                   const SizedBox(width: 4),
                   Text(
                     '$responses Responses',
-                    style: const TextStyle(
-                      fontSize: 13,
+                    style: TextStyle(
+                      fontSize: 12,
                       color: AppColors.textSecondary,
+                      fontFamily: 'Plus Jakarta Sans',
                     ),
                   ),
                 ],
                 if (visibility != null) ...[
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 14),
                   Icon(
                     visibility == 'private' ? Icons.lock_outline : Icons.visibility_outlined,
-                    size: 16,
+                    size: 14,
                     color: AppColors.textSecondary,
                   ),
                   const SizedBox(width: 4),
                   Text(
                     visibility!,
-                    style: const TextStyle(
-                      fontSize: 13,
+                    style: TextStyle(
+                      fontSize: 12,
                       color: AppColors.textSecondary,
+                      fontFamily: 'Plus Jakarta Sans',
                     ),
                   ),
                 ],
                 if (lastUpdated != null) ...[
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 14),
                   Icon(
                     Icons.access_time,
-                    size: 16,
+                    size: 14,
                     color: AppColors.textSecondary,
                   ),
                   const SizedBox(width: 4),
                   Text(
                     lastUpdated!,
-                    style: const TextStyle(
-                      fontSize: 13,
+                    style: TextStyle(
+                      fontSize: 12,
                       color: AppColors.textSecondary,
+                      fontFamily: 'Plus Jakarta Sans',
                     ),
                   ),
                 ],

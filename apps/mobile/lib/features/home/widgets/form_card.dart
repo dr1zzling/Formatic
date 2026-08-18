@@ -3,153 +3,114 @@ import '../../../core/theme/app_colors.dart';
 
 class FormCard extends StatelessWidget {
   final String title;
-  final String category;
-  final String status;
-  final int responses;
-  final int gradientIndex;
-  final VoidCallback? onTap;
-  final VoidCallback? onFill;
+  final int questions;
+  final String responses;
+  final String badge;
+  final bool hasImage;
 
   const FormCard({
     super.key,
     required this.title,
-    required this.category,
-    required this.status,
+    required this.questions,
     required this.responses,
-    required this.gradientIndex,
-    this.onTap,
-    this.onFill,
+    required this.badge,
+    required this.hasImage,
   });
+
+  Color _getBadgeColor() {
+    switch (badge.toLowerCase()) {
+      case 'public':
+        return AppColors.blueAccent;
+      case 'private':
+        return AppColors.textSecondary;
+      default:
+        return AppColors.blueAccent;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final gradient = AppColors.cardGradients[gradientIndex % AppColors.cardGradients.length];
-    final isPublic = status.toLowerCase() == 'public';
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFF3F4F6)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.cardBorder),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.cardShadow,
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header gradient + status badge
-            Container(
-              height: 128,
-              decoration: BoxDecoration(gradient: gradient),
-              child: Stack(
-                children: [
-                  Center(
-                    child: Icon(
-                      Icons.description_outlined,
-                      size: 56,
-                      color: Colors.black.withOpacity(0.12),
-                    ),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _getBadgeColor().withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: isPublic
-                            ? const Color(0xFFDCFCE7)
-                            : const Color(0xFFF3F4F6),
-                        borderRadius: BorderRadius.circular(50),
-                      ),
-                      child: Text(
-                        status.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: isPublic
-                              ? const Color(0xFF15803D)
-                              : const Color(0xFF6B7280),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (category.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(50),
-                      ),
-                      child: Text(
-                        category,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF2563EB),
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 6),
-                  Text(
-                    title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 14,
+                  child: Text(
+                    badge,
+                    style: TextStyle(
+                      color: _getBadgeColor(),
+                      fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1F2937),
-                      height: 1.3,
+                      fontFamily: 'Plus Jakarta Sans',
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '$responses Responses',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF9CA3AF),
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: onFill,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            gradient: AppColors.primaryGradient,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            'Fill Form',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                ),
+                const Spacer(),
+                Icon(
+                  Icons.more_vert,
+                  color: AppColors.textHint,
+                  size: 20,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+                fontFamily: 'Plus Jakarta Sans',
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(Icons.help_outline, size: 14, color: AppColors.textSecondary),
+                const SizedBox(width: 4),
+                Text(
+                  '$questions Questions',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                    fontFamily: 'Plus Jakarta Sans',
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Icon(Icons.people_outline, size: 14, color: AppColors.textSecondary),
+                const SizedBox(width: 4),
+                Text(
+                  '$responses Responses',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                    fontFamily: 'Plus Jakarta Sans',
+                  ),
+                ),
+              ],
             ),
           ],
         ),

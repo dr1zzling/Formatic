@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
@@ -75,54 +74,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
         content: Text('Share feature coming soon!'),
         backgroundColor: AppColors.primary,
       ),
-    );
-  }
-
-  // The backend returns the QR code as a base64 data URL (data:image/png;base64,...),
-  // which Image.network cannot render. Decode it into bytes instead.
-  Uint8List? _decodeQrCodeBytes() {
-    final dataUrl = _qrCodeDataUrl;
-    if (dataUrl == null || dataUrl.isEmpty) return null;
-    try {
-      final base64Data =
-          dataUrl.contains(',') ? dataUrl.split(',').last : dataUrl;
-      return base64Decode(base64Data);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Widget _buildQrImage() {
-    final bytes = _decodeQrCodeBytes();
-    if (bytes == null) {
-      return Container(
-        width: 250,
-        height: 250,
-        color: AppColors.background,
-        child: const Icon(
-          Icons.qr_code,
-          size: 100,
-          color: AppColors.textSecondary,
-        ),
-      );
-    }
-    return Image.memory(
-      bytes,
-      width: 250,
-      height: 250,
-      fit: BoxFit.contain,
-      errorBuilder: (context, error, stackTrace) {
-        return Container(
-          width: 250,
-          height: 250,
-          color: AppColors.background,
-          child: const Icon(
-            Icons.qr_code,
-            size: 100,
-            color: AppColors.textSecondary,
-          ),
-        );
-      },
     );
   }
 
@@ -240,7 +191,24 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                 if (_qrCodeDataUrl != null)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: _buildQrImage(),
+                    child: Image.network(
+                      _qrCodeDataUrl!,
+                      width: 250,
+                      height: 250,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          width: 250,
+                          height: 250,
+                          color: AppColors.background,
+                          child: const Icon(
+                            Icons.qr_code,
+                            size: 100,
+                            color: AppColors.textSecondary,
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 const SizedBox(height: 24),
                 Container(

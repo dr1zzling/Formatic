@@ -3,11 +3,11 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/services/form_service.dart';
 import '../widgets/form_card.dart';
-import '../../forms/widgets/create_form_sheet.dart';
-import '../../forms/screens/form_viewer_screen.dart';
+import '../widgets/category_chip.dart';
+import '../../forms/screens/create_form_screen.dart';
 import '../../forms/screens/my_forms_screen.dart';
+import '../../history/screens/history_screen.dart';
 import '../../profile/screens/profile_screen.dart';
-import '../../trash/screens/trash_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,132 +22,97 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _screens = [
     const _HomeContent(),
     const MyFormsScreen(),
-    const TrashScreen(),
+    const SizedBox(),
+    const HistoryScreen(),
     const ProfileScreen(),
   ];
 
-  void _createForm() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => CreateFormSheet(
-        onCreated: (slug) {
-          Navigator.of(sheetContext).pop();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Form created successfully!'),
-                backgroundColor: AppColors.success,
-              ),
-            );
-          }
-        },
+  void _navigateToCreateForm() async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const CreateFormScreen(),
       ),
     );
+
+    if (result == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Form created successfully!'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: IndexedStack(index: _selectedIndex, children: _screens),
-      bottomNavigationBar: _FloatingNav(
-        currentIndex: _selectedIndex,
-        onTap: (index) => setState(() => _selectedIndex = index),
-        onAdd: _createForm,
-      ),
-    );
-  }
-}
-
-// ── Floating pill bottom navigation (sama dengan web mobile) ────────────────
-class _FloatingNav extends StatelessWidget {
-  final int currentIndex;
-  final ValueChanged<int> onTap;
-  final VoidCallback onAdd;
-
-  const _FloatingNav({
-    required this.currentIndex,
-    required this.onTap,
-    required this.onAdd,
-  });
-
-  static const _items = [
-    (icon: Icons.home, label: 'Home'),
-    (icon: Icons.description_outlined, label: 'My Form'),
-    (icon: Icons.delete_outline, label: 'Trash'),
-    (icon: Icons.person_outline, label: 'Profil'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: Container(
-        decoration: BoxDecoration(
+      body: _selectedIndex == 2 ? const SizedBox() : _screens[_selectedIndex],
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: const [
+          border: Border(
+            top: BorderSide(color: Color(0xFFE0EAF6), width: 1),
+          ),
+          boxShadow: [
             BoxShadow(
-              color: Color(0x1F000000),
-              blurRadius: 32,
-              offset: Offset(0, 8),
+              color: Color(0x0D000000),
+              blurRadius: 20,
+              offset: Offset(0, -4),
             ),
           ],
         ),
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          children: List.generate(_items.length, (i) {
-            final item = _items[i];
-            final active = currentIndex == i;
-            return Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => onTap(i),
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  decoration: BoxDecoration(
-                    color: active
-                        ? const Color(0x1F005FB3)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        item.icon,
-                        size: 21,
-                        color: active
-                            ? AppColors.primary
-                            : const Color(0xFF9CA3AF),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        item.label,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: active
-                              ? AppColors.primary
-                              : const Color(0xFF9CA3AF),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }),
+        child: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: (index) {
+            if (index == 2) {
+              _navigateToCreateForm();
+            } else {
+              setState(() {
+                _selectedIndex = index;
+              });
+            }
+          },
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.white,
+          elevation: 0,
+          selectedItemColor: AppColors.blueAccent,
+          unselectedItemColor: AppColors.textHint,
+          selectedFontSize: 10,
+          unselectedFontSize: 10,
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.description_outlined),
+              activeIcon: Icon(Icons.description),
+              label: 'My Forms',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.add_circle, size: 36),
+              label: '',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.history_outlined),
+              activeIcon: Icon(Icons.history),
+              label: 'History',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: 'Profile',
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// ── Dashboard content (sama dengan web Home) ────────────────────────────────
 class _HomeContent extends StatefulWidget {
   const _HomeContent();
 
@@ -156,16 +121,19 @@ class _HomeContent extends StatefulWidget {
 }
 
 class _HomeContentState extends State<_HomeContent> {
-  static const _categories = ['All', 'Public', 'Quiz', 'Survey'];
-
   String _selectedCategory = 'All';
   String _username = 'User';
   bool _isLoading = true;
-  String _error = '';
   List<Map<String, dynamic>> _allForms = [];
   List<Map<String, dynamic>> _filteredForms = [];
-  final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+
+  final List<Map<String, dynamic>> _categories = [
+    {'label': 'All', 'selected': true},
+    {'label': 'Public', 'selected': false},
+    {'label': 'Quiz', 'selected': false},
+    {'label': 'Survey', 'selected': false},
+  ];
 
   @override
   void initState() {
@@ -174,507 +142,579 @@ class _HomeContentState extends State<_HomeContent> {
     _loadForms();
   }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  String _categoryName(Map<String, dynamic> form) {
-    final cat = form['category'];
-    if (cat is String && cat.isNotEmpty) return cat;
-    final id = form['category_id'];
-    if (id == 1) return 'Quiz';
-    if (id == 2) return 'Survey';
-    return '';
-  }
-
   Future<void> _loadUsername() async {
     final username = await StorageService.getUsername();
     if (username != null && mounted) {
-      setState(() => _username = username);
+      setState(() {
+        _username = username;
+      });
     }
   }
 
   Future<void> _loadForms() async {
     setState(() {
       _isLoading = true;
-      _error = '';
     });
 
     final result = await FormService.getForms();
 
     if (result['success'] && mounted) {
-      final responseData =
-          result['data'] is Map ? result['data']['data'] : null;
-      final List<dynamic> forms = responseData is List ? responseData : [];
+      final responseData = result['data']['data'];
+      final List<dynamic> forms = responseData ?? [];
 
       setState(() {
-        _allForms = forms.asMap().entries.map((entry) {
-          final form = (entry.value is Map)
-              ? Map<String, dynamic>.from(entry.value as Map)
-              : <String, dynamic>{};
-          return {
-            'index': entry.key,
-            'title': form['title'] ?? form['form_title'] ?? 'Untitled Form',
-            'slug': form['slug'] ?? form['form_slug'] ?? '',
-            'status': form['status'] ?? form['form_status'] ?? 'private',
-            'category': _categoryName(form),
-            'responses': form['total_respon'] is int
-                ? form['total_respon']
-                : (form['responses'] ?? 0),
-          };
+        _allForms = forms.map((form) => {
+          'id': form['id'].toString(),
+          'form_id': form['id'],
+          'title': form['form_title'] ?? 'Untitled Form',
+          'slug': form['form_slug'] ?? '',
+          'status': form['form_status'] ?? 'private',
+          'category': form['category'] ?? '',
+          'category_id': form['category_id'],
+          'questions': 0,
+          'responses': '0',
+          'badge': (form['form_status'] ?? 'private').toUpperCase(),
+          'hasImage': false,
         }).toList();
         _applyFilter();
         _isLoading = false;
       });
     } else {
       setState(() {
-        _error = result['message'] ?? 'Gagal memuat form.';
         _isLoading = false;
       });
     }
   }
 
   void _applyFilter() {
-    final query = _searchQuery.trim().toLowerCase();
-    _filteredForms = _allForms.where((form) {
-      final matchesCategory = _selectedCategory == 'All' ||
-          (_selectedCategory == 'Public'
-              ? (form['status'] as String).toLowerCase() == 'public'
-              : (form['category'] as String).toLowerCase() ==
-                  _selectedCategory.toLowerCase());
-      final matchesQuery = query.isEmpty ||
-          (form['title'] as String).toLowerCase().contains(query);
-      return matchesCategory && matchesQuery;
-    }).toList();
+    List<Map<String, dynamic>> filtered = List.from(_allForms);
+
+    if (_selectedCategory != 'All') {
+      filtered = filtered.where((form) {
+        final category = (form['category'] as String).toLowerCase();
+        return category == _selectedCategory.toLowerCase();
+      }).toList();
+    }
+
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered.where((form) {
+        final title = (form['title'] as String).toLowerCase();
+        return title.contains(_searchQuery.toLowerCase());
+      }).toList();
+    }
+
+    setState(() {
+      _filteredForms = filtered;
+    });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Hi, $_username!',
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1F2937),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                _circleBtn(const Icon(Icons.notifications_none, size: 18)),
-                const SizedBox(width: 8),
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    gradient: AppColors.avatarGradient,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text(
-                      _username.isNotEmpty ? _username[0].toUpperCase() : 'U',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+  Color _getCategoryColor(String category) {
+    switch (category.toLowerCase()) {
+      case 'ujian':
+      case 'exam':
+        return AppColors.catUjian;
+      case 'survey':
+        return AppColors.catSurvey;
+      default:
+        return AppColors.catDefault;
+    }
+  }
 
-          // Search
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-            child: Container(
+  Color _getCategoryBgColor(String category) {
+    switch (category.toLowerCase()) {
+      case 'ujian':
+      case 'exam':
+        return AppColors.catUjianBg;
+      case 'survey':
+        return AppColors.catSurveyBg;
+      default:
+        return AppColors.catDefaultBg;
+    }
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                color: AppColors.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
               ),
-              child: TextField(
-                controller: _searchController,
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                    _applyFilter();
-                  });
-                },
-                style: const TextStyle(fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: 'Search forms or templates...',
-                  hintStyle: const TextStyle(
-                    color: Color(0xFF9CA3AF),
-                    fontSize: 14,
-                  ),
-                  prefixIcon: const Icon(
-                    Icons.search,
-                    size: 18,
-                    color: Color(0xFF9CA3AF),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(
-                      color: AppColors.primaryLight,
-                    ),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                ),
+              child: Icon(
+                Icons.description_outlined,
+                size: 60,
+                color: AppColors.primary,
               ),
             ),
-          ),
-
-          // Category tabs + refresh
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 36,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              children: [
-                ..._categories.map((cat) {
-                  final selected = _selectedCategory == cat;
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedCategory = cat;
-                        _applyFilter();
-                      });
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: selected
-                            ? AppColors.primaryGradient
-                            : null,
-                        color: selected ? null : Colors.white,
-                        borderRadius: BorderRadius.circular(50),
-                        border: selected
-                            ? null
-                            : Border.all(color: const Color(0xFFE5E7EB)),
-                        boxShadow: selected
-                            ? [
-                                BoxShadow(
-                                  color:
-                                      AppColors.primary.withOpacity(0.3),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: Center(
-                        child: Text(
-                          cat,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: selected
-                                ? Colors.white
-                                : const Color(0xFF4B5563),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-                const SizedBox(width: 4),
-                GestureDetector(
-                  onTap: _loadForms,
-                  child: Container(
-                    width: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE5E7EB)),
-                    ),
-                    child: const Icon(
-                      Icons.refresh,
-                      size: 15,
-                      color: Color(0xFF6B7280),
-                    ),
+            const SizedBox(height: 24),
+            Text(
+              'No Forms Yet',
+              style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                   ),
-                ),
-              ],
             ),
-          ),
-
-          // Content
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Recommended Forms',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1F2937),
-                        ),
-                      ),
-                      const Text(
-                        'View all →',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF3B82F6),
-                        ),
-                      ),
-                    ],
+            const SizedBox(height: 12),
+            Text(
+              'Start creating your first form by tapping\nthe + button below',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontSize: 15,
                   ),
-                  const SizedBox(height: 12),
-                  Expanded(child: _buildBody()),
-                ],
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const CreateFormScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Create Form'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.blueAccent,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _circleBtn(Widget child) {
-    return Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Center(
-        child: DefaultTextStyle(
-          style: const TextStyle(color: Color(0xFF6B7280)),
-          child: child,
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildBody() {
-    if (_isLoading) {
-      return ListView(
-        children: List.generate(4, (_) => const _SkeletonCard()),
-      );
-    }
-
-    if (_error.isNotEmpty && _allForms.isEmpty) {
-      return _EmptyState(
-        icon: '😕',
-        title: _error,
-        buttonLabel: 'Coba Lagi',
-        onPressed: _loadForms,
-      );
-    }
-
-    if (_filteredForms.isEmpty) {
-      return _EmptyState(
-        icon: _allForms.isEmpty ? '📋' : '🔍',
-        title: _allForms.isEmpty ? 'Belum ada form tersedia' : 'Form tidak ditemukan',
-        subtitle: _allForms.isEmpty
-            ? 'Coba kategori lain atau buat form baru.'
-            : 'Coba kata kunci lain.',
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadForms,
-      child: ListView.separated(
-        padding: const EdgeInsets.only(bottom: 24),
-        itemCount: _filteredForms.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 16),
-        itemBuilder: (context, index) {
-          final form = _filteredForms[index];
-          final slug = form['slug'] as String;
-          return FormCard(
-            title: form['title'],
-            category: form['category'],
-            status: form['status'],
-            responses: form['responses'],
-            gradientIndex: form['index'],
-            onTap: slug.isNotEmpty
-                ? () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => FormViewerScreen(slug: slug),
-                      ),
-                    );
-                  }
-                : null,
-            onFill: slug.isNotEmpty
-                ? () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => FormViewerScreen(slug: slug),
-                      ),
-                    );
-                  }
-                : null,
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _SkeletonCard extends StatelessWidget {
-  const _SkeletonCard();
-
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 200,
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF3F4F6)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(height: 120, color: const Color(0xFFF3F4F6)),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 80,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.circular(6),
+      color: AppColors.background,
+      child: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Hi, $_username! 👋',
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                            fontFamily: 'Plus Jakarta Sans',
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Fill out forms, give responses, and share your feedback.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                            fontFamily: 'Plus Jakarta Sans',
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  width: 180,
-                  height: 16,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.circular(6),
+                  Container(
+                    width: 39,
+                    height: 39,
+                    decoration: BoxDecoration(
+                      color: AppColors.blueAccent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        _username.isNotEmpty ? _username[0].toUpperCase() : 'U',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 20),
+            // Search Bar
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.inputBorder),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.cardShadow,
+                      blurRadius: 12,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: TextField(
+                  onChanged: (value) {
+                    _searchQuery = value;
+                    _applyFilter();
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Search forms or templates...',
+                    hintStyle: TextStyle(
+                      color: AppColors.textHint,
+                      fontSize: 13,
+                    ),
+                    prefixIcon: Icon(Icons.search, color: AppColors.blueButton, size: 20),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Category Chips
+            SizedBox(
+              height: 36,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                itemCount: _categories.length,
+                itemBuilder: (context, index) {
+                  final category = _categories[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: CategoryChip(
+                      label: category['label'],
+                      isSelected: _selectedCategory == category['label'],
+                      onTap: () {
+                        setState(() {
+                          _selectedCategory = category['label'];
+                          _applyFilter();
+                        });
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Content
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator(color: AppColors.blueAccent))
+                  : _allForms.isEmpty
+                      ? _buildEmptyState(context)
+                      : RefreshIndicator(
+                          onRefresh: _loadForms,
+                          child: ListView(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            children: [
+                              // Create Form Card
+                              _buildCreateFormCard(),
+                              const SizedBox(height: 16),
+                              // Forms List
+                              if (_filteredForms.isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.all(40),
+                                  child: Column(
+                                    children: [
+                                      Icon(
+                                        Icons.search_off,
+                                        size: 64,
+                                        color: AppColors.textSecondary.withOpacity(0.5),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        'No $_selectedCategory forms found',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else
+                                ..._filteredForms.map((form) {
+                                  final cat = (form['category'] as String?) ?? 'default';
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: _buildFormListItem(form, cat),
+                                  );
+                                }),
+                              const SizedBox(height: 20),
+                            ],
+                          ),
+                        ),
+            ),
+          ],
+        ),
       ),
     );
   }
-}
 
-class _EmptyState extends StatelessWidget {
-  final String icon;
-  final String title;
-  final String? subtitle;
-  final String? buttonLabel;
-  final VoidCallback? onPressed;
-
-  const _EmptyState({
-    required this.icon,
-    required this.title,
-    this.subtitle,
-    this.buttonLabel,
-    this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
+  Widget _buildCreateFormCard() {
+    return GestureDetector(
+      onTap: () async {
+        final result = await Navigator.of(context).push(
+          MaterialPageRoute(builder: (context) => const CreateFormScreen()),
+        );
+        if (result == true) _loadForms();
+      },
+      child: Container(
+        width: double.infinity,
         padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(icon, style: const TextStyle(fontSize: 44)),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF374151),
-              ),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFFFFFFF), Color(0xFFF2F8FF)],
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.cardBorder),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.cardShadow,
+              blurRadius: 25,
+              offset: const Offset(0, 8),
             ),
-            if (subtitle != null) ...[
-              const SizedBox(height: 6),
-              Text(
-                subtitle!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF9CA3AF),
-                ),
-              ),
-            ],
-            if (buttonLabel != null) ...[
-              const SizedBox(height: 16),
-              GestureDetector(
-                onTap: onPressed,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    buttonLabel!,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'FORM MAKER',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.blueButton,
+                      letterSpacing: 1,
                     ),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Buat Form\nSemudah Ini',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF103B86),
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Buat form yang menarik, bagikan ke\nsiapapun, dan dapatkan respons.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.blueAccent,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add, color: Colors.white, size: 18),
+                        SizedBox(width: 6),
+                        Text(
+                          'Create Form',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
+            // Mini form illustration
+            Container(
+              width: 120,
+              height: 140,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0x29195496),
+                    blurRadius: 18,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    height: 26,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF1760CE),
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: List.generate(
+                        3,
+                        (i) => Padding(
+                          padding: const EdgeInsets.only(left: 10, top: 9),
+                          child: Container(
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.7),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      children: List.generate(
+                        3,
+                        (i) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 18,
+                                height: 18,
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: const Color(0xFF5596D8), width: 2),
+                                  shape: i == 1 ? BoxShape.rectangle : BoxShape.circle,
+                                  borderRadius: i == 1 ? BorderRadius.circular(3) : null,
+                                  color: i == 1 ? const Color(0xFFE3F2FF) : null,
+                                ),
+                                child: i == 1
+                                    ? const Center(
+                                        child: Text('✓', style: TextStyle(fontSize: 8, color: Color(0xFF1767CE))),
+                                      )
+                                    : null,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      height: 4,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFDCE7F3),
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Container(
+                                      height: 4,
+                                      width: 50,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFDCE7F3),
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFormListItem(Map<String, dynamic> form, String category) {
+    final catColor = _getCategoryColor(category);
+    final catBg = _getCategoryBgColor(category);
+
+    return GestureDetector(
+      onTap: () {},
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.cardBorder),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.cardShadow,
+              blurRadius: 12,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: catBg,
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Icon(Icons.description_outlined, color: catColor, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    form['title'] ?? 'Untitled',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${form['category'] ?? '—'} • 0 responses',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.textHint),
           ],
         ),
       ),

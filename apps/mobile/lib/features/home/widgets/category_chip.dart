@@ -18,20 +18,21 @@ class CategoryChip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.white,
+          color: isSelected ? AppColors.navy : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.inputBorder,
+            color: isSelected ? AppColors.navy : const Color(0xFFD9E6F6),
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : AppColors.textSecondary,
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
+            color: isSelected ? Colors.white : AppColors.textPrimary,
+            fontWeight: FontWeight.w500,
+            fontSize: 12,
+            fontFamily: 'Plus Jakarta Sans',
           ),
         ),
       ),

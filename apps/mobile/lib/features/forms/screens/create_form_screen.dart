@@ -15,70 +15,65 @@ class CreateFormScreen extends StatefulWidget {
 class _CreateFormScreenState extends State<CreateFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
-  String _category = 'Ujian';
-  bool _isLoading = false;
+  final _tokenController = TextEditingController();
+  String _selectedCategory = 'ujian';
   XFile? _bannerFile;
   Uint8List? _bannerBytes;
-
-  final List<String> _categories = ['Ujian', 'Survei'];
+  bool _isLoading = false;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void dispose() {
     _titleController.dispose();
+    _tokenController.dispose();
     super.dispose();
   }
 
-  Future<void> _pickBanner() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(
+  Future<void> _pickImage() async {
+    final XFile? image = await _picker.pickImage(
       source: ImageSource.gallery,
-      maxWidth: 1920,
-      maxHeight: 1080,
+      maxWidth: 1024,
+      maxHeight: 1024,
       imageQuality: 85,
     );
-    if (picked != null) {
-      final bytes = await picked.readAsBytes();
+    if (image != null) {
+      final bytes = await image.readAsBytes();
       setState(() {
-        _bannerFile = picked;
+        _bannerFile = image;
         _bannerBytes = bytes;
       });
     }
   }
 
   void _handleCreateForm() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = true;
+      });
 
-    if (_bannerFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Banner wajib dipilih'),
-          backgroundColor: Colors.red,
-        ),
+      final result = await FormService.createForm(
+        title: _titleController.text.trim(),
+        category: _selectedCategory,
+        tokenRespon: _tokenController.text.trim(),
+        bannerBytes: _bannerBytes,
+        bannerName: _bannerFile?.name,
+        bannerMimeType: _bannerFile?.mimeType,
       );
-      return;
-    }
 
-    setState(() => _isLoading = true);
+      setState(() {
+        _isLoading = false;
+      });
 
-    final result = await FormService.createForm(
-      title: _titleController.text.trim(),
-      category: _category,
-      bannerFile: _bannerFile!,
-    );
-
-    setState(() => _isLoading = false);
-
-    if (!mounted) return;
-
-    if (result['success']) {
-      Navigator.of(context).pop(true);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['message'] ?? 'Failed to create form'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      if (result['success'] && mounted) {
+        Navigator.of(context).pop(true);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to create form'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
@@ -91,6 +86,7 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const AppLogo(),
                 const SizedBox(height: 40),
@@ -114,8 +110,7 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
                       children: [
                         Text(
                           'Create New Form',
-                          style: Theme.of(context).textTheme.displayMedium
-                              ?.copyWith(
+                          style: Theme.of(context).textTheme.displayMedium?.copyWith(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -126,8 +121,6 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                         const SizedBox(height: 32),
-
-                        // ── Form Title ──
                         Text(
                           'FORM TITLE',
                           style: Theme.of(context).textTheme.labelLarge,
@@ -139,145 +132,139 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
                             hintText: 'e.g. Customer Satisfaction Survey',
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: AppColors.inputBorder,
-                              ),
+                              borderSide: const BorderSide(color: AppColors.inputBorder),
                             ),
                           ),
-                          validator: (v) => (v == null || v.isEmpty)
-                              ? 'Please enter a form title'
-                              : null,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter a form title';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 24),
-
-                        // ── Category ──
                         Text(
-                          'KATEGORI',
+                          'CATEGORY',
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildCategoryOption(
+                                label: 'Ujian / Quiz',
+                                value: 'ujian',
+                                icon: Icons.quiz_outlined,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildCategoryOption(
+                                label: 'Survey',
+                                value: 'survei',
+                                icon: Icons.poll_outlined,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          'TOKEN RESPON',
                           style: Theme.of(context).textTheme.labelLarge,
                         ),
                         const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: AppColors.inputBorder),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: _category,
-                              isExpanded: true,
-                              items: _categories
-                                  .map(
-                                    (c) => DropdownMenuItem(
-                                      value: c,
-                                      child: Text(c),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (val) {
-                                if (val != null) {
-                                  setState(() => _category = val);
-                                }
-                              },
+                        TextFormField(
+                          controller: _tokenController,
+                          decoration: InputDecoration(
+                            hintText: 'Masukkan token respon',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: AppColors.inputBorder),
                             ),
                           ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Token respon wajib diisi';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 24),
-
-                        // ── Banner ──
                         Text(
-                          'BANNER *',
+                          'BANNER IMAGE',
                           style: Theme.of(context).textTheme.labelLarge,
                         ),
                         const SizedBox(height: 8),
                         GestureDetector(
-                          onTap: _pickBanner,
+                          onTap: _pickImage,
                           child: Container(
+                            height: 120,
                             width: double.infinity,
-                            height: 140,
                             decoration: BoxDecoration(
-                              color: Colors.grey[100],
+                              color: AppColors.background,
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: _bannerFile == null
-                                    ? AppColors.inputBorder
-                                    : AppColors.primary,
-                                width: _bannerFile == null ? 1 : 2,
-                              ),
+                              border: Border.all(color: AppColors.inputBorder),
+                              image: _bannerBytes != null
+                                  ? DecorationImage(
+                                      image: MemoryImage(_bannerBytes!),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : null,
                             ),
-                            child: _bannerFile != null
-                                ? ClipRRect(
-                                    borderRadius: BorderRadius.circular(11),
-                                    child: Stack(
-                                      children: [
-                                        // File paths can't be loaded by NetworkImage on Android,
-                                        // so render the picked image from its bytes instead.
-                                        Image.memory(
-                                          _bannerBytes!,
-                                          width: double.infinity,
-                                          height: double.infinity,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (_, _, _) =>
-                                              _bannerPlaceholder(),
+                            child: _bannerBytes == null
+                                ? Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.cloud_upload_outlined,
+                                        size: 40,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Tap to upload banner',
+                                        style: TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 14,
                                         ),
-                                        Positioned(
-                                          top: 8,
-                                          right: 8,
-                                          child: GestureDetector(
-                                            onTap: () => setState(() {
-                                              _bannerFile = null;
-                                              _bannerBytes = null;
-                                            }),
-                                            child: Container(
-                                              padding: const EdgeInsets.all(4),
-                                              decoration: const BoxDecoration(
-                                                color: Colors.black54,
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: const Icon(
-                                                Icons.close,
-                                                color: Colors.white,
-                                                size: 16,
-                                              ),
-                                            ),
-                                          ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'JPG, PNG, WEBP (Max 5MB)',
+                                        style: TextStyle(
+                                          color: AppColors.textHint,
+                                          fontSize: 12,
                                         ),
-                                        // Overlay "file dipilih"
-                                        if (_bannerBytes != null)
-                                          Positioned(
-                                            bottom: 0,
-                                            left: 0,
-                                            right: 0,
-                                            child: Container(
-                                              padding: const EdgeInsets.all(8),
-                                              decoration: const BoxDecoration(
-                                                color: Colors.black45,
-                                                borderRadius:
-                                                    BorderRadius.vertical(
-                                                      bottom: Radius.circular(
-                                                        11,
-                                                      ),
-                                                    ),
-                                              ),
-                                              child: Text(
-                                                _bannerFile!.name,
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 11,
-                                                ),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   )
-                                : _bannerPlaceholder(),
+                                : Align(
+                                    alignment: Alignment.topRight,
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          _bannerFile = null;
+                                          _bannerBytes = null;
+                                        });
+                                      },
+                                      child: Container(
+                                        margin: const EdgeInsets.all(8),
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.black54,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.close,
+                                          color: Colors.white,
+                                          size: 16,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                           ),
                         ),
                         const SizedBox(height: 32),
-
-                        // ── Submit ──
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
@@ -288,9 +275,7 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
                                     width: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                     ),
                                   )
                                 : const Text('Create Form'),
@@ -300,7 +285,9 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: TextButton(
-                            onPressed: () => Navigator.of(context).pop(),
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                            },
                             child: Text(
                               'Cancel',
                               style: TextStyle(
@@ -322,21 +309,48 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
     );
   }
 
-  Widget _bannerPlaceholder() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(Icons.image_outlined, size: 36, color: Colors.grey[400]),
-        const SizedBox(height: 8),
-        Text(
-          'Ketuk untuk pilih banner',
-          style: TextStyle(color: Colors.grey[500], fontSize: 13),
+  Widget _buildCategoryOption({
+    required String label,
+    required String value,
+    required IconData icon,
+  }) {
+    final isSelected = _selectedCategory == value;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedCategory = value;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.inputBorder,
+            width: isSelected ? 2 : 1,
+          ),
         ),
-        Text(
-          'JPG, PNG, WEBP · Maks 5MB',
-          style: TextStyle(color: Colors.grey[400], fontSize: 11),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: isSelected ? Colors.white : AppColors.textSecondary,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

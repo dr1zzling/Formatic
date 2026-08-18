@@ -32,7 +32,12 @@ class CustomTextField extends StatelessWidget {
       children: [
         Text(
           label,
-          style: Theme.of(context).textTheme.labelLarge,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.navy,
+            fontFamily: 'Plus Jakarta Sans',
+          ),
         ),
         const SizedBox(height: 8),
         TextFormField(
@@ -41,6 +46,10 @@ class CustomTextField extends StatelessWidget {
           validator: validator,
           decoration: InputDecoration(
             hintText: hint,
+            hintStyle: TextStyle(
+              color: AppColors.textHint,
+              fontSize: 13,
+            ),
             prefixIcon: Icon(
               prefixIcon,
               color: AppColors.textHint,

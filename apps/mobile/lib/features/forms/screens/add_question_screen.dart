@@ -5,13 +5,13 @@ import '../../../core/services/form_service.dart';
 class AddQuestionScreen extends StatefulWidget {
   final String formId;
   final String formTitle;
-  final String formSlug;
+  final String? formSlug;
 
   const AddQuestionScreen({
     super.key,
     required this.formId,
     required this.formTitle,
-    required this.formSlug,
+    this.formSlug,
   });
 
   @override
@@ -81,18 +81,8 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
       return;
     }
 
-    if (widget.formSlug.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Form slug is missing. Please try again.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
-    }
-
-    // Validate options only for radio/checkbox (rating generates its own options)
-    if (_selectedType == 'radio' || _selectedType == 'checkbox') {
+    // Validate options if needed
+    if (_needsOptions()) {
       bool hasEmptyOption = _optionControllers.any((c) => c.text.trim().isEmpty);
       if (hasEmptyOption) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -110,39 +100,49 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
     });
 
     try {
-      List<Map<String, dynamic>> options;
-
-      if (_selectedType == 'rating') {
-        options = List.generate(5, (i) {
-          return {
-            'value': (i + 1).toString(),
-            'is_correct': false,
-          };
-        });
-      } else if (_needsOptions()) {
-        options = _optionControllers.asMap().entries.map((entry) {
-          final index = entry.key;
-          final controller = entry.value;
-          return {
-            'value': controller.text.trim(),
-            'is_correct': _correctOptionIndex == index,
-          };
-        }).toList();
-      } else {
-        options = [];
+      final formId = int.tryParse(widget.formId);
+      if (formId == null) {
+        throw Exception('Invalid form ID');
       }
 
-      final Map<String, dynamic> payload = {
-        'soal': {
-          'question': _questionController.text.trim(),
-          'type': _selectedType,
-        },
-        if (options.isNotEmpty) 'options': options,
-      };
+      final List<Map<String, dynamic>> questions = [];
+
+      if (_needsOptions()) {
+        // For questions with options
+        final optionValues = _optionControllers
+            .asMap()
+            .entries
+            .map((entry) {
+              final index = entry.key;
+              final controller = entry.value;
+              return {
+                'value': controller.text.trim(),
+                'is_correct': _correctOptionIndex == index, // Individual is_correct per option
+              };
+            })
+            .toList();
+
+        questions.add({
+          'soal': {
+            'question': _questionController.text.trim(),
+            'type': _selectedType,
+          },
+          'options': optionValues,
+        });
+      } else {
+        // For text/file questions (no options)
+        questions.add({
+          'soal': {
+            'question': _questionController.text.trim(),
+            'type': _selectedType,
+          },
+          'options': [],
+        });
+      }
 
       final result = await FormService.createQuestions(
-        formSlug: widget.formSlug,
-        questions: [payload],
+        formSlug: widget.formSlug ?? '',
+        questions: questions,
       );
 
       setState(() {
@@ -450,7 +450,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                     ],
                   ),
                 );
-              }),
+              }).toList(),
               if (_correctOptionIndex != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
