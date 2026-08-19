@@ -155,18 +155,24 @@ export default function FormEditor() {
     setSaving(true); setError("");
     try {
       const payload = newOnes.map((q) => {
-        const hasOpts = ["radio", "checkbox"].includes(q.type);
+        const hasOpts = ["radio", "checkbox", "rating"].includes(q.type);
         return {
-          soal: { question: q.question, type: q.type },
+          soal: { question: q.question, type: q.type, image: null },
           options: hasOpts
-            ? q.options.filter((o) => o.value.trim()).map((o) => ({
+            ? q.options.filter((o) => o.value?.trim()).map((o) => ({
                 value: o.value,
-                is_correct: Boolean(o.is_correct),
+                image: null,
               }))
             : [],
         };
       });
-      await api.post("/form/soal", payload, { params: { form_slug: slug } });
+      // Backend expect multipart/form-data dengan field 'data' berisi JSON string
+      const fd = new FormData();
+      fd.append("data", JSON.stringify(payload));
+      await api.post("/form/soal", fd, {
+        params: { form_slug: slug },
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       showToast(`${newOnes.length} soal berhasil disimpan!`);
       loadForm();
     } catch (e) { setError(e.response?.data?.message || "Gagal menyimpan soal."); }
@@ -561,30 +567,23 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemo
 
 /* ── Responses Tab ──────────────────────────────────────────── */
 function ResponsesTab({ formId, form }) {
-  const [responses, setResponses]   = useState([]);
-  const [loading, setLoading]       = useState(true);
+  const formSlug = form?.slug ?? form?.form_slug;
+  const [summary, setSummary]           = useState(null);
+  const [loading, setLoading]           = useState(true);
   const [activeSubTab, setActiveSubTab] = useState("Ringkasan");
 
   useEffect(() => {
-    (async () => {
-      try {
-        if (!formId) return;
-        const [respRes] = await Promise.all([
-          api.get(`/form/${formId}/submit`).catch(() => ({ data: { data: [] } })),
-        ]);
-        const data = respRes.data?.data ?? [];
-        setResponses(Array.isArray(data) ? data : []);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [formId]);
+    if (!formSlug) { setLoading(false); return; }
+    api.get("/form/submit", { params: { form_slug: formSlug } })
+      .then(res => setSummary(res.data?.data ?? null))
+      .catch(() => setSummary(null))
+      .finally(() => setLoading(false));
+  }, [formSlug]);
 
-  // Build per-question stats from responses
-  const questionStats = buildQuestionStats(responses);
-  const total = responses.length;
-  const isPublic = form?.status === "public" || form?.form_status === "public";
-  const title = form?.title ?? form?.form_title ?? "Form";
+  const total     = summary?.total_submit ?? 0;
+  const questions = summary?.questions    ?? [];
+  const isPublic  = form?.status === "public" || form?.form_status === "public";
+  const title     = form?.title ?? form?.form_title ?? "Form";
 
   return (
     <div className="min-h-full px-8 py-6 pb-16" style={{ background: "linear-gradient(135deg,#ffffff 0%,#f5f9ff 55%,#edf5ff 100%)" }}>
@@ -662,8 +661,8 @@ function ResponsesTab({ formId, form }) {
             </div>
 
             {/* PER-QUESTION CARDS */}
-            {questionStats.map((q, qi) => (
-              <div key={q.soal_id ?? qi} className="mx-[22px] mb-4 p-[22px] border border-[#e7edf6] rounded-xl bg-white">
+            {questions.map((q, qi) => (
+              <div key={q.id ?? qi} className="mx-[22px] mb-4 p-[22px] border border-[#e7edf6] rounded-xl bg-white">
                 <div className="flex justify-between items-start gap-4 mb-5">
                   <div>
                     <h3 className="m-0 text-[14px] font-semibold text-[#142d63] flex items-center gap-2 flex-wrap">
@@ -678,7 +677,7 @@ function ResponsesTab({ formId, form }) {
                 </div>
 
                 {/* RADIO/CHECKBOX → donut */}
-                {(q.type === "radio" || q.type === "checkbox") && q.options.length > 0 && (
+                {(q.type === "radio" || q.type === "checkbox") && (q.options ?? []).length > 0 && (
                   <div className="flex items-center gap-[50px] pl-2 flex-wrap">
                     <div className="shrink-0 flex justify-center">
                       <div className="relative w-[138px] h-[138px] rounded-full flex items-center justify-center"
@@ -691,11 +690,11 @@ function ResponsesTab({ formId, form }) {
                       </div>
                     </div>
                     <div className="flex-1 min-w-[200px] flex flex-col gap-3">
-                      {q.options.map((opt, oi) => (
+                      {(q.options ?? []).map((opt, oi) => (
                         <div key={oi} className="grid gap-2 text-[11px] text-[#50658d]" style={{ gridTemplateColumns: "12px 1fr auto" }}>
                           <span className="w-2.5 h-2.5 rounded-full mt-0.5 shrink-0" style={{ background: CHART_COLORS[oi % CHART_COLORS.length] }} />
-                          <span>{opt.value}</span>
-                          <strong className="text-[#142d63] text-[11px]">{opt.count} ({pct(opt.count, total)}%)</strong>
+                          <span>{opt.value ?? opt.option_value}</span>
+                          <strong className="text-[#142d63] text-[11px]">{opt.total_answer ?? 0} ({pct(opt.total_answer ?? 0, total)}%)</strong>
                         </div>
                       ))}
                     </div>
@@ -705,12 +704,9 @@ function ResponsesTab({ formId, form }) {
                 {/* TEXT answers */}
                 {q.type === "text" && (
                   <div className="flex flex-col gap-2.5 px-2">
-                    {q.textAnswers.length === 0
-                      ? <p className="text-[12px] text-[#8ca0ba]">Belum ada jawaban teks.</p>
-                      : q.textAnswers.map((t, ti) => (
-                          <div key={ti} className="px-4 py-3 bg-[#f7faff] border border-[#e8eef7] rounded-lg text-[12px] text-[#3a5280] leading-relaxed">{t}</div>
-                        ))
-                    }
+                    <p className="text-[12px] text-[#8ca0ba]">
+                      {total > 0 ? `${total} jawaban teks masuk.` : "Belum ada jawaban teks."}
+                    </p>
                   </div>
                 )}
               </div>
@@ -740,11 +736,13 @@ function buildConicGradient(options, total) {
   const COLORS = ["#3d91ef","#19c26b","#31b8b2","#ff626b","#a55be9","#f5a623","#9aa5b8"];
   let deg = 0;
   const stops = options.map((opt, i) => {
-    const share = total > 0 ? (opt.count / total) * 360 : 0;
+    const count = opt.total_answer ?? opt.count ?? 0;
+    const share = total > 0 ? (count / total) * 360 : 0;
     const start = deg;
     deg += share;
     return `${COLORS[i % COLORS.length]} ${start}deg ${deg}deg`;
   });
+  if (deg < 360) stops.push(`#e8eef7 ${deg}deg 360deg`);
   return `conic-gradient(${stops.join(", ")})`;
 }
 

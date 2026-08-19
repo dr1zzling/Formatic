@@ -255,7 +255,7 @@ function HistoryPengerjaan({ loading }) {
     <section className="bg-white border border-[#e0eaf6] rounded-xl shadow-[0_8px_25px_rgba(35,83,145,0.08)] p-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="m-0 text-[16px] font-bold text-[#17366d]">History Pengerjaan</h3>
-        <button className="bg-transparent border-none text-[#1764d6] text-[11px] font-semibold cursor-pointer">View all</button>
+        <button onClick={() => navigate("/history")} className="bg-transparent border-none text-[#1764d6] text-[11px] font-semibold cursor-pointer hover:underline">View all</button>
       </div>
       <div className="flex flex-col divide-y divide-[#edf2f8]">
         {loading && [...Array(4)].map((_, i) => (

@@ -61,4 +61,19 @@ export const authAPI = {
     }),
 };
 
+// Submit API helpers
+export const submitAPI = {
+  // Cek token sebelum isi form: POST /form/submit?form_slug=
+  checkToken: (form_slug, token) =>
+    api.post("/form/submit", { token }, { params: { form_slug } }),
+
+  // Get ringkasan jawaban (untuk creator): GET /form/submit?form_slug=
+  getSummary: (form_slug) =>
+    api.get("/form/submit", { params: { form_slug } }),
+
+  // Get detail jawaban per responden: GET /form/submit/detail?form_slug=
+  getDetail: (form_slug) =>
+    api.get("/form/submit/detail", { params: { form_slug } }),
+};
+
 export default api;

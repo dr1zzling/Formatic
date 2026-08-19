@@ -46,12 +46,13 @@ function SkeletonCard() {
 
 /* ── Create Form Modal ───────────────────────────────────────── */
 function CreateModal({ onClose, onCreated }) {
-  const [title, setTitle]     = useState("");
-  const [cat, setCat]         = useState("ujian");
-  const [banner, setBanner]   = useState(null);
-  const [preview, setPreview] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
+  const [title, setTitle]             = useState("");
+  const [cat, setCat]                 = useState("ujian");
+  const [banner, setBanner]           = useState(null);
+  const [preview, setPreview]         = useState(null);
+  const [tokenRespon, setTokenRespon] = useState("");
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState("");
 
   function handleFile(e) {
     const f = e.target.files[0];
@@ -69,6 +70,7 @@ function CreateModal({ onClose, onCreated }) {
       fd.append("title", title.trim());
       fd.append("category", cat);
       fd.append("banner", banner);
+      fd.append("token_respon", tokenRespon.trim());
       const res  = await fetch(`${FORM_API}/form`, {
         method: "POST",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -133,6 +135,20 @@ function CreateModal({ onClose, onCreated }) {
               }
               <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} className="absolute inset-0 opacity-0 cursor-pointer" />
             </label>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-[#4d6a82] uppercase tracking-wider mb-1.5">
+              Token Responden
+              <span className="ml-1 text-[10px] text-[#8ca0ba] normal-case tracking-normal font-normal">(opsional — kosongkan jika form terbuka untuk umum)</span>
+            </label>
+            <input
+              className="w-full h-10 border border-[#d9e8f1] rounded-lg px-3.5 text-[14px] text-[#183056] outline-none bg-[#f7fbff] focus:border-[#3d91b2] focus:bg-white focus:ring-4 focus:ring-[#3d91b2]/10 transition-all box-border"
+              placeholder="Contoh: TOKEN123"
+              value={tokenRespon}
+              onChange={e => { setTokenRespon(e.target.value); setError(""); }}
+            />
+            <p className="text-[11px] text-[#8ca0ba] mt-1">Token digunakan untuk membatasi siapa yang bisa mengisi form ini.</p>
           </div>
         </div>
 

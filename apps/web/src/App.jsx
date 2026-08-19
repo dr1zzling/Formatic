@@ -7,6 +7,7 @@ import FormEditor from "./pages/Dashboard/FormEditor";
 import FillForm   from "./pages/Dashboard/FillForm";
 import Trash      from "./pages/Dashboard/Trash";
 import Profile    from "./pages/Dashboard/Profile";
+import History    from "./pages/Dashboard/History";
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("token");
@@ -33,8 +34,9 @@ function App() {
         <Route path="/home"      element={<ProtectedRoute><Home /></ProtectedRoute>} />
         <Route path="/my-forms"  element={<ProtectedRoute><MyForms /></ProtectedRoute>} />
         <Route path="/form/:slug" element={<ProtectedRoute><FormEditor /></ProtectedRoute>} />
-        <Route path="/fill/:slug" element={<ProtectedRoute><FillForm /></ProtectedRoute>} />
-        <Route path="/trash"     element={<ProtectedRoute><Trash /></ProtectedRoute>} />
+        <Route path="/fill/:slug"  element={<ProtectedRoute><FillForm /></ProtectedRoute>} />
+        <Route path="/history"    element={<ProtectedRoute><History /></ProtectedRoute>} />
+        <Route path="/trash"      element={<ProtectedRoute><Trash /></ProtectedRoute>} />
         <Route path="/profile"   element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
         {/* Fallback */}
