@@ -2,9 +2,10 @@ import { BadRequestException, Body, Controller, Get, Param, Post, Query, Uploade
 import { SoalService } from './soal.service';
 import { ValidateFormExist } from '../Pipe/validate.form.exist';
 import { JwtAuthGuard } from '../guard/jwt.auth.guard';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
+import { memoryStorage } from 'multer';
 
 @Controller('form/soal')
 export class SoalController {
@@ -14,6 +15,20 @@ export class SoalController {
   @UseGuards(JwtAuthGuard)
   getSoalByForm(@Param('id', ValidateFormExist) id: string) {
     return this.soalService.getSoalByForm(Number(id))
+  }
+
+  @Post('import')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  importDocx(
+    @Query('form_slug', ValidateFormExist) form_slug: any,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file || extname(file.originalname).toLowerCase() !== '.docx') {
+      throw new BadRequestException('File harus berformat .docx')
+    }
+
+    return this.soalService.importDocx(form_slug, file.buffer)
   }
 
   @Post()

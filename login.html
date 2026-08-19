@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistem Otentikasi</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 min-h-screen flex items-center justify-center p-4">
+
+  <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
+    
+    <!-- Tab Navigation -->
+    <div class="flex border-b border-gray-200 mb-6">
+      <button id="tab-login-btn" onclick="switchTab('login')" class="flex-1 py-2 font-semibold text-blue-600 border-b-2 border-blue-600">Login</button>
+      <button id="tab-register-btn" onclick="switchTab('register')" class="flex-1 py-2 font-semibold text-gray-500 hover:text-blue-600">Register</button>
+      <button id="tab-forgot-btn" onclick="switchTab('forgot')" class="flex-1 py-2 font-semibold text-gray-500 hover:text-blue-600 text-sm">Lupa Password</button>
+    </div>
+
+    <!-- Alert Box -->
+    <div id="alert-box" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+
+    <!-- Form Login -->
+    <form id="form-login" onsubmit="handleLogin(event)" class="space-y-4">
+      <h2 class="text-xl font-bold text-gray-800 text-center">Masuk ke Akun</h2>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+        <input type="text" id="login-username" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+        <input type="password" id="login-password" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+      </div>
+      <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition duration-200">Login</button>
+    </form>
+
+    <!-- Form Register -->
+    <form id="form-register" onsubmit="handleRegister(event)" class="space-y-4 hidden">
+      <h2 class="text-xl font-bold text-gray-800 text-center">Daftar Akun Baru</h2>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+        <input type="text" id="register-username" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+        <input type="password" id="register-password" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+      </div>
+      <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-lg transition duration-200">Register</button>
+    </form>
+
+    <!-- Form Lupa Password -->
+    <form id="form-forgot" onsubmit="handleForgotPassword(event)" class="space-y-4 hidden">
+      <h2 class="text-xl font-bold text-gray-800 text-center">Reset Password</h2>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+        <input type="text" id="forgot-username" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Password Baru</label>
+        <input type="password" id="forgot-password" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+      </div>
+      <button type="submit" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 rounded-lg transition duration-200">Ubah Password</button>
+    </form>
+
+  </div>
+
+  <script>
+    // SESUAIKAN PORT DAN HOST BACKEND (NestJS / Express)
+    const API_BASE_URL = 'http://localhost:5000'; 
+
+    // Jika pengguna sudah memiliki token di localStorage, langsung alihkan ke Dashboard
+    if (localStorage.getItem('token')) {
+      window.location.href = 'dashboard.html';
+    }
+
+    const alertBox = document.getElementById('alert-box');
+
+    function showAlert(message, isSuccess = false) {
+      alertBox.textContent = message;
+      alertBox.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
+      
+      if (isSuccess) {
+        alertBox.classList.add('bg-green-100', 'text-green-700');
+      } else {
+        alertBox.classList.add('bg-red-100', 'text-red-700');
+      }
+    }
+
+    function hideAlert() {
+      alertBox.classList.add('hidden');
+    }
+
+    function switchTab(tab) {
+      hideAlert();
+      const forms = ['login', 'register', 'forgot'];
+      
+      forms.forEach(f => {
+        document.getElementById(`form-${f}`).classList.add('hidden');
+        const btn = document.getElementById(`tab-${f}-btn`);
+        btn.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
+        btn.classList.add('text-gray-500');
+      });
+
+      document.getElementById(`form-${tab}`).classList.remove('hidden');
+      const activeBtn = document.getElementById(`tab-${tab}-btn`);
+      activeBtn.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+      activeBtn.classList.remove('text-gray-500');
+    }
+
+    // Handler Login
+    async function handleLogin(e) {
+      e.preventDefault();
+      hideAlert();
+
+      const username = document.getElementById('login-username').value;
+      const password = document.getElementById('login-password').value;
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/user/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          localStorage.setItem('token', data.token);
+          showAlert(data.message, true);
+          
+          // Redirect ke Dashboard setelah delay singkat
+          setTimeout(() => {
+            window.location.href = 'dashboard.html';
+          }, 500);
+        } else {
+          showAlert(data.message || 'Login gagal');
+        }
+      } catch (err) {
+        showAlert('Tidak dapat terhubung ke server');
+      }
+    }
+
+    // Handler Register
+    async function handleRegister(e) {
+      e.preventDefault();
+      hideAlert();
+
+      const username = document.getElementById('register-username').value;
+      const password = document.getElementById('register-password').value;
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/user/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          localStorage.setItem('token', data.token);
+          showAlert(`${data.message}! Mengalihkan...`, true);
+          
+          // Redirect ke Dashboard setelah delay singkat
+          setTimeout(() => {
+            window.location.href = 'dashboard.html';
+          }, 500);
+        } else {
+          showAlert(data.message || 'Register gagal');
+        }
+      } catch (err) {
+        showAlert('Tidak dapat terhubung ke server');
+      }
+    }
+
+    // Handler Forgot Password
+    async function handleForgotPassword(e) {
+      e.preventDefault();
+      hideAlert();
+
+      const username = document.getElementById('forgot-username').value;
+      const password = document.getElementById('forgot-password').value;
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/user/forgot-password`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          showAlert(data.message + '. Silakan login dengan password baru.', true);
+          setTimeout(() => {
+            switchTab('login');
+          }, 1500);
+        } else {
+          showAlert(data.message || 'Gagal mengubah password');
+        }
+      } catch (err) {
+        showAlert('Tidak dapat terhubung ke server');
+      }
+    }
+  </script>
+</body>
+</html>

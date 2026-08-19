@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Forms - Manage Your Forms</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-slate-50 min-h-screen flex flex-col font-sans">
+
+    <!-- Navbar -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-3">
+                    <div class="bg-blue-600 text-white p-2 rounded-lg font-bold text-xl">F</div>
+                    <span class="font-bold text-xl text-slate-800">FormApp</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <a href="dashboard.html"
+                        class="text-sm font-medium text-slate-600 hover:text-blue-600 transition">Dashboard</a>
+                    <a href="my-forms.html" class="text-sm font-medium text-blue-600 border-b-2 border-blue-600 py-4">My
+                        Forms</a>
+                    <span id="user-display"
+                        class="text-sm font-semibold text-slate-700 bg-slate-100 px-3 py-1 rounded-full">...</span>
+                    <button onclick="handleLogout()"
+                        class="text-sm font-medium text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
+
+        <!-- Action Bar -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900">Kelola Form Saya</h1>
+                <p class="text-sm text-slate-500">Daftar form yang Anda buat atau di mana Anda menjadi kolaborator.</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="openJoinModal()"
+                    class="inline-flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition">
+                    + Join Kolaborasi
+                </button>
+                <button onclick="openCreateModal()"
+                    class="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition">
+                    + Buat Form Baru
+                </button>
+            </div>
+        </div>
+
+        <!-- Alert Box -->
+        <div id="alert-box" class="hidden mb-6 p-4 rounded-lg text-sm font-medium"></div>
+
+        <!-- Forms Grid Container -->
+        <div id="forms-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Cards will be injected by JavaScript -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="hidden text-center py-16 bg-white rounded-xl border border-slate-200">
+            <svg class="mx-auto h-12 w-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                </path>
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-slate-900">Belum ada form</h3>
+            <p class="mt-1 text-sm text-slate-500">Mulai dengan membuat form baru atau bergabung sebagai kolaborator.
+            </p>
+            <div class="mt-6">
+                <button onclick="openCreateModal()"
+                    class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
+                    Buat Form
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODAL: Buat Form Baru -->
+    <div id="modal-create"
+        class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                <h3 class="font-bold text-slate-800">Buat Form Baru</h3>
+                <button onclick="closeModal('modal-create')"
+                    class="text-slate-400 hover:text-slate-600">&times;</button>
+            </div>
+            <form id="form-create" onsubmit="handleCreateForm(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Judul Form</label>
+                    <input type="text" id="create-title" required
+                        class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Kategori</label>
+                    <input type="text" id="create-category" placeholder="misal: Edukasi, Survei, Event" required
+                        class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Token Respon (Kunci Mengisi)</label>
+                    <input type="text" id="create-token-respon" placeholder="Password untuk responden" required
+                        class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Banner Form (Gambar)</label>
+                    <input type="file" id="create-banner" accept="image/*" required
+                        class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                </div>
+                <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                    <button type="button" onclick="closeModal('modal-create')"
+                        class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Batal</button>
+                    <button type="submit"
+                        class="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700">Simpan
+                        Form</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Join Sebagai Kolaborator -->
+    <div id="modal-join"
+        class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                <h3 class="font-bold text-slate-800">Gabung Kolaborasi Form</h3>
+                <button onclick="closeModal('modal-join')" class="text-slate-400 hover:text-slate-600">&times;</button>
+            </div>
+            <form id="form-join" onsubmit="handleJoinCollab(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Link Undangan Kolaborasi</label>
+                    <input type="url" id="join-link" required
+                        placeholder="Contoh: http://localhost:3000/form/judul-form-123?token=xyz123"
+                        class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <p class="text-xs text-slate-400 mt-1">Tempelkan link undangan kolaborasi yang Anda dapatkan.</p>
+                </div>
+                <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                    <button type="button" onclick="closeModal('modal-join')"
+                        class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Batal</button>
+                    <button type="submit"
+                        class="px-4 py-2 text-sm font-medium bg-slate-800 text-white rounded-lg hover:bg-slate-900">Gabung</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:4000';
+        const token = localStorage.getItem('token');
+
+        if (!token) {
+            window.location.href = 'index.html';
+        }
+
+        const headers = {
+            'Authorization': `Bearer ${token}`
+        };
+
+        document.addEventListener('DOMContentLoaded', fetchMyForms);
+
+        function handleLogout() {
+            localStorage.removeItem('token');
+            window.location.href = 'index.html';
+        }
+
+        function showAlert(message, isSuccess = false) {
+            const alertBox = document.getElementById('alert-box');
+            alertBox.textContent = message;
+            alertBox.className = `mb-6 p-4 rounded-lg text-sm font-medium ${isSuccess ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'
+                }`;
+            alertBox.classList.remove('hidden');
+            alertBox.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function hideAlert() {
+            document.getElementById('alert-box').classList.add('hidden');
+        }
+
+        function openCreateModal() { document.getElementById('modal-create').classList.remove('hidden'); }
+        function openJoinModal() { document.getElementById('modal-join').classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        async function fetchMyForms() {
+            hideAlert();
+            try {
+                const res = await fetch(`${API_BASE_URL}/form/user`, { headers });
+                const result = await res.json();
+
+                if (res.status === 401) {
+                    handleLogout();
+                    return;
+                }
+
+                if (res.ok) {
+                    const { username, forms } = result.data;
+                    document.getElementById('user-display').textContent = `@${username}`;
+                    renderForms(forms);
+                } else {
+                    showAlert(result.message || 'Gagal mengambil data form');
+                }
+            } catch (err) {
+                showAlert('Terjadi kesalahan jaringan atau server mati');
+            }
+        }
+
+        function renderForms(forms) {
+            const container = document.getElementById('forms-container');
+            const emptyState = document.getElementById('empty-state');
+            container.innerHTML = '';
+
+            if (!forms || forms.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+
+            forms.forEach(item => {
+                const isCreator = item.access_type === 'Creator';
+                const isPublic = item.form_status === 'public';
+                const bannerUrl = item.form_banner ? `${API_BASE_URL}${item.form_banner}` : 'https://via.placeholder.com/400x150';
+
+                const card = document.createElement('div');
+                card.className = "bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition flex flex-col justify-between";
+
+                card.innerHTML = `
+        <div>
+          <!-- Banner Image -->
+          <div class="h-36 bg-slate-100 relative">
+            <img src="${bannerUrl}" alt="${item.form_title}" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/400x150?text=No+Banner'">
+            <span class="absolute top-3 left-3 bg-white/90 backdrop-blur-sm text-slate-700 text-xs font-semibold px-2.5 py-1 rounded-md shadow-sm">
+              ${item.category}
+            </span>
+            <span class="absolute top-3 right-3 text-xs font-semibold px-2.5 py-1 rounded-md shadow-sm ${isCreator ? 'bg-indigo-600 text-white' : 'bg-emerald-600 text-white'}">
+              ${item.access_type}
+            </span>
+          </div>
+
+          <div class="p-5">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="text-xs px-2 py-0.5 rounded ${isPublic ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'} font-medium">
+                ${item.form_status.toUpperCase()}
+              </span>
+              <span class="text-xs text-slate-400">ID: ${item.form_id}</span>
+            </div>
+            <h3 class="font-bold text-slate-800 text-lg mb-1 truncate">${item.form_title}</h3>
+            <p class="text-xs text-slate-500 font-mono mb-4 truncate">Slug: ${item.form_slug}</p>
+
+            <!-- Tokens Info -->
+            <div class="bg-slate-50 p-3 rounded-lg text-xs space-y-1 font-mono text-slate-600">
+              <p><span class="font-bold text-slate-700">Token Respon:</span> ${item.token_respon}</p>
+              <p class="truncate"><span class="font-bold text-slate-700">Token Collab:</span> ${item.token_collab}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card Actions -->
+        <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+          <!-- Tombol Ke Halaman Kelola Soal -->
+          <a href="create-soal.html?form_slug=${encodeURIComponent(item.form_slug)}&form_id=${item.form_id}" 
+             class="text-xs font-semibold px-3 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition flex items-center gap-1">
+             📝 Kelola Soal
+          </a>
+
+          <div class="flex items-center gap-1">
+            ${isCreator ? `
+              <button onclick="toggleFormStatus('${item.form_slug}', '${isPublic ? 'private' : 'public'}')" class="text-xs font-medium px-2.5 py-1.5 rounded-md border border-slate-300 hover:bg-slate-100 transition">
+                ${isPublic ? 'Private' : 'Public'}
+              </button>
+              <button onclick="deleteForm('${item.form_slug}')" class="text-xs font-medium px-2.5 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-md transition">
+                Hapus
+              </button>
+            ` : `
+              <span class="text-xs text-slate-400 italic">Kolaborator</span>
+            `}
+          </div>
+        </div>
+      `;
+
+                container.appendChild(card);
+            });
+        }
+
+        async function handleCreateForm(e) {
+            e.preventDefault();
+
+            const title = document.getElementById('create-title').value;
+            const category = document.getElementById('create-category').value;
+            const token_respon = document.getElementById('create-token-respon').value;
+            const bannerFile = document.getElementById('create-banner').files[0];
+
+            const formData = new FormData();
+            formData.append('title', title);
+            formData.append('category', category);
+            formData.append('token_respon', token_respon);
+            formData.append('banner', bannerFile);
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/form`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+
+                const result = await res.json();
+
+                if (res.ok) {
+                    showAlert(result.message || 'Form berhasil dibuat!', true);
+                    closeModal('modal-create');
+                    document.getElementById('form-create').reset();
+                    fetchMyForms();
+                } else {
+                    showAlert(result.message || 'Gagal membuat form');
+                }
+            } catch (err) {
+                showAlert('Tidak dapat terhubung ke server');
+            }
+        }
+
+        async function handleJoinCollab(e) {
+            e.preventDefault();
+
+            const linkInput = document.getElementById('join-link').value.trim();
+
+            if (!linkInput) {
+                showAlert('Link undangan kolaborasi wajib diisi');
+                return;
+            }
+
+            let formSlug = '';
+            let tokenCollab = '';
+
+            try {
+                const parsedUrl = new URL(linkInput);
+
+                // 1. Ekstraksi token dari Query Parameter (?token=... atau ?token_collab=...)
+                tokenCollab = parsedUrl.searchParams.get('token') ||
+                    parsedUrl.searchParams.get('token_collab') ||
+                    parsedUrl.searchParams.get('token_respon');
+
+                // 2. Ekstraksi form_slug dari Pathname (misal: /form/judul-form-123 atau /form/judul-form-123/collaborate)
+                const pathSegments = parsedUrl.pathname.split('/').filter(Boolean);
+                const formIdx = pathSegments.indexOf('form');
+
+                if (formIdx !== -1 && pathSegments[formIdx + 1]) {
+                    formSlug = pathSegments[formIdx + 1];
+                } else if (pathSegments.length > 0) {
+                    // Fallback: mengambil segment pertama dari path jika struktur route berbeda
+                    formSlug = pathSegments[0];
+                }
+
+            } catch (err) {
+                showAlert('Format URL/Link tidak valid. Pastikan menyertakan http:// atau https://');
+                return;
+            }
+
+            // Validasi hasil ekstraksi
+            if (!formSlug || !tokenCollab) {
+                showAlert('URL tidak memiliki parameter form_slug atau token kolaborasi yang valid');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/form/share?form_slug=${encodeURIComponent(formSlug)}`, {
+                    method: 'POST',
+                    headers: {
+                        ...headers,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ token_collab: tokenCollab })
+                });
+
+                const result = await res.json();
+
+                if (res.ok) {
+                    showAlert(result.message || 'Berhasil bergabung sebagai kolaborator!', true);
+                    closeModal('modal-join');
+                    document.getElementById('form-join').reset();
+                    fetchMyForms();
+                } else {
+                    showAlert(result.message || 'Gagal bergabung');
+                }
+            } catch (err) {
+                showAlert('Tidak dapat terhubung ke server');
+            }
+        }
+
+        async function toggleFormStatus(form_slug, newStatus) {
+            try {
+                const res = await fetch(`${API_BASE_URL}/form?form_slug=${encodeURIComponent(form_slug)}`, {
+                    method: 'PATCH',
+                    headers: {
+                        ...headers,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status: newStatus })
+                });
+
+                const result = await res.json();
+
+                if (res.ok) {
+                    showAlert(result.message, true);
+                    fetchMyForms();
+                } else {
+                    showAlert(result.message || 'Gagal merubah status');
+                }
+            } catch (err) {
+                showAlert('Tidak dapat terhubung ke server');
+            }
+        }
+
+        async function deleteForm(form_slug) {
+            if (!confirm('Apakah Anda yakin ingin menghapus form ini?')) return;
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/form?form_slug=${encodeURIComponent(form_slug)}`, {
+                    method: 'DELETE',
+                    headers
+                });
+
+                const result = await res.json();
+
+                if (res.ok) {
+                    showAlert(result.message, true);
+                    fetchMyForms();
+                } else {
+                    showAlert(result.message || 'Gagal menghapus form');
+                }
+            } catch (err) {
+                showAlert('Tidak dapat terhubung ke server');
+            }
+        }
+    </script>
+</body>
+
+</html>

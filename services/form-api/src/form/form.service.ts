@@ -16,9 +16,13 @@ export class FormService {
   // Get All Form
   async getAll() {
     const get = await this.knexService.connection('forms')
-      .select("*")
-      .limit(10)
-      .offset(0)
+      .select({
+        id: 'forms.id',
+        slug: 'forms.slug',
+        title: 'forms.title',
+        category: 'forms.category',
+        banner: 'forms.banner'
+      })
 
     if (get.length === 0) throw new NotFoundException('Tidak Ada Form Dari Category Tersebut')
 
@@ -32,9 +36,13 @@ export class FormService {
   async getAllByCategory(category: string) {
     const lower = category.toLowerCase()
     const get = await this.knexService.connection('forms')
-      .select("*")
-      .limit(10)
-      .offset(0)
+      .select({
+        id: 'forms.id',
+        slug: 'forms.slug',
+        title: 'forms.title',
+        category: 'forms.category',
+        banner: 'forms.banner'
+      })
       .where("category", lower)
 
     if (get.length === 0) throw new NotFoundException('Tidak Ada Form Dari Category Tersebut')
@@ -99,7 +107,7 @@ export class FormService {
   async create(user: { id: number, username: string }, body: { title: string, category: string, token_respon: string }, banner: Express.Multer.File) {
     const slug = slugify(body.title, { lower: true, strict: true })
     const finalSlug = `${slug}-${Date.now()}`
-    const bannerPath = `/uploads/${banner.filename}`
+    const bannerPath = `/uploads/banner/${banner.filename}`
     const tokenCollab = await crypto.randomBytes(64).toString('hex')
 
     const formResult = await this.knexService.connection.transaction(async (trx) => {
