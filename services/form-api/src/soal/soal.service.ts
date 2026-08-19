@@ -1,9 +1,76 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { KnexService } from '../database/knex.service'
+import * as mammoth from 'mammoth'
 
 @Injectable()
 export class SoalService {
     constructor(private knexService: KnexService) { }
+
+    async importDocx(form_slug, buffer: Buffer) {
+        const result = await mammoth.extractRawText({ buffer })
+        const lines = result.value
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean)
+
+        const parsedSoal: any[] = []
+        let current: any = null
+
+        const saveCurrent = () => {
+            if (!current) return
+            if (!current.soal.question) {
+                throw new BadRequestException('Ada soal tanpa pertanyaan')
+            }
+
+            const answerKeys = current.answer
+                ? current.answer.split(/[,\s]+/).filter(Boolean).map((key) => key.toUpperCase())
+                : []
+            const options = current.options.map((option) => ({
+                value: option.value,
+                is_correct: answerKeys.includes(option.key),
+            }))
+
+            parsedSoal.push({
+                soal: {
+                    question: current.soal.question,
+                    type: current.type || (options.length > 0 ? (answerKeys.length > 1 ? 'checkbox' : 'radio') : 'text'),
+                },
+                options,
+            })
+            current = null
+        }
+
+        for (const line of lines) {
+            const questionMatch = line.match(/^\d+[.)]\s+(.+)$/)
+            const optionMatch = line.match(/^([A-Z])[.)]\s+(.+)$/i)
+            const answerMatch = line.match(/^(?:kunci|jawaban)\s*:\s*(.+)$/i)
+            const typeMatch = line.match(/^tipe\s*:\s*(radio|checkbox|rating|text|file)$/i)
+
+            if (questionMatch) {
+                saveCurrent()
+                current = { soal: { question: questionMatch[1] }, options: [], answer: null, type: null }
+            } else if (!current) {
+                throw new BadRequestException('Format DOCX tidak valid: soal harus diawali nomor, contoh "1. Pertanyaan"')
+            } else if (optionMatch) {
+                current.options.push({ key: optionMatch[1].toUpperCase(), value: optionMatch[2] })
+            } else if (answerMatch) {
+                current.answer = answerMatch[1]
+            } else if (typeMatch) {
+                current.type = typeMatch[1].toLowerCase()
+            } else if (!current.options.length) {
+                current.soal.question += ` ${line}`
+            } else {
+                throw new BadRequestException(`Format DOCX tidak valid pada baris: ${line}`)
+            }
+        }
+
+        saveCurrent()
+        if (parsedSoal.length === 0) {
+            throw new BadRequestException('Tidak ada soal yang ditemukan di dokumen DOCX')
+        }
+
+        return this.createSoalAndOption(form_slug, parsedSoal)
+    }
 
     // Get Soal From Form
     async getSoalByForm(id: number) {
