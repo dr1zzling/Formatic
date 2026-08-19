@@ -14,61 +14,61 @@ exports.seed = async function(knex) {
       title: 'Soal Matematika 2026',
       status: 'public',
       category: 'ujian',
-      banner: '/uploads/soal-1'
+      banner: '/uploads/banner/soal-1'
     },
     {
       title: 'Soal Pendidikan Pancasila 2026',
       status: 'private',
       category: 'ujian',
-      banner: '/uploads/soal-2'
+      banner: '/uploads/banner/soal-2'
     },
     {
       title: 'Soal Bahasa Asing 2026',
       status: 'public',
       category: 'ujian',
-      banner: '/uploads/soal-3'
+      banner: '/uploads/banner/soal-3'
     },
     {
       title: 'Soal Fisika Dasar 2026',
       status: 'public',
       category: 'ujian',
-      banner: '/uploads/soal-4'
+      banner: '/uploads/banner/soal-4'
     },
     {
       title: 'Survei Kepuasan Siswa 2026',
       status: 'public',
       category: 'survei',
-      banner: '/uploads/soal-5'
+      banner: '/uploads/banner/soal-5'
     },
     {
       title: 'Soal Kimia Organik 2026',
       status: 'private',
       category: 'ujian',
-      banner: '/uploads/soal-6'
+      banner: '/uploads/banner/soal-6'
     },
     {
       title: 'Survei Ekstrakurikuler yang diminati 2026',
       status: 'public',
       category: 'survei',
-      banner: '/uploads/soal-7'
+      banner: '/uploads/banner/soal-7'
     },
     {
       title: 'Soal Biologi Umum 2026',
       status: 'public',
       category: 'ujian',
-      banner: '/uploads/soal-8'
+      banner: '/uploads/banner/soal-8'
     },
     {
       title: 'Kuesioner Fasilitas Sekolah 2026',
       status: 'private',
       category: 'survei',
-      banner: '/uploads/soal-9'
+      banner: '/uploads/banner/soal-9'
     },
     {
       title: 'Soal Sejarah Indonesia 2026',
       status: 'public',
       category: 'ujian',
-      banner: '/uploads/soal-10'
+      banner: '/uploads/banner/soal-10'
     }
   ];
 

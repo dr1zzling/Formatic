@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Testing Builder Soal & Option</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #eef0f3;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .card-header h3 {
+            margin: 0;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #444;
+            font-size: 14px;
+        }
+
+        input[type="text"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        input[type="file"] {
+            margin-top: 5px;
+        }
+
+        /* Option Item Styling */
+        .option-list {
+            margin-top: 10px;
+            padding-left: 10px;
+            border-left: 3px solid #007bff;
+        }
+
+        .option-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 6px;
+        }
+
+        .option-item input[type="text"] {
+            flex: 1;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 8px 14px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: 0.2s;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 13px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <!-- Config Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3>⚙️ Konfigurasi Request</h3>
+            </div>
+            <div class="form-group">
+                <label>Endpoint URL API:</label>
+                <input type="text" id="apiUrl" value="http://localhost:3000/soal?form_slug=form-matematika-123">
+            </div>
+            <div class="form-group">
+                <label>Bearer Token (Auth Guard):</label>
+                <input type="text" id="bearerToken" placeholder="Paste Token JWT di sini...">
+            </div>
+        </div>
+
+        <!-- Form Builder Container -->
+        <form id="soalForm">
+            <div id="soalContainer">
+                <!-- Card Soal akan muncul secara dinamis via JS -->
+            </div>
+
+            <!-- Actions -->
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <button type="button" class="btn btn-primary" onclick="addSoalCard()">+ Tambah Soal</button>
+                <button type="button" class="btn btn-success" style="flex: 1;" onclick="submitForm()">🚀 Kirim Semua
+                    Soal & Gambar</button>
+            </div>
+        </form>
+
+        <!-- Output Log / Response -->
+        <div class="card">
+            <div class="card-header">
+                <h3>📡 Response API</h3>
+            </div>
+            <pre id="responseOutput">// Response dari backend akan tampil di sini...</pre>
+        </div>
+
+    </div>
+
+    <script>
+        let soalCount = 0;
+
+        // Render Card Soal Pertama Saat Pertama Kali Dimuat
+        window.onload = () => {
+            addSoalCard();
+        };
+
+        // Fungsi Menambah Card Soal Baru
+        function addSoalCard() {
+            soalCount++;
+            const sId = soalCount;
+
+            const cardHtml = `
+      <div class="card soal-card" id="soalCard_${sId}" data-soal-id="${sId}">
+        <div class="card-header">
+          <h3>Soal #${sId}</h3>
+          <button type="button" class="btn btn-danger btn-sm" onclick="removeSoalCard(${sId})">Hapus Soal</button>
+        </div>
+
+        <div class="form-group">
+          <label>Pertanyaan Soal:</label>
+          <input type="text" class="input-question" placeholder="Masukkan pertanyaan..." required>
+        </div>
+
+        <div class="form-group">
+          <label>Tipe Soal:</label>
+          <select class="input-type" onchange="toggleOptionSection(${sId}, this.value)">
+            <option value="radio">Radio (Pilihan Ganda - 1 Jawaban)</option>
+            <option value="checkbox">Checkbox (Banyak Jawaban)</option>
+            <option value="text">Isian Singkat / Text</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Gambar Soal (Optional):</label>
+          <input type="file" class="input-soal-file" accept="image/*">
+        </div>
+
+        <!-- Section Opsi Jawaban -->
+        <div class="option-section" id="optionSection_${sId}">
+          <label>Daftar Opsi Jawaban:</label>
+          <div class="option-list" id="optionList_${sId}">
+            <!-- Opsi item akan ditambahkan di sini -->
+          </div>
+          <button type="button" class="btn btn-primary btn-sm" style="margin-top: 8px;" onclick="addOptionItem(${sId})">+ Tambah Opsi</button>
+        </div>
+      </div>
+    `;
+
+            document.getElementById('soalContainer').insertAdjacentHTML('beforeend', cardHtml);
+
+            // Default tambahkan 2 pilihan opsi awal
+            addOptionItem(sId);
+            addOptionItem(sId);
+        }
+
+        // Fungsi Hapus Card Soal
+        function removeSoalCard(sId) {
+            const card = document.getElementById(`soalCard_${sId}`);
+            if (document.querySelectorAll('.soal-card').length > 1) {
+                card.remove();
+            } else {
+                alert('Minimal harus ada 1 soal!');
+            }
+        }
+
+        // Hide/Show Opsi jika tipe soal = text
+        function toggleOptionSection(sId, type) {
+            const optSection = document.getElementById(`optionSection_${sId}`);
+            if (type === 'text') {
+                optSection.style.display = 'none';
+            } else {
+                optSection.style.display = 'block';
+            }
+        }
+
+        // Fungsi Menambah Item Opsi Jawaban
+        function addOptionItem(sId) {
+            const optList = document.getElementById(`optionList_${sId}`);
+            const optCount = optList.children.length + 1;
+
+            const optHtml = `
+      <div class="option-item">
+        <input type="checkbox" class="input-is-correct" title="Centang jika jawaban ini benar">
+        <input type="text" class="input-opt-value" placeholder="Opsi ${optCount}" required>
+        <input type="file" class="input-opt-file" accept="image/*" title="Upload Gambar Opsi">
+        <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.remove()">✕</button>
+      </div>
+    `;
+
+            optList.insertAdjacentHTML('beforeend', optHtml);
+        }
+
+        // ==========================================
+        // PROCESS SUBMIT FORM (FORMAT TO MULTIPART)
+        // ==========================================
+        async function submitForm() {
+            const url = document.getElementById('apiUrl').value;
+            const token = document.getElementById('bearerToken').value.trim();
+            const formData = new FormData();
+            const payloadData = [];
+
+            const soalCards = document.querySelectorAll('.soal-card');
+
+            soalCards.forEach((card) => {
+                const question = card.querySelector('.input-question').value;
+                const type = card.querySelector('.input-type').value;
+                const soalFileInput = card.querySelector('.input-soal-file');
+
+                // Object Soal
+                const soalObj = {
+                    question: question,
+                    type: type
+                };
+
+                // Handle Gambar Soal
+                if (soalFileInput && soalFileInput.files && soalFileInput.files[0]) {
+                    const soalFile = soalFileInput.files[0]; // Deklarasi variabel
+                    formData.append('soal_images', soalFile);
+                    soalObj.image_filename = soalFile.name;  // Menggunakan variabel yang sudah dideklarasikan
+                }
+
+                // Handle Options jika bukan tipe text
+                const optionsArr = [];
+                if (type !== 'text') {
+                    const optionItems = card.querySelectorAll('.option-item');
+                    optionItems.forEach((optItem) => {
+                        const optValue = optItem.querySelector('.input-opt-value').value;
+                        const isCorrect = optItem.querySelector('.input-is-correct').checked;
+                        const optFileInput = optItem.querySelector('.input-opt-file');
+
+                        const optObj = {
+                            value: optValue,
+                            is_correct: isCorrect
+                        };
+
+                        // Handle Gambar Opsi
+                        if (optFileInput.files[0]) {
+                            const file = optFileInput.files[0];
+                            formData.append('option_images', file);
+                            // Simpan nama file asli sebagai identifier pencocokan di backend
+                            optObj.image_filename = file.name;
+                        }
+
+                        optionsArr.push(optObj);
+                    });
+                }
+
+                payloadData.push({
+                    soal: soalObj,
+                    options: optionsArr
+                });
+            });
+
+            // Masukkan Array Payload sebagai JSON string ke key 'data'
+            formData.append('data', JSON.stringify(payloadData));
+
+            // Kirim Ke Backend via Fetch
+            document.getElementById('responseOutput').innerText = 'Mengirim data...';
+
+            try {
+                const headers = {};
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: headers,
+                    body: formData // Browser otomatis menyusun multipart/form-data boundary
+                });
+
+                const resData = await res.json();
+                document.getElementById('responseOutput').innerText =
+                    `HTTP Status: ${res.status}\n\n` + JSON.stringify(resData, null, 2);
+
+            } catch (err) {
+                document.getElementById('responseOutput').innerText = 'Error: ' + err.message;
+            }
+        }
+    </script>
+
+</body>
+
+</html>

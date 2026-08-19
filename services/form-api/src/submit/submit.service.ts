@@ -14,7 +14,7 @@ export class SubmitService {
   // Check Token
   async checkTokenResponden(req: { id: number }, form, token: string) {
     const checkRole = await this.isCreator.isCreator(req.id, form.id)
-    console.log(form)
+    
     if (checkRole != false) throw new UnauthorizedException("Anda Tidak Berhak Sebagai Responden")
 
     if (form.token_respon == null) return { message: "Berhasil" }

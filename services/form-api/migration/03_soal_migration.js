@@ -6,6 +6,7 @@ exports.up = function(knex) {
     return knex.schema.createTable('soal', function(table){
         table.increments()
         table.text('question').notNullable()
+        table.text('image')
         table.integer('form_id').unsigned()
         table.enum('type', ['radio', 'text', 'file', 'checkbox'])
         
