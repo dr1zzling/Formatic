@@ -31,6 +31,7 @@ export class SubmitController {
 
     // Get All Submit Detail By Form
     @Get('/detail')
+    @UseGuards(JwtAuthGuard)
     getAllSubmitResponseByForm(
       @Request() req,
       @Query('form_slug', ValidateFormExist) form_slug
