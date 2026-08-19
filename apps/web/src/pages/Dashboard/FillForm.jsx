@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../../utils/api";
 import { ArrowLeft, Send, Check, CheckCircle2, UploadCloud, FileText } from "lucide-react";
+import { saveToHistory } from "./History";
 
 const TYPE_LABEL = {
   radio: "Pilihan Ganda",
@@ -95,7 +96,9 @@ export default function FillForm() {
       }
 
       fd.append("data", JSON.stringify(payload));
-      await api.post(`/form/submit/${form.id}`, fd);
+      await api.post(`/form/submit`, fd, { params: { form_slug: slug } });
+      // Simpan ke history lokal
+      saveToHistory(slug, form?.title ?? form?.form_title, form?.category);
       setDone(true);
     } catch (e) {
       const status = e.response?.status;
