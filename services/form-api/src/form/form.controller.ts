@@ -42,7 +42,7 @@ export class FormController {
   @UseInterceptors(
     FileInterceptor('banner', {
       storage: diskStorage({
-        destination: './uploads',
+        destination: './uploads/banner',
         filename: (req, file, cb) => {
           const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
           const ext = extname(file.originalname);
@@ -65,7 +65,7 @@ export class FormController {
     banner: Express.Multer.File,
     @Body() body: { title: string; category: string, token_respon: string },
   ) {
-    if (!body.title || !body.category || !body.token_respon) {
+    if (!body.title || !body.category) {
       throw new BadRequestException('Judul dan kategori wajib diisi');
     }
 

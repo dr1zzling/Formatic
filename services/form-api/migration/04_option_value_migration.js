@@ -5,6 +5,7 @@
 exports.up = function(knex) {
   return knex.schema.createTable('option_value', function(table){
     table.increments()
+    table.text('image')
     table.text('value')
   })
 };

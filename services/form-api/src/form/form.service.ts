@@ -103,7 +103,6 @@ export class FormService {
     const tokenCollab = await crypto.randomBytes(64).toString('hex')
 
     const formResult = await this.knexService.connection.transaction(async (trx) => {
-      await trx('file_upload').insert({ file_path: bannerPath })
 
       const [insertedForm] = await trx('forms')
         .insert({
