@@ -41,27 +41,16 @@ function timeAgo(iso) {
 
 /* Simpan history ke localStorage saat submit form */
 export function saveToHistory(formSlug, formTitle, category) {
-  const key = HISTORY_KEY;
-  const existing = JSON.parse(localStorage.getItem(key) ?? "[]");
+  const existing = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]");
   const entry = {
     form_slug: formSlug,
     form_title: formTitle,
     category: category ?? "—",
     submitted_at: new Date().toISOString(),
   };
-  // Simpan paling atas, hindari duplikat slug
   const filtered = existing.filter(e => e.form_slug !== formSlug);
-  localStorage.setItem(key, JSON.stringify([entry, ...filtered].slice(0, 50)));
+  localStorage.setItem(HISTORY_KEY, JSON.stringify([entry, ...filtered].slice(0, 50)));
 }
-
-/* ── DUMMY DATA ───────────────────────────────────────────────── */
-const DUMMY_HISTORY = [
-  { form_slug: "survey-kepuasan",  form_title: "Survey Kepuasan Layanan Sekolah", category: "survey", submitted_at: new Date(Date.now() - 2 * 60 * 1000).toISOString() },
-  { form_slug: "quiz-umum",        form_title: "Quiz Pengetahuan Umum",            category: "ujian",  submitted_at: new Date(Date.now() - 35 * 60 * 1000).toISOString() },
-  { form_slug: "seminar-nasional", form_title: "Form Pendaftaran Seminar",         category: "survey", submitted_at: new Date(Date.now() - 3 * 3600 * 1000).toISOString() },
-  { form_slug: "evaluasi-siswa",   form_title: "Evaluasi Pembelajaran Siswa",      category: "ujian",  submitted_at: new Date(Date.now() - 26 * 3600 * 1000).toISOString() },
-  { form_slug: "feedback-kantin",  form_title: "Feedback Kantin Sekolah",          category: "survey", submitted_at: new Date(Date.now() - 3 * 86400 * 1000).toISOString() },
-];
 
 const CAT_STYLE = {
   ujian:   { bg: "bg-[#eee7ff]", text: "text-[#7b51d6]", dot: "bg-[#7b51d6]" },
@@ -92,11 +81,10 @@ export default function History() {
   function loadHistory(showLoading = true) {
     if (showLoading) setLoading(true);
     try {
-      // Ambil dari localStorage
       const local = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]");
-      setHistory(local.length ? local : DUMMY_HISTORY);
+      setHistory(local);
     } catch {
-      setHistory(DUMMY_HISTORY);
+      setHistory([]);
     } finally {
       if (showLoading) setLoading(false);
     }

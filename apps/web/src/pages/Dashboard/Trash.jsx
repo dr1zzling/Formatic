@@ -15,14 +15,6 @@ const SCHEMES = [
   "linear-gradient(135deg,#ffe4e6,#fecdd3)",
 ];
 
-const DUMMY_TRASH = [
-  { form_id: 1, form_title: "Survey Kepuasan Layanan Sekolah",    form_slug: "d1", category: "survey", form_status: "private", form_banner: null },
-  { form_id: 2, form_title: "Quiz Pengetahuan Umum",               form_slug: "d2", category: "ujian",  form_status: "private", form_banner: null },
-  { form_id: 3, form_title: "Form Pendaftaran Seminar Nasional",   form_slug: "d3", category: "survey", form_status: "private", form_banner: null },
-  { form_id: 4, form_title: "Evaluasi Pembelajaran Siswa",         form_slug: "d4", category: "survey", form_status: "private", form_banner: null },
-  { form_id: 5, form_title: "Pendataan Kegiatan Ekstrakurikuler",  form_slug: "d5", category: "ujian",  form_status: "private", form_banner: null },
-];
-
 function getUser() {
   try { const p = JSON.parse(atob(localStorage.getItem("token").split(".")[1])); return p.username || p.name || "User"; }
   catch { return "User"; }
@@ -43,21 +35,33 @@ export default function Trash() {
     setLoading(true);
     try {
       const res = await api.get("/form/user");
-      const data = res.data?.data?.forms ?? [];
-      setForms(data.length ? data : DUMMY_TRASH);
-    } catch { setForms(DUMMY_TRASH); }
+      setForms(res.data?.data?.forms ?? []);
+    } catch { setForms([]); }
     finally { setLoading(false); }
   }
 
   async function restore(form) {
-    try { await api.patch("/form", { status: "public" }, { params: { form_slug: form.form_slug } }); showToast("Form dipulihkan!"); load(); }
-    catch { showToast("Gagal memulihkan."); }
+    try {
+      const res = await fetch(`http://localhost:3000/form?form_slug=${form.form_slug}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+        body: JSON.stringify({ status: "public" }),
+      });
+      if (!res.ok) throw new Error();
+      showToast("Form dipulihkan!"); load();
+    } catch { showToast("Gagal memulihkan."); }
   }
 
   async function destroy(form) {
     if (!window.confirm(`Hapus permanen "${form.form_title}"?`)) return;
-    try { await api.delete("/form", { params: { form_slug: form.form_slug } }); showToast("Form dihapus permanen."); load(); }
-    catch { showToast("Gagal menghapus."); }
+    try {
+      const res = await fetch(`http://localhost:3000/form?form_slug=${form.form_slug}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      if (!res.ok) throw new Error();
+      showToast("Form dihapus permanen."); load();
+    } catch { showToast("Gagal menghapus."); }
   }
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(""), 3000); }

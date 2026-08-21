@@ -12,43 +12,6 @@ const QUESTION_TYPES = [
 ];
 const TABS = ["Pertanyaan", "Jawaban", "Setelan"];
 
-/* ── DUMMY DATA ───────────────────────────────────────────────── */
-const DUMMY_FORM = {
-  title: "Kuesioner Pelaksanaan Program Makan Bergizi Gratis (MBG)",
-  category: "survey", status: "public",
-};
-const DUMMY_QUESTIONS = [
-  { id: 1, question: "Kelas", type: "radio", required: true, options: [
-    { id: 1, value: "X",   is_correct: false }, { id: 2, value: "XI",  is_correct: false }, { id: 3, value: "XII", is_correct: false },
-  ]},
-  { id: 2, question: "Apakah sekolah Anda mendapatkan program MBG?", type: "radio", required: true, options: [
-    { id: 4, value: "Ya", is_correct: false }, { id: 5, value: "Tidak", is_correct: false },
-  ]},
-  { id: 3, question: "Apakah pembagian MBG sudah merata ke semua siswa?", type: "radio", required: true, options: [
-    { id: 6, value: "Ya", is_correct: false }, { id: 7, value: "Tidak", is_correct: false },
-  ]},
-  { id: 4, question: "Bagaimana pendapat Anda tentang kualitas makanan MBG?", type: "text", required: true, options: [] },
-];
-const DUMMY_RESPONSES = {
-  total: 10,
-  submittedAt: new Date().toISOString(),
-  questions: [
-    { soal_id: 1, question: "Kelas", type: "radio", options: [
-      { value: "X",   count: 4 }, { value: "XI", count: 5 }, { value: "XII", count: 1 },
-    ], textAnswers: [] },
-    { soal_id: 2, question: "Apakah sekolah Anda mendapatkan program MBG?", type: "radio", options: [
-      { value: "Ya", count: 9 }, { value: "Tidak", count: 1 },
-    ], textAnswers: [] },
-    { soal_id: 3, question: "Apakah pembagian MBG sudah merata ke semua siswa?", type: "radio", options: [
-      { value: "Ya", count: 7 }, { value: "Tidak", count: 3 },
-    ], textAnswers: [] },
-    { soal_id: 4, question: "Bagaimana pendapat Anda tentang kualitas makanan MBG?", type: "text", options: [], textAnswers: [
-      "Makanan enak dan bergizi", "Cukup baik tapi porsinya kurang", "Sangat membantu siswa kurang mampu",
-      "Perlu ditingkatkan variasi menunya", "Bagus, semoga terus berlanjut",
-    ]},
-  ],
-};
-
 export default function FormEditor() {
   const { slug } = useParams();
   const navigate = useNavigate();
@@ -71,22 +34,23 @@ export default function FormEditor() {
       const f   = res.data?.data;
       if (f) {
         setForm(f);
-        setQuestions(
-          (f?.soal ?? []).map((s) => ({
+        setQuestions(prev => {
+          // Soal dari DB
+          const fromDB = (f?.soal ?? []).map((s) => ({
             id: s.id, question: s.question, type: s.type, required: true,
             options: (s.options ?? []).map((o) => ({
-              id: o.id, value: o.option_value, is_correct: o.is_correct,
+              id: o.id, value: o.value ?? o.option_value, is_correct: o.is_correct,
             })),
-          }))
-        );
+          }));
+          // Pertahankan soal baru yang belum tersimpan (_new: true)
+          const unsaved = prev.filter(q => q._new);
+          return [...fromDB, ...unsaved];
+        });
       } else {
-        setForm(DUMMY_FORM);
-        setQuestions(DUMMY_QUESTIONS);
+        setError("Form tidak ditemukan.");
       }
     } catch {
-      // Fallback ke dummy supaya tampilan tetap bisa dilihat
-      setForm(DUMMY_FORM);
-      setQuestions(DUMMY_QUESTIONS);
+      setError("Form tidak ditemukan.");
     }
     finally { setLoading(false); }
   }
@@ -154,34 +118,61 @@ export default function FormEditor() {
     if (newOnes.find((q) => !q.question.trim())) { setError("Semua pertanyaan wajib diisi."); return; }
     setSaving(true); setError("");
     try {
-      const payload = newOnes.map((q) => {
+      const fd = new FormData();
+      const payload = newOnes.map((q, i) => {
         const hasOpts = ["radio", "checkbox", "rating"].includes(q.type);
+        if (q.attachment instanceof File) {
+          fd.append("soal_images", q.attachment, `soal_${i}_${q.attachment.name}`);
+        }
         return {
-          soal: { question: q.question, type: q.type, image: null },
+          soal: { question: q.question, type: q.type, image: q.attachment instanceof File ? q.attachment.name : null },
           options: hasOpts
-            ? q.options.filter((o) => o.value?.trim()).map((o) => ({
-                value: o.value,
-                image: null,
-              }))
+            ? q.options.filter((o) => o.value?.trim()).map((o) => ({ value: o.value, image: null }))
             : [],
         };
       });
-      // Backend expect multipart/form-data dengan field 'data' berisi JSON string
-      const fd = new FormData();
       fd.append("data", JSON.stringify(payload));
-      await api.post("/form/soal", fd, {
-        params: { form_slug: slug },
-        headers: { "Content-Type": "multipart/form-data" },
+      const res = await fetch(`http://localhost:3000/form/soal?form_slug=${slug}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        body: fd,
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data?.message || JSON.stringify(data) || "Gagal menyimpan soal.";
+        throw new Error(msg);
+      }
       showToast(`${newOnes.length} soal berhasil disimpan!`);
-      loadForm();
-    } catch (e) { setError(e.response?.data?.message || "Gagal menyimpan soal."); }
+      // Setelah simpan, reload dari DB
+      const res2 = await api.get("/form/slug", { params: { slug } });
+      const f = res2.data?.data;
+      if (f) {
+        setForm(f);
+        setQuestions(
+          (f?.soal ?? []).map((s) => ({
+            id: s.id, question: s.question, type: s.type, required: true,
+            options: (s.options ?? []).map((o) => ({
+              id: o.id, value: o.value ?? o.option_value, is_correct: o.is_correct,
+            })),
+          }))
+        );
+      }
+    } catch (e) {
+      setError(e.message || "Gagal menyimpan soal.");
+      showToast("❌ " + (e.message || "Gagal menyimpan soal."));
+    }
     finally { setSaving(false); }
   }
 
   async function updateStatus(status) {
     try {
-      await api.patch("/form", { status }, { params: { form_slug: slug } });
+      const res = await fetch(`http://localhost:3000/form?form_slug=${slug}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+        body: JSON.stringify({ status }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showToast(data?.message || "Gagal mengubah status."); return; }
       showToast(`Status diubah ke "${status}"`);
       loadForm();
     } catch { showToast("Gagal mengubah status."); }
@@ -189,7 +180,12 @@ export default function FormEditor() {
 
   async function deleteForm() {
     try {
-      await api.delete("/form", { params: { form_slug: slug } });
+      const res = await fetch(`http://localhost:3000/form?form_slug=${slug}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showToast(data?.message || "Gagal menghapus form."); return; }
       navigate("/my-forms");
     } catch { showToast("Gagal menghapus form."); }
   }
@@ -248,6 +244,17 @@ export default function FormEditor() {
           <div className="flex items-center gap-2">
             <button onClick={copyLink} title="Salin link" className="hidden sm:flex w-10 h-10 rounded-xl items-center justify-center text-gray-400 hover:bg-[#eef5fb] hover:text-[#1a4fa0] transition-all">
               <Link2 size={17} />
+            </button>
+            <button
+              onClick={() => {
+                const collabLink = `${window.location.origin}/form/${slug}/collaborate?token=${form?.token_collab ?? ""}`;
+                navigator.clipboard.writeText(collabLink);
+                showToast("Link collaborator berhasil disalin!");
+              }}
+              title="Undang Collaborator"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-semibold border border-violet-200 text-violet-600 bg-violet-50 hover:bg-violet-100 transition"
+            >
+              <Share2 size={14} /> Kolaborasi
             </button>
             <button onClick={() => setShowDelete(true)} className="hidden sm:flex w-10 h-10 rounded-xl items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all">
               <Trash2 size={17} />
@@ -308,6 +315,8 @@ export default function FormEditor() {
               onToggleCorrect={toggleCorrect}
               onReorder={reorderQ}
               onCopyLink={copyLink}
+              onShowToast={showToast}
+              onImported={loadForm}
             />
           )}
           {activeTab === "Jawaban" && (
@@ -347,7 +356,7 @@ export default function FormEditor() {
 }
 
 /* ── Pertanyaan Tab ─────────────────────────────────────────── */
-function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ, onUpdateOpt, onAddOpt, onRemoveOpt, onRemoveQ, onDuplicateQ, onToggleCorrect, onReorder, onCopyLink }) {
+function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ, onUpdateOpt, onAddOpt, onRemoveOpt, onRemoveQ, onDuplicateQ, onToggleCorrect, onReorder, onCopyLink, onShowToast, onImported }) {
   const [dragFrom, setDragFrom]   = useState(null);
   const [dragOver, setDragOver]   = useState(null);
   return (
@@ -409,6 +418,7 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ,
             onDuplicate={() => onDuplicateQ(qIdx)}
             onDragHandleStart={() => setDragFrom(qIdx)}
             onDragHandleEnd={() => { setDragFrom(null); setDragOver(null); }}
+            onShowToast={onShowToast}
           />
         </div>
       ))}
@@ -419,27 +429,27 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ,
       >
         <ListPlus size={20} /> Tambah Pertanyaan
       </button>
+
+      {/* Import dari Word */}
+      <ImportDocxButton slug={slug} onImported={onImported} />
     </div>
   );
 }
 
 /* ── Question Card ──────────────────────────────────────────── */
-function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemoveOpt, onToggleCorrect, onRemove, onDuplicate, onDragHandleStart, onDragHandleEnd }) {
+function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemoveOpt, onToggleCorrect, onRemove, onDuplicate, onDragHandleStart, onDragHandleEnd, onShowToast }) {
   const hasOptions = ["radio", "checkbox"].includes(question.type);
-  const isNew = question._new;
+  // Semua soal bisa diedit (tidak hanya yang baru)
+  const editable = true;
   return (
     <div className={`bg-white rounded-2xl border shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-6 transition-all hover:shadow-[0_14px_40px_rgba(23,64,120,0.12)] ${
-      isNew ? "border-[#1a4fa0]/50 ring-1 ring-[#1a4fa0]/10" : "border-[#e5eef7]"
+      question._new ? "border-[#1a4fa0]/50 ring-1 ring-[#1a4fa0]/10" : "border-[#e5eef7]"
     }`}>
       <div className="flex items-center gap-3 mb-5">
         <button
           type="button"
           draggable
-          onDragStart={(e) => {
-            e.dataTransfer.effectAllowed = "move";
-            e.dataTransfer.setData("text/plain", String(index));
-            onDragHandleStart?.();
-          }}
+          onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(index)); onDragHandleStart?.(); }}
           onDragEnd={() => onDragHandleEnd?.()}
           title="Tarik untuk urutkan soal"
           className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-[#1a4fa0] transition-colors"
@@ -454,14 +464,12 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemo
           value={question.question}
           onChange={(e) => onUpdate("question", e.target.value)}
           placeholder="Masukkan pertanyaan..."
-          readOnly={!isNew}
           className="flex-1 text-[16px] font-semibold text-[#102f56] outline-none border-b border-dashed border-gray-200 pb-1.5 focus:border-[#1a4fa0] transition-colors bg-transparent"
         />
         <select
           value={question.type}
           onChange={(e) => onUpdate("type", e.target.value)}
-          disabled={!isNew}
-          className="text-[13.5px] border border-[#d9e5f0] rounded-xl px-3.5 py-2.5 bg-white outline-none disabled:opacity-60 shrink-0 font-medium text-gray-700 shadow-sm focus:border-[#1a4fa0]"
+          className="text-[13.5px] border border-[#d9e5f0] rounded-xl px-3.5 py-2.5 bg-white outline-none shrink-0 font-medium text-gray-700 shadow-sm focus:border-[#1a4fa0]"
         >
           {QUESTION_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
@@ -495,70 +503,75 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemo
                 type="text"
                 value={opt.value}
                 onChange={(e) => onUpdateOpt(oIdx, e.target.value)}
-                readOnly={!isNew}
                 className="flex-1 text-[15px] text-gray-700 outline-none border-b border-dashed border-gray-100 focus:border-[#1a4fa0] transition-colors bg-transparent py-1"
               />
-              {isNew && (
-                <button onClick={() => onRemoveOpt(oIdx)} className="w-8 h-8 rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-all flex items-center justify-center shrink-0">
-                  ✕
-                </button>
-              )}
+              <button onClick={() => onRemoveOpt(oIdx)} className="w-8 h-8 rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-all flex items-center justify-center shrink-0">✕</button>
             </div>
           ))}
-          {isNew && (
-            <button onClick={onAddOpt} className="text-[14px] font-medium text-gray-400 hover:text-[#1a4fa0] flex items-center gap-2 ml-1 mt-2 transition-colors">
-              <Plus size={16} /> Tambah opsi
-            </button>
-          )}
+          <button onClick={onAddOpt} className="text-[14px] font-medium text-gray-400 hover:text-[#1a4fa0] flex items-center gap-2 ml-1 mt-2 transition-colors">
+            <Plus size={16} /> Tambah opsi
+          </button>
         </div>
       )}
 
       {question.type === "text" && (
         <div className="ml-2 mb-4">
-          <input
-            type="text"
-            value={question.placeholder ?? ""}
-            onChange={(e) => onUpdate("placeholder", e.target.value)}
-            placeholder="Tulis jawabanmu"
-            readOnly={!isNew}
-            className="w-full text-[15px] text-gray-500 outline-none border-b border-dashed border-gray-100 focus:border-[#1a4fa0] transition-colors bg-transparent py-1"
-          />
+          <input type="text" value={question.placeholder ?? ""} onChange={(e) => onUpdate("placeholder", e.target.value)}
+            placeholder="Tulis jawabanmu di sini..."
+            className="w-full text-[15px] text-gray-500 outline-none border-b border-dashed border-gray-100 focus:border-[#1a4fa0] transition-colors bg-transparent py-1" />
         </div>
       )}
+
+      {/* ── Tipe FILE ───────────────────────────────────────────── */}
       {question.type === "file" && (
-        <div className="ml-2 mb-4">
-          {isNew ? (
-            <label className="flex flex-col sm:flex-row items-center justify-center gap-2 w-full rounded-xl border-2 border-dashed border-[#c3d4e4] bg-[#f7fafd] py-4 px-4 cursor-pointer hover:border-[#1a4fa0] hover:bg-[#f0f6fe] transition-all">
-              {question.file
-                ? <>
-                    <FileText size={18} className="text-[#1a4fa0] shrink-0" />
-                    <span className="text-[13.5px] font-semibold text-[#102f56] truncate">{question.file.name}</span>
-                    <span className="text-[12px] text-gray-400 shrink-0">Klik untuk ganti file</span>
-                  </>
-                : <>
-                    <UploadCloud size={18} className="text-[#1a4fa0] shrink-0" />
-                    <span className="text-[13.5px] font-semibold text-gray-500">Unggah file contoh (pratinjau)</span>
-                  </>
-              }
-              <input type="file" className="hidden" onChange={(e) => onUpdate("file", e.target.files?.[0])} />
+        <div className="ml-2 mb-4 space-y-3">
+          {/* Attachment soal — pembuat bisa upload file soal/cerita */}
+          <div>
+            <p className="text-[12px] font-semibold text-[#1a4fa0] uppercase tracking-wide mb-1.5">📎 Lampiran Soal (opsional)</p>
+            <p className="text-[11.5px] text-gray-400 mb-2">Upload file soal/cerita yang akan ditampilkan kepada responden saat mengisi form.</p>
+            <label className="flex items-center gap-3 w-full rounded-xl border-2 border-dashed border-[#c3d4e4] bg-[#f7fafd] py-3 px-4 cursor-pointer hover:border-[#1a4fa0] hover:bg-[#f0f6fe] transition-all">
+              {question.attachment ? (
+                <>
+                  <FileText size={18} className="text-[#1a4fa0] shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-semibold text-[#102f56] truncate">{question.attachment.name ?? question.attachment}</p>
+                    <p className="text-[11px] text-gray-400">Klik untuk ganti file lampiran</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <UploadCloud size={18} className="text-gray-400 shrink-0" />
+                  <span className="text-[13px] text-gray-500">Klik untuk upload file lampiran soal</span>
+                </>
+              )}
+              <input type="file" className="hidden" onChange={(e) => onUpdate("attachment", e.target.files?.[0])} />
             </label>
-          ) : (
-            <div className="flex items-center gap-2.5 text-[14px] text-gray-400">
-              <span className="w-9 h-9 rounded-xl bg-[#eef5fb] grid place-items-center">📎</span>
-              Pengguna dapat mengunggah file
-            </div>
-          )}
+          </div>
+
+          {/* Info jawaban file */}
+          <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl bg-blue-50 border border-blue-100">
+            <span className="text-[16px] shrink-0 mt-0.5">💡</span>
+            <p className="text-[12px] text-blue-700 leading-relaxed">
+              <strong>Jawaban responden</strong> akan dikumpulkan dalam bentuk file upload. Responden akan diminta untuk mengunggah file sebagai jawaban mereka.
+            </p>
+          </div>
         </div>
       )}
 
       <div className="flex items-center justify-between gap-2 mt-5 pt-4 border-t border-[#eef3f8]">
         <div className="flex items-center gap-1">
           <button title="Duplikat" onClick={onDuplicate} className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-400 hover:bg-[#eef5fb] hover:text-[#1a4fa0] transition-all"><Copy size={16} /></button>
-          <button title="Hapus" onClick={onRemove} className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all"><Trash2 size={16} /></button>
+          <button title="Hapus" onClick={() => {
+            if (!question._new) {
+              onShowToast("Hapus soal yang sudah tersimpan belum tersedia. Minta teman backend untuk menambahkan endpoint DELETE soal.");
+              return;
+            }
+            onRemove();
+          }} className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all"><Trash2 size={16} /></button>
         </div>
         <label className="flex items-center gap-2 text-[13.5px] font-medium text-gray-500 cursor-pointer select-none">
           Wajib diisi
-          <input type="checkbox" checked={question.required} onChange={(e) => onUpdate("required", e.target.checked)} className="w-4.5 h-4.5 accent-[#1a4fa0]" style={{ width: 18, height: 18 }} />
+          <input type="checkbox" checked={question.required} onChange={(e) => onUpdate("required", e.target.checked)} className="accent-[#1a4fa0]" style={{ width: 18, height: 18 }} />
         </label>
       </div>
     </div>
@@ -647,7 +660,7 @@ function ResponsesTab({ formId, form }) {
                 { icon: "♙", color: "bg-[#edf4ff] text-[#075ee0]", label: "Total Respon",         value: total,              sub: "responden" },
                 { icon: "✓", color: "bg-[#eafaf3] text-[#18ae70]", label: "Tingkat Penyelesaian",  value: "100%",             sub: "selesai" },
                 { icon: "◷", color: "bg-[#fff5e8] text-[#ee941c]", label: "Rata-rata Waktu",       value: "—",                sub: "menit" },
-                { icon: "◔", color: "bg-[#f5edff] text-[#8e4de7]", label: "Selesai Hari Ini",      value: countToday(responses), sub: "responden" },
+                { icon: "◔", color: "bg-[#f5edff] text-[#8e4de7]", label: "Selesai Hari Ini", value: (() => { const today = new Date().toDateString(); return 0; })(), sub: "responden" },
               ].map((s, i) => (
                 <div key={i} className="min-h-[110px] border border-[#e7edf6] rounded-xl p-[17px] flex items-center gap-[15px] bg-white">
                   <div className={`w-[43px] h-[43px] shrink-0 flex items-center justify-center rounded-[9px] text-[20px] ${s.color}`}>{s.icon}</div>
@@ -873,5 +886,83 @@ function Toggle({ value, onChange }) {
     >
       <span className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
     </button>
+  );
+}
+
+/* ── Import Docx Button ─────────────────────────────────────── */
+function ImportDocxButton({ slug, onImported }) {
+  const [importing, setImporting] = useState(false);
+  const [toast, setToast]         = useState("");
+  const [error, setError]         = useState("");
+
+  function showMsg(msg, isErr = false) {
+    if (isErr) setError(msg);
+    else setToast(msg);
+    setTimeout(() => { setToast(""); setError(""); }, 4000);
+  }
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.name.endsWith(".docx")) {
+      showMsg("File harus berformat .docx", true); return;
+    }
+    setImporting(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`http://localhost:3000/form/soal/import?form_slug=${slug}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || "Gagal import.");
+      const count = data?.data?.length ?? 0;
+      showMsg(`✅ ${count} soal berhasil diimport dari Word!`);
+      onImported?.();
+    } catch (e) {
+      showMsg(e.message || "Gagal import.", true);
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <label className={`w-full py-3.5 rounded-2xl border-2 border-dashed flex items-center justify-center gap-2 text-[14px] font-semibold transition-all cursor-pointer ${
+        importing
+          ? "border-gray-200 text-gray-400 cursor-not-allowed"
+          : "border-[#c7d8e8] text-gray-500 hover:border-[#1a4fa0] hover:text-[#1a4fa0] hover:bg-white"
+      }`}>
+        {importing ? (
+          <>
+            <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+            Mengimport soal...
+          </>
+        ) : (
+          <>
+            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+              <line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/>
+            </svg>
+            Import Soal dari Word (.docx)
+          </>
+        )}
+        <input type="file" accept=".docx" onChange={handleFile} disabled={importing} className="hidden" />
+      </label>
+
+      {toast && (
+        <div className="px-4 py-3 rounded-xl bg-green-50 border border-green-200 text-green-700 text-[13px] text-center">
+          {toast}
+        </div>
+      )}
+      {error && (
+        <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-[13px] text-center">
+          {error}
+        </div>
+      )}
+    </div>
   );
 }

@@ -4,23 +4,7 @@ import Sidebar from "../../components/Sidebar";
 import api from "../../utils/api";
 
 const FORM_API = "http://localhost:3000";
-
 const CATEGORIES = ["All", "Survey", "Quiz / Ujian"];
-
-const DUMMY_FORMS = [
-  { form_id: 1, form_title: "Kuesioner Pelaksanaan Program Makan Bergizi Gratis (MBG)", form_slug: "dummy-mbg",      category: "survey", form_status: "public",  form_banner: null,
-    image: "https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=900&q=80" },
-  { form_id: 2, form_title: "Customer UX Quiz",                                          form_slug: "dummy-ux",       category: "ujian",  form_status: "public",  form_banner: null,
-    image: "https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=900&q=80" },
-  { form_id: 3, form_title: "Student Feedback Form",                                     form_slug: "dummy-feedback", category: "survey", form_status: "private", form_banner: null,
-    image: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=900&q=80" },
-  { form_id: 4, form_title: "Product Research Quiz",                                     form_slug: "dummy-product",  category: "ujian",  form_status: "public",  form_banner: null,
-    image: "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=900&q=80" },
-  { form_id: 5, form_title: "Event Registration Form",                                   form_slug: "dummy-event",    category: "survey", form_status: "private", form_banner: null,
-    image: "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?auto=format&fit=crop&w=900&q=80" },
-  { form_id: 6, form_title: "Employee Satisfaction Survey",                              form_slug: "dummy-employee", category: "survey", form_status: "public",  form_banner: null,
-    image: "https://images.unsplash.com/photo-1521737711867-e3b97375f902?auto=format&fit=crop&w=900&q=80" },
-];
 
 function getUsername() {
   try {
@@ -47,7 +31,7 @@ function SkeletonCard() {
 /* ── Create Form Modal ───────────────────────────────────────── */
 function CreateModal({ onClose, onCreated }) {
   const [title, setTitle]             = useState("");
-  const [cat, setCat]                 = useState("ujian");
+  const [cat, setCat] = useState("ujian");
   const [banner, setBanner]           = useState(null);
   const [preview, setPreview]         = useState(null);
   const [tokenRespon, setTokenRespon] = useState("");
@@ -119,7 +103,7 @@ function CreateModal({ onClose, onCreated }) {
               onChange={e => setCat(e.target.value)}
             >
               <option value="ujian">Ujian / Quiz</option>
-              <option value="survey">Survey</option>
+              <option value="survei">Survey</option>
             </select>
           </div>
 
@@ -178,6 +162,7 @@ export default function MyForms() {
   const [activeCategory, setActive] = useState("All");
   const [search, setSearch]         = useState("");
   const [showModal, setShowModal]   = useState(false);
+  const [showJoin, setShowJoin]     = useState(false);
 
   useEffect(() => { load(); }, []);
 
@@ -185,9 +170,8 @@ export default function MyForms() {
     setLoading(true);
     try {
       const res = await api.get("/form/user");
-      const data = res.data?.data?.forms ?? [];
-      setForms(data.length ? data : DUMMY_FORMS);
-    } catch { setForms(DUMMY_FORMS); }
+      setForms(res.data?.data?.forms ?? []);
+    } catch { setForms([]); }
     finally { setLoading(false); }
   }
 
@@ -198,7 +182,7 @@ export default function MyForms() {
     const matchSearch = title.includes(search.toLowerCase());
     const matchCat =
       activeCategory === "All" ||
-      (activeCategory === "Survey"     && cat === "survey") ||
+      (activeCategory === "Survey"       && (cat === "survey" || cat === "survei")) ||
       (activeCategory === "Quiz / Ujian" && cat === "ujian");
     return matchSearch && matchCat;
   });
@@ -218,13 +202,22 @@ export default function MyForms() {
               <h1 className="text-[28px] font-extrabold tracking-tight text-[#102f56]">My Forms</h1>
               <p className="mt-1.5 text-[13.5px] text-[#7290a9]">Halo, {username}! Kelola semua form yang kamu buat.</p>
             </div>
-            <button
-              onClick={() => setShowModal(true)}
-              className="inline-flex items-center gap-2 px-[19px] py-3 rounded-xl text-white text-[14px] font-semibold shadow-[0_6px_15px_rgba(61,145,178,0.22)] hover:-translate-y-0.5 hover:shadow-[0_9px_20px_rgba(61,145,178,0.3)] transition-all"
-              style={{ background: "linear-gradient(135deg,#183056,#3d91b2)" }}
-            >
-              <span className="text-lg leading-none">＋</span> Create Form
-            </button>
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                onClick={() => setShowJoin(true)}
+                className="inline-flex items-center gap-2 px-[19px] py-3 rounded-xl text-[14px] font-semibold border border-violet-300 text-violet-700 bg-violet-50 hover:bg-violet-100 hover:-translate-y-0.5 transition-all"
+              >
+                <span className="text-lg leading-none">🤝</span>
+                <span className="hidden sm:inline">Join Kolaborasi</span>
+              </button>
+              <button
+                onClick={() => setShowModal(true)}
+                className="inline-flex items-center gap-2 px-[19px] py-3 rounded-xl text-white text-[14px] font-semibold shadow-[0_6px_15px_rgba(61,145,178,0.22)] hover:-translate-y-0.5 transition-all"
+                style={{ background: "linear-gradient(135deg,#183056,#3d91b2)" }}
+              >
+                <span className="text-lg leading-none">＋</span> Create Form
+              </button>
+            </div>
           </header>
 
           {/* ── Search ─────────────────────────────── */}
@@ -359,6 +352,112 @@ export default function MyForms() {
           }}
         />
       )}
+
+      {showJoin && (
+        <JoinModal onClose={() => setShowJoin(false)} onJoined={() => { setShowJoin(false); load(); }} />
+      )}
+    </div>
+  );
+}
+
+/* ── Join Collaborator Modal ─────────────────────────────────── */
+function JoinModal({ onClose, onJoined }) {
+  const navigate = useNavigate();
+  const [link, setLink]       = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState("");
+
+  async function handleJoin() {
+    setError("");
+    let slug = "", token = "";
+    try {
+      const url = new URL(link.trim().startsWith("http") ? link.trim() : `http://localhost${link.trim()}`);
+      const parts = url.pathname.split("/");
+      const formIdx = parts.indexOf("form");
+      if (formIdx !== -1) slug = parts[formIdx + 1] ?? "";
+      token = url.searchParams.get("token") ?? "";
+    } catch {
+      setError("Format link tidak valid."); return;
+    }
+
+    if (!slug || !token) { setError("Link tidak valid atau token tidak ditemukan."); return; }
+
+    setLoading(true);
+    try {
+      // Gunakan fetch langsung supaya interceptor logout tidak terpicu
+      const res = await fetch(`http://localhost:3000/form/share?form_slug=${slug}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ token_collab: token }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data?.message ?? "";
+        if (msg.toLowerCase().includes("sudah")) {
+          setError("Kamu sudah menjadi bagian dari form ini.");
+        } else if (msg.toLowerCase().includes("token")) {
+          setError("Token tidak valid atau sudah kadaluarsa.");
+        } else {
+          setError(msg || "Gagal bergabung. Pastikan link benar.");
+        }
+        return;
+      }
+      onJoined();
+      navigate(`/form/${slug}`);
+    } catch {
+      setError("Tidak dapat terhubung ke server.");
+    } finally { setLoading(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      onClick={onClose}>
+      <div className="w-full max-w-[420px] bg-white rounded-2xl overflow-hidden shadow-2xl"
+        onClick={e => e.stopPropagation()}>
+
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center text-xl">🤝</div>
+            <div>
+              <h3 className="text-[16px] font-bold text-[#183056]">Join Kolaborasi</h3>
+              <p className="text-[11px] text-[#7290a9]">Masukkan link undangan collaborator</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-[#7290a9] hover:text-[#183056] text-[22px] leading-none">×</button>
+        </div>
+
+        <div className="px-6 py-5 flex flex-col gap-4">
+          {error && (
+            <div className="text-[12.5px] text-red-600 bg-red-50 px-3 py-2.5 rounded-lg border border-red-100">{error}</div>
+          )}
+
+          <div>
+            <label className="block text-[11px] font-bold text-[#4d6a82] uppercase tracking-wider mb-1.5">Link Undangan</label>
+            <input
+              className="w-full h-11 border border-[#d9e8f1] rounded-lg px-3.5 text-[13.5px] text-[#183056] outline-none bg-[#f7fbff] focus:border-[#7c3aed] focus:bg-white focus:ring-4 focus:ring-violet-100 transition-all box-border"
+              placeholder="https://localhost:5173/form/slug/collaborate?token=..."
+              value={link}
+              onChange={e => { setLink(e.target.value); setError(""); }}
+            />
+            <p className="text-[11px] text-[#7290a9] mt-1.5">Paste link yang dikirim oleh creator form.</p>
+          </div>
+        </div>
+
+        <div className="flex gap-3 px-6 pb-5">
+          <button onClick={onClose}
+            className="flex-1 h-11 rounded-lg border border-[#d6e5ee] bg-white text-[#55738d] text-[13.5px] font-semibold hover:bg-[#f4fafd] transition-all">
+            Batal
+          </button>
+          <button onClick={handleJoin} disabled={loading || !link.trim()}
+            className="flex-1 h-11 rounded-lg text-white text-[13.5px] font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ background: "linear-gradient(135deg,#6d28d9,#7c3aed)" }}>
+            {loading ? "Bergabung..." : "Bergabung 🤝"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

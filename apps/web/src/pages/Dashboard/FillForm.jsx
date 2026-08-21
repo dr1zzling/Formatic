@@ -12,7 +12,7 @@ const TYPE_LABEL = {
 };
 
 function fallbackLabel(opt, i) {
-  return opt.option_value?.trim() || `Opsi ${i + 1}`;
+  return opt.value?.trim() || opt.option_value?.trim() || `Opsi ${i + 1}`;
 }
 
 const inputCls =
@@ -96,7 +96,22 @@ export default function FillForm() {
       }
 
       fd.append("data", JSON.stringify(payload));
-      await api.post(`/form/submit`, fd, { params: { form_slug: slug } });
+
+      // Kirim langsung dengan axios tanpa interceptor logout
+      const token = localStorage.getItem("token");
+      const response = await fetch(`http://localhost:3000/form/submit?form_slug=${slug}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        if (response.status === 401) {
+          throw new Error(data.message || "Kamu tidak berhak mengisi form ini.");
+        }
+        throw new Error(data.message || "Gagal mengirim jawaban.");
+      }
       // Simpan ke history lokal
       saveToHistory(slug, form?.title ?? form?.form_title, form?.category);
       setDone(true);
@@ -173,6 +188,25 @@ export default function FillForm() {
               <span className="text-[11px] font-semibold text-[#c9393f] shrink-0">*</span>
             </div>
 
+            {/* Attachment soal (file lampiran dari pembuat) */}
+            {soal.image && (
+              <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-100 rounded-xl">
+                <FileText size={18} className="text-[#1a4fa0] shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-semibold text-[#1a4fa0]">Lampiran Soal</p>
+                  <p className="text-[11.5px] text-blue-500 truncate">{soal.image}</p>
+                </div>
+                <a
+                  href={`http://localhost:3000/uploads/soal/${soal.image}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 px-3 py-1.5 rounded-lg bg-[#1a4fa0] text-white text-[12px] font-semibold hover:opacity-90 transition"
+                >
+                  Buka File
+                </a>
+              </div>
+            )}
+
             {/* Radio / Checkbox */}
             {(soal.type === "radio" || soal.type === "checkbox") && (
               <div className="space-y-2.5">
@@ -219,30 +253,26 @@ export default function FillForm() {
               />
             )}
 
-            {/* File */}
+            {/* File — jawaban dalam bentuk file upload */}
             {soal.type === "file" && (
-              <label className="flex flex-col items-center justify-center gap-2 w-full rounded-xl border-2 border-dashed border-[#c3d4e4] bg-[#f7fafd] py-8 cursor-pointer hover:border-[#1a4fa0] hover:bg-[#f0f6fe] transition-all">
-                {answers[soal.id]?.file
-                  ? (
+              <div className="space-y-3">
+                <label className="flex flex-col items-center justify-center gap-2 w-full rounded-xl border-2 border-dashed border-[#c3d4e4] bg-[#f7fafd] py-8 cursor-pointer hover:border-[#1a4fa0] hover:bg-[#f0f6fe] transition-all">
+                  {answers[soal.id]?.file ? (
                     <>
                       <FileText size={28} className="text-[#1a4fa0]" />
                       <span className="text-[14px] font-semibold text-[#102f56]">{answers[soal.id].file.name}</span>
-                      <span className="text-[12.5px] text-gray-400">Klik untuk ganti file</span>
+                      <span className="text-[12px] text-gray-400">({(answers[soal.id].file.size / 1024).toFixed(0)} KB) · Klik untuk ganti</span>
                     </>
-                  )
-                  : (
+                  ) : (
                     <>
                       <UploadCloud size={28} className="text-[#1a4fa0]" />
                       <span className="text-[14px] font-semibold text-[#102f56]">Unggah file jawaban</span>
-                      <span className="text-[12.5px] text-gray-400">Maks 10 file</span>
+                      <span className="text-[12.5px] text-gray-400">Klik untuk memilih file</span>
                     </>
                   )}
-                <input
-                  type="file"
-                  className="hidden"
-                  onChange={(e) => setAnswer(soal.id, { file: e.target.files?.[0] })}
-                />
-              </label>
+                  <input type="file" className="hidden" onChange={(e) => setAnswer(soal.id, { file: e.target.files?.[0] })} />
+                </label>
+              </div>
             )}
           </div>
         ))}
