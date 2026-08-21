@@ -21,8 +21,10 @@ export class FormService {
         slug: 'forms.slug',
         title: 'forms.title',
         category: 'forms.category',
-        banner: 'forms.banner'
+        banner: 'forms.banner',
+        status: 'forms.status'
       })
+      .where('status', 'public')
 
     if (get.length === 0) throw new NotFoundException('Tidak Ada Form Dari Category Tersebut')
 
@@ -78,10 +80,7 @@ export class FormService {
     const get = await this.knexService.connection('user_form')
       .innerJoin('forms', 'forms.id', 'user_form.form_id')
       .select({
-        id: 'user_form.id',
-        user_id: 'user_form.user_id',
         access_type: 'user_form.access_type',
-
         form_id: 'forms.id',
         form_slug: 'forms.slug',
         form_title: 'forms.title',
@@ -90,6 +89,8 @@ export class FormService {
         token_respon: 'forms.token_respon',
         token_collab: 'forms.token_collab',
         category: 'forms.category',
+        duration: 'forms.duration',
+        start_at: 'forms.start_at'
       })
       .where('user_form.user_id', data.id)
 
@@ -157,8 +158,8 @@ export class FormService {
     }
   }
 
-  // Update Form Public
-  async updateForm(req: {id: number }, form_id, status: string ){
+  // Post Form to Public or Private
+  async postPublic(req: {id: number }, form_id, status: string ){
     const isCreator = await this.isCreator.isCreator(req.id, form_id.id)
     if(isCreator != 'Creator') throw new UnauthorizedException("Anda Tidak Berhak Menghapus Form Ini")
     const validateStatus = ['public', 'private']
@@ -170,6 +171,23 @@ export class FormService {
 
     return {
       message: `Berhasil Mengubah ke ${status}`
+    }
+  }
+
+  async updateForm(req: {id: number }, form, body: { duration: number, start_at: number}){
+    const isCreator = await this.isCreator.isCreator(req.id, form.id)
+    if(isCreator == false) throw new UnauthorizedException("Anda Tidak Berhak Update Form Ini")
+
+    if(!body) throw new BadRequestException("Isi yang benar")
+    const updateForm = await this.knexService.connection("forms")
+    .update({
+      duration: body.duration,
+      start_at: new Date(body.start_at)
+    })
+    .where("id", form.id)
+
+    return {
+      message: "Berhasil Mengubah Waktu Pengerjaan"
     }
   }
 

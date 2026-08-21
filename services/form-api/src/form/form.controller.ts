@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Query, Request, UseGuards, ParseIntPipe, UseInterceptors, UploadedFile, UploadedFiles, Delete, Patch, ParseFilePipe, FileTypeValidator, MaxFileSizeValidator } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Query, Request, UseGuards, ParseIntPipe, UseInterceptors, UploadedFile, UploadedFiles, Delete, Patch, ParseFilePipe, FileTypeValidator, MaxFileSizeValidator, Put } from '@nestjs/common';
 import { FormService } from './form.service';
 import { JwtAuthGuard } from '../guard/jwt.auth.guard';
 import { ValidateFormExist } from '../Pipe/validate.form.exist';
@@ -75,12 +75,12 @@ export class FormController {
   // Update Form
   @Patch()
   @UseGuards(JwtAuthGuard)
-  updateForm(
+  postPublic(
     @Request() req,
     @Query('form_slug', ValidateFormExist) form_slug: string,
     @Body('status') status: string
   ) {
-    return this.formService.updateForm(req.user, form_slug, status)
+    return this.formService.postPublic(req.user, form_slug, status)
   }
 
   // Delete Form
@@ -113,4 +113,13 @@ export class FormController {
     return this.formService.changeRole(req.user, form_slug, token_collab)
   }
 
+  @Put('/time')
+  @UseGuards(JwtAuthGuard)
+  updateForm(
+    @Request() req,
+    @Query('form_slug', ValidateFormExist) form_slug: string,
+    @Body() body: { duration: number, start_at: number}
+  ){
+    return this.formService.updateForm(req.user, form_slug, body)
+  }
 }
