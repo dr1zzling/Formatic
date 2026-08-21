@@ -1,11 +1,12 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Query, UploadedFile, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
-import { SoalService } from './soal.service';
-import { ValidateFormExist } from '../Pipe/validate.form.exist';
-import { JwtAuthGuard } from '../guard/jwt.auth.guard';
-import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
-import { memoryStorage } from 'multer';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFile, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common'
+import { SoalService } from './soal.service'
+import { ValidateFormExist } from '../Pipe/validate.form.exist'
+import { JwtAuthGuard } from '../guard/jwt.auth.guard'
+import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express'
+import { diskStorage } from 'multer'
+import { extname } from 'path'
+import { memoryStorage } from 'multer'
+import { ValidateSoalExist } from 'src/Pipe/validate.soal.exist'
 
 @Controller('form/soal')
 export class SoalController {
@@ -53,7 +54,7 @@ export class SoalController {
   async createSoalAndOption(
     @Query('form_slug', ValidateFormExist) form_slug: any,
     @Body('data') dataRaw: string,
-    @UploadedFiles() 
+    @UploadedFiles()
     files?: {
       soal_images?: Express.Multer.File[]
       option_images?: Express.Multer.File[]
@@ -95,6 +96,80 @@ export class SoalController {
     }
 
     return this.soalService.createSoalAndOption(form_slug, listSoal)
+  }
+
+  // Update Soal
+  @Patch(':soal_id')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'soal_images', maxCount: 1 },
+        { name: 'option_images', maxCount: 10 },
+      ],
+      {
+        storage: diskStorage({
+          destination: './uploads/soal',
+          filename: (req, file, cb) => {
+            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9)
+            cb(null, `${file.fieldname}-${uniqueSuffix}${extname(file.originalname)}`)
+          },
+        }),
+      },
+    ),
+  )
+  async updateSoal(
+    @Param('soal_id', ValidateSoalExist) soal_id: string,
+    @Body('data') dataRaw: string,
+    @Body() rawBody: any,
+    @UploadedFiles()
+    files?: {
+      soal_images?: Express.Multer.File[]
+      option_images?: Express.Multer.File[]
+    },
+  ) {
+    let parsedData: any
+    
+    try {
+      parsedData = typeof dataRaw === 'string' ? JSON.parse(dataRaw) : (dataRaw || rawBody)
+    } catch (error) {
+      throw new BadRequestException('Format JSON pada request body tidak valid!')
+    }
+
+    if (files) {
+      if (parsedData.soal && parsedData.soal.image_filename) {
+        const matchSoalFile = files.soal_images?.find(
+          (f) => f.originalname === parsedData.soal.image_filename,
+        )
+        if (matchSoalFile) {
+          parsedData.soal.image = `/uploads/soal/${matchSoalFile.filename}`
+        }
+      }
+
+      if (parsedData.options && Array.isArray(parsedData.options)) {
+        parsedData.options.forEach((opt: any) => {
+          if (opt.image_filename) {
+            const matchOptionFile = files.option_images?.find(
+              (f) => f.originalname === opt.image_filename,
+            )
+            if (matchOptionFile) {
+              opt.image = `/uploads/soal/${matchOptionFile.filename}`
+            }
+          }
+        })
+      }
+    }
+
+    return this.soalService.updateSoal(Number(soal_id), parsedData)
+  }
+
+  // Delete Soal
+  @Delete(':soal_id')
+  @UseGuards(JwtAuthGuard)
+  deleteSoal(
+    @Param('soal_id', ValidateSoalExist) soal_id: string
+  ) {
+    return this.soalService.deleteSoal(Number(soal_id))
   }
 
 }
