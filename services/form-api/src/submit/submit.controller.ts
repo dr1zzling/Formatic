@@ -1,8 +1,10 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Query, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Request, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { SubmitService } from './submit.service';
 import { ValidateFormExist } from '../Pipe/validate.form.exist';
 import { JwtAuthGuard } from '../guard/jwt.auth.guard';
-import { AuthGuard } from '@nestjs/passport';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 
 @Controller('form/submit')
 export class SubmitController {
@@ -37,5 +39,28 @@ export class SubmitController {
       @Query('form_slug', ValidateFormExist) form_slug
     ){
       return this.submitService.getAllSubmitResponseByForm(req.user, form_slug)
+    }
+
+    // Submit jawaban responden
+    @Post()
+    @UseGuards(JwtAuthGuard)
+    @UseInterceptors(
+      FilesInterceptor('files', 20, {
+        storage: diskStorage({
+          destination: './uploads/answers',
+          filename: (req, file, cb) => {
+            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9)
+            cb(null, `${file.fieldname}-${uniqueSuffix}${extname(file.originalname)}`)
+          },
+        }),
+      }),
+    )
+    submitForm(
+      @Request() req,
+      @Query('form_slug', ValidateFormExist) form_slug,
+      @Body('data') data: string,
+      @UploadedFiles() files: Express.Multer.File[] = [],
+    ) {
+      return this.submitService.submitForm(req.user, form_slug, data, files)
     }
 }

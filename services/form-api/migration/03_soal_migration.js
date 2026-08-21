@@ -9,7 +9,7 @@ exports.up = function(knex) {
         table.text('image')
         table.integer('form_id').unsigned()
         table.enum('type', ['radio', 'text', 'file', 'checkbox'])
-        
+        table.integer('score').nullable()
         table.foreign('form_id').references('forms.id').onDelete('CASCADE')
     })
 };

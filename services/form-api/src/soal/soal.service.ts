@@ -88,6 +88,7 @@ export class SoalService {
             question: soal.question,
             type: soal.type,
             image: soal.image,
+            score: soal.score,
             options: getOption.filter((option) => option.soal_id == soal.id)
         }))
     }
@@ -112,6 +113,7 @@ export class SoalService {
                             form_id: form_slug.id,
                             question: soal.question,
                             type: soal.type,
+                            score: soal.score,
                             image: soal.image ?? null
                         })
                         .returning(['id', 'question', 'type', 'image'])

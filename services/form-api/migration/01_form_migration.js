@@ -11,6 +11,8 @@ exports.up = function(knex) {
     table.text('token_collab').notNullable()
     table.enum('category', ['ujian', 'survei']).notNullable()
     table.enum('status', ['public', 'private']).defaultTo('public')
+    table.integer('duration').nullable()
+    table.timestamp('start_at', { useTz: true }).nullable()
     table.text('banner').notNullable()
   })
 };
