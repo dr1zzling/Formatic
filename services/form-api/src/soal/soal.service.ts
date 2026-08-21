@@ -80,14 +80,7 @@ export class SoalService {
 
         const soalId = getSoal.map((soal) => soal.id)
         const getOption = await this.knexService.connection("soal_option")
-            .innerJoin('option_value', 'option_value.id', 'soal_option.option_value_id')
-            .select({
-                id: "soal_option.id",
-                soal_id: "soal_option.soal_id",
-                is_correct: "soal_option.is_correct",
-                value: "option_value.value",
-                image: "option_value.image"
-            })
+            .select("*")
             .whereIn("soal_id", soalId)
 
         return getSoal.map((soal) => ({
@@ -126,31 +119,24 @@ export class SoalService {
                     if (!optionTypes.includes(soal.type)) return insertSoal
 
                     const optionList = Array.isArray(options) ? options : (options ? [options] : [])
-                    const payloadOptionValue = optionList.map((option) => ({
-                        value: option.value,
-                        image: option.image ?? null
-                    }))
 
-                    const insertOptionValue = await trx('option_value')
-                        .insert(payloadOptionValue)
-                        .returning('*')
 
-                    const payloadSoalOption = insertOptionValue.map((optionValue, idx) => ({
+                    const payloadSoalOption = optionList.map((optionValue, idx) => ({
                         soal_id: insertSoal.id,
-                        option_value_id: optionValue.id,
+                        image: optionValue.image ?? null,
+                        value: optionValue.value,
                         is_correct: optionList[idx]?.is_correct ?? false
                     }))
                     const insertSoalOption = await trx('soal_option')
                         .insert(payloadSoalOption)
-                        .returning(['id', 'is_correct'])
+                        .returning(['id', 'is_correct', 'image', 'value'])
 
                     return {
                         soal: insertSoal,
-                        options: insertSoalOption.map((so, idx) => ({
+                        options: insertSoalOption.map((so) => ({
                             id: so.id,
-                            option_value_id: insertOptionValue[idx].id,
-                            option_value: insertOptionValue[idx].value,
-                            image: insertOptionValue[idx].image ?? null,
+                            value: so.value,
+                            image: so.image ?? null,
                             is_correct: so.is_correct
                         })),
                     }
@@ -163,6 +149,67 @@ export class SoalService {
             data: {
                 form_slug: form_slug,
                 list_soal: insert
+            },
+        }
+    }
+
+    // Delete Soal
+    async deleteSoal(soal_id: number) {
+        const del = await this.knexService.connection("soal")
+            .delete()
+            .where('id', soal_id)
+
+        return {
+            message: "Berhasil Menghapus Soal"
+        }
+    }
+
+    // Update Soal
+    async updateSoal(soal_id: number, body: any) {
+        const soal = { ...body.soal }
+
+        delete soal.image_filename // just for testing with that html file
+        if (!soal.image) {
+            delete soal.image
+        }
+
+        const updateSoal = await this.knexService.connection("soal")
+            .where("id", soal_id)
+            .update(soal)
+            .returning("*")
+
+        const options = body.options ? (Array.isArray(body.options) ? body.options : [body.options]) : []
+
+        const updateOption = await this.knexService.connection.transaction(async (trx) => {
+            return Promise.all(
+                options.map(async (e) => {
+                    const payloadOption: any = {
+                        value: e.value,
+                        is_correct: e.is_correct,
+                    }
+
+                    if (e.image) {
+                        payloadOption.image = e.image
+                    }
+
+                    await trx("soal_option")
+                        .where("id", e.id)
+                        .update(payloadOption)
+
+                    const get = await trx("soal_option")
+                        .where("id", e.id)
+                        .first()
+
+                    return get
+                })
+            )
+        })
+
+        return {
+            message: "Berhasil Mengubah Soal",
+            data: {
+                soal: updateSoal,
+                options: updateOption,
             },
         }
     }

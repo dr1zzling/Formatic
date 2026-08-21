@@ -9,7 +9,7 @@ export class SubmitController {
     constructor(private submitService: SubmitService) {}
 
     // Check Token Responden
-    @Post()
+    @Post('check-token')
     @UseGuards(JwtAuthGuard)
     checkRole(
       @Request() req,

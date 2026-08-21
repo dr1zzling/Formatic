@@ -3,10 +3,14 @@
  * @returns { Promise<void> }
  */
 exports.up = function(knex) {
-  return knex.schema.createTable('option_value', function(table){
+  return knex.schema.createTable('soal_option', function(table){
     table.increments()
+    table.integer('soal_id').unsigned()
     table.text('image')
     table.text('value')
+    table.boolean('is_correct')
+
+    table.foreign('soal_id').references("soal.id").onDelete('CASCADE')
   })
 };
 
@@ -15,5 +19,5 @@ exports.up = function(knex) {
  * @returns { Promise<void> }
  */
 exports.down = function(knex) {
-  return knex.schema.dropTable('option_value')
+  return knex.schema.dropTable('soal_option')
 };
