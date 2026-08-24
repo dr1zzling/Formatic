@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Login       from "./pages/auth/Login";
 import Register    from "./pages/auth/Register";
+import ForgotPassword from "./pages/auth/ForgotPassword";
 import Home        from "./pages/Dashboard/Home";
 import MyForms     from "./pages/Dashboard/MyForms";
 import FormEditor  from "./pages/Dashboard/FormEditor";
@@ -29,6 +30,7 @@ function App() {
         {/* Auth */}
         <Route path="/login"    element={<AuthRoute><Login /></AuthRoute>} />
         <Route path="/register" element={<AuthRoute><Register /></AuthRoute>} />
+        <Route path="/forgot-password" element={<AuthRoute><ForgotPassword /></AuthRoute>} />
 
         {/* Dashboard */}
         <Route path="/"          element={<ProtectedRoute><Home /></ProtectedRoute>} />
