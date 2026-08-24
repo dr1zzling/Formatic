@@ -251,9 +251,9 @@ export default function Login() {
                                     />
                                     Remember me
                                 </label>
-                                <a href="#" className="font-medium hover:opacity-80" style={{ color: COLORS.cyan }}>
+                                <Link to="/forgot-password" className="font-medium hover:opacity-80" style={{ color: COLORS.cyan }}>
                                     Forgot password?
-                                </a>
+                                </Link>
                             </div>
 
                             <button
