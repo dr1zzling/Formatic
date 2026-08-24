@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../utils/api";
 import { Bell, HelpCircle, Plus, ArrowRight, FileText, Search } from "lucide-react";
+import Sidebar from "../../components/Sidebar";
 
 const FORM_API = "http://localhost:3000";
 
@@ -23,49 +24,7 @@ function timeAgo(dateStr) {
 
 const HISTORY_KEY = "formatic_history";
 
-/* ── Sidebar ──────────────────────────────────────────────────── */
-function AppSidebar({ activeMenu, setActiveMenu }) {
-  const navigate = useNavigate();
-  const items = [
-    { id: "home",   label: "Home",    path: "/",
-      icon: <><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></> },
-    { id: "myform", label: "My Form", path: "/my-forms",
-      icon: <><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h4"/></> },
-    { id: "trash",  label: "Trash",   path: "/trash",
-      icon: <><path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 14h10l1-14"/><path d="M9 7V4h6v3"/></> },
-  ];
-  const username = getUsername();
-  return (
-    <aside className="w-[366px] min-w-[366px] h-screen fixed left-0 top-0 flex flex-col z-20"
-      style={{ background: "linear-gradient(180deg,#06245a 0%,#0a438f 48%,#257dc6 100%)" }}>
-      <div className="flex items-center gap-3 px-8 pt-9 pb-14">
-        <div className="w-[38px] h-[38px] flex items-center justify-center bg-white rounded-[9px] text-[#1251aa] text-[21px] font-extrabold shrink-0">F</div>
-        <span className="text-[22px] font-bold text-white">Formatic</span>
-      </div>
-      <nav className="flex flex-col gap-2 px-6 flex-1">
-        {items.map(item => {
-          const on = activeMenu === item.id;
-          return (
-            <button key={item.id} onClick={() => { setActiveMenu(item.id); navigate(item.path); }}
-              className={`w-full h-[58px] flex items-center gap-[18px] px-[18px] rounded-[9px] text-[16px] font-medium transition-all border-none cursor-pointer ${on ? "text-white" : "text-white/90 hover:bg-white/10"}`}
-              style={on ? { background: "linear-gradient(90deg,rgba(95,171,255,0.35),rgba(255,255,255,0.12))" } : {}}>
-              <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">{item.icon}</svg>
-              {item.label}
-            </button>
-          );
-        })}
-      </nav>
-      <div className="flex items-center gap-3 px-6 py-4 cursor-pointer" onClick={() => navigate("/profile")}>
-        <div className="w-[38px] h-[38px] rounded-full bg-[#1663df] flex items-center justify-center font-bold text-white shrink-0 text-[15px]">{username[0]?.toUpperCase()}</div>
-        <div className="flex flex-col flex-1">
-          <strong className="text-[14px] text-white font-semibold">{username}</strong>
-          <span className="text-[10px] text-white/65 mt-0.5">My Account</span>
-        </div>
-        <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m7 9 5 5 5-5"/></svg>
-      </div>
-    </aside>
-  );
-}
+
 
 /* ── Activity Card ─────────────────────────────────────────────── */
 function ActivityCard({ forms, loading }) {
@@ -271,7 +230,6 @@ export default function Home() {
   const navigate = useNavigate();
   const username = getUsername();
 
-  const [activeMenu, setActiveMenu] = useState("home");
   const [search, setSearch]         = useState("");
   const [category, setCategory]     = useState("All");
   const [myForms, setMyForms]       = useState([]);
@@ -289,28 +247,31 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen flex" style={{ background: "radial-gradient(circle at 85% 10%,rgba(93,174,255,0.1),transparent 28%),#f5f9ff" }}>
-      <AppSidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
-      <main className="flex-1 min-w-0 ml-[366px] px-11 py-9 pb-16 max-[1300px]:px-8 max-[800px]:px-5 max-[800px]:py-7">
-        <header className="flex items-start justify-between mb-7">
-          <div>
-            <h1 className="m-0 text-[30px] font-bold text-[#102f68] leading-tight">Hi, {username}! 👋</h1>
-            <p className="mt-2 text-[14px] text-[#8195b2]">Fill out forms, give responses, and share your feedback.</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <button className="w-[38px] h-[38px] flex items-center justify-center text-[#143b75] bg-transparent border-none cursor-pointer"><Bell size={20} /></button>
-            <button className="w-[38px] h-[38px] flex items-center justify-center text-[#143b75] bg-transparent border-none cursor-pointer"><HelpCircle size={20} /></button>
-            <div className="w-[39px] h-[39px] rounded-full bg-[#1458d1] text-white text-[14px] font-bold flex items-center justify-center">{username[0]?.toUpperCase()}</div>
-          </div>
-        </header>
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <main className="flex-1 min-w-0" style={{ width: "calc(100% - 366px)" }}>
+        <div className="min-h-screen px-11 py-9 pb-16 max-[1300px]:px-8 max-[800px]:px-5 max-[800px]:py-7"
+          style={{ background: "radial-gradient(circle at 85% 10%,rgba(93,174,255,0.1),transparent 28%),#f5f9ff" }}>
+          <header className="flex items-start justify-between mb-7">
+            <div>
+              <h1 className="m-0 text-[30px] font-bold text-[#102f68] leading-tight">Hi, {username}! 👋</h1>
+              <p className="mt-2 text-[14px] text-[#8195b2]">Fill out forms, give responses, and share your feedback.</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <button className="w-[38px] h-[38px] flex items-center justify-center text-[#143b75] bg-transparent border-none cursor-pointer"><Bell size={20} /></button>
+              <button className="w-[38px] h-[38px] flex items-center justify-center text-[#143b75] bg-transparent border-none cursor-pointer"><HelpCircle size={20} /></button>
+              <div className="w-[39px] h-[39px] rounded-full bg-[#1458d1] text-white text-[14px] font-bold flex items-center justify-center">{username[0]?.toUpperCase()}</div>
+            </div>
+          </header>
 
-        <SearchFilter search={search} setSearch={setSearch} category={category} setCategory={setCategory} />
+          <SearchFilter search={search} setSearch={setSearch} category={category} setCategory={setCategory} />
 
-        <div className="grid grid-cols-[minmax(0,1.75fr)_minmax(310px,0.9fr)] gap-5 items-stretch max-[1050px]:grid-cols-1">
-          <CreateFormCard onCreateClick={() => navigate("/my-forms")} />
-          <ActivityCard forms={myForms} loading={myLoading} />
-          <HistoryPengerjaan loading={myLoading} />
-          <ManageFormsCard totalForms={myForms.length} />
+          <div className="grid grid-cols-[minmax(0,1.75fr)_minmax(310px,0.9fr)] gap-5 items-stretch max-[1050px]:grid-cols-1">
+            <CreateFormCard onCreateClick={() => navigate("/my-forms")} />
+            <ActivityCard forms={myForms} loading={myLoading} />
+            <HistoryPengerjaan loading={myLoading} />
+            <ManageFormsCard totalForms={myForms.length} />
+          </div>
         </div>
       </main>
     </div>
