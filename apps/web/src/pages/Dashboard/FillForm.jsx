@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../../utils/api";
-import { ArrowLeft, Send, Check, CheckCircle2, UploadCloud, FileText } from "lucide-react";
+import { socket } from "../../utils/socket";
+import { ArrowLeft, Send, Check, CheckCircle2, UploadCloud, FileText, Bell } from "lucide-react";
 import { saveToHistory } from "./History";
+import RichTextDisplay from "../../components/RichTextDisplay";
 
 const TYPE_LABEL = {
   radio: "Pilihan Ganda",
@@ -29,6 +31,7 @@ export default function FillForm() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone]           = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [liveNotice, setLiveNotice]   = useState("");
 
   useEffect(() => {
     (async () => {
@@ -41,6 +44,30 @@ export default function FillForm() {
       } finally { setLoading(false); }
     })();
   }, [slug]);
+
+  useEffect(() => {
+    if (!slug) return;
+
+    socket.connect();
+    socket.emit("joinForm", { slug });
+
+    const handleFormUpdated = (data) => {
+      if (data?.soal) {
+        setForm((prev) => (prev ? { ...prev, soal: data.soal } : prev));
+        setLiveNotice("Soal telah diperbarui oleh Admin!");
+        setTimeout(() => setLiveNotice(""), 5000);
+      }
+    };
+
+    socket.on("formUpdated", handleFormUpdated);
+
+    return () => {
+      socket.emit("leaveForm", { slug });
+      socket.off("formUpdated", handleFormUpdated);
+      socket.disconnect();
+    };
+  }, [slug]);
+
 
   function setAnswer(soalId, value) {
     setAnswers((prev) => ({ ...prev, [soalId]: value }));
@@ -69,7 +96,8 @@ export default function FillForm() {
   async function submit() {
     const empty = (form?.soal ?? []).find((s) => !hasAnswer(s));
     if (empty) {
-      setSubmitError(`Pertanyaan "${empty.question || "Wajib"}" belum dijawab.`);
+      const cleanTitle = (empty.question || "Wajib").replace(/<[^>]*>/g, '').trim() || "Wajib";
+      setSubmitError(`Pertanyaan "${cleanTitle}" belum dijawab.`);
       return;
     }
 
@@ -170,8 +198,16 @@ export default function FillForm() {
           <ArrowLeft size={16} /> Kembali
         </button>
 
+        {liveNotice && (
+          <div className="mb-4 px-4 py-3 rounded-xl bg-blue-600 text-white text-[14px] font-semibold flex items-center gap-3 shadow-lg animate-bounce">
+            <Bell size={18} />
+            <span>{liveNotice}</span>
+          </div>
+        )}
+
         {/* Form header */}
         <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-7 mb-5">
+
           <h1 className="text-[24px] font-extrabold tracking-tight text-[#102f56] leading-snug">{title}</h1>
           <p className="mt-1 text-[13.5px] text-gray-400">{form?.category}</p>
         </div>
@@ -179,11 +215,11 @@ export default function FillForm() {
         {/* Questions */}
         {(form?.soal ?? []).map((soal, qi) => (
           <div key={soal.id ?? qi} className="bg-white rounded-2xl border border-[#e5eef7] shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-6 mb-4">
-            <div className="flex items-center gap-3 mb-5">
-              <span className="w-9 h-9 rounded-xl bg-[#eef5fb] text-[#1a4fa0] text-[14px] font-extrabold grid place-items-center shrink-0">{qi + 1}</span>
+            <div className="flex items-start gap-3 mb-4">
+              <span className="w-9 h-9 rounded-xl bg-[#eef5fb] text-[#1a4fa0] text-[14px] font-extrabold grid place-items-center shrink-0 mt-0.5">{qi + 1}</span>
               <div className="flex-1 min-w-0">
-                <p className="text-[16px] font-bold text-[#102f56] leading-snug">{soal.question}</p>
-                <span className="text-[12px] font-medium text-[#1a4fa0]">{TYPE_LABEL[soal.type] ?? soal.type}</span>
+                <RichTextDisplay content={soal.question} className="text-[16px] font-bold text-[#102f56] leading-snug" />
+                <span className="text-[12px] font-medium text-[#1a4fa0] block mt-1">{TYPE_LABEL[soal.type] ?? soal.type}</span>
               </div>
               <span className="text-[11px] font-semibold text-[#c9393f] shrink-0">*</span>
             </div>

@@ -3,6 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import Sidebar from "../../components/Sidebar";
 import api from "../../utils/api";
 import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical } from "lucide-react";
+import QuillEditor from "../../components/QuillEditor";
+import RichTextDisplay from "../../components/RichTextDisplay";
 
 const QUESTION_TYPES = [
   { value: "radio",    label: "Pilihan Ganda" },
@@ -17,13 +19,14 @@ export default function FormEditor() {
   const navigate = useNavigate();
 
   const [form, setForm]             = useState(null);
-  const [questions, setQuestions]   = useState([]);
-  const [activeTab, setActiveTab]   = useState("Pertanyaan");
-  const [loading, setLoading]       = useState(true);
-  const [saving, setSaving]         = useState(false);
-  const [error, setError]           = useState("");
-  const [toast, setToast]           = useState("");
-  const [showDelete, setShowDelete] = useState(false);
+  const [questions, setQuestions]           = useState([]);
+  const [deletedQuestionIds, setDeletedQuestionIds] = useState([]);
+  const [activeTab, setActiveTab]           = useState("Pertanyaan");
+  const [loading, setLoading]               = useState(true);
+  const [saving, setSaving]                 = useState(false);
+  const [error, setError]                   = useState("");
+  const [toast, setToast]                   = useState("");
+  const [showDelete, setShowDelete]         = useState(false);
 
   useEffect(() => { loadForm(); }, [slug]);
 
@@ -58,7 +61,7 @@ export default function FormEditor() {
   function addQuestion() {
     setQuestions((prev) => [...prev, {
       _new: true, question: "", type: "radio", required: true,
-      options: [{ value: "Opsi 1" }, { value: "Opsi 2" }],
+      options: [{ value: "" }, { value: "" }],
     }]);
   }
   function updateQ(idx, field, val) {
@@ -72,7 +75,7 @@ export default function FormEditor() {
   }
   function addOpt(qIdx) {
     setQuestions((prev) => prev.map((q, i) =>
-      i !== qIdx ? q : { ...q, options: [...q.options, { value: `Opsi ${q.options.length + 1}`, is_correct: false }] }
+      i !== qIdx ? q : { ...q, options: [...q.options, { value: "", is_correct: false }] }
     ));
   }
   function toggleCorrect(qIdx, oIdx) {
@@ -94,7 +97,15 @@ export default function FormEditor() {
       i !== qIdx ? q : { ...q, options: q.options.filter((_, j) => j !== oIdx) }
     ));
   }
-  function removeQ(idx) { setQuestions((prev) => prev.filter((_, i) => i !== idx)); }
+  function removeQ(idx) {
+    setQuestions((prev) => {
+      const target = prev[idx];
+      if (target && target.id && !target._new) {
+        setDeletedQuestionIds((d) => [...d, target.id]);
+      }
+      return prev.filter((_, i) => i !== idx);
+    });
+  }
   function reorderQ(from, to) {
     if (from === to) return;
     setQuestions((prev) => {
@@ -113,56 +124,86 @@ export default function FormEditor() {
   }
 
   async function saveQuestions() {
-    const newOnes = questions.filter((q) => q._new);
-    if (!newOnes.length) { showToast("Tidak ada soal baru untuk disimpan."); return; }
-    if (newOnes.find((q) => !q.question.trim())) { setError("Semua pertanyaan wajib diisi."); return; }
+    const isTextEmpty = (str) => !str || str.replace(/<[^>]*>/g, '').trim() === '';
+    if (questions.find((q) => isTextEmpty(q.question))) { setError("Semua pertanyaan wajib diisi."); return; }
     setSaving(true); setError("");
     try {
-      const fd = new FormData();
-      const payload = newOnes.map((q, i) => {
-        const hasOpts = ["radio", "checkbox", "rating"].includes(q.type);
-        if (q.attachment instanceof File) {
-          fd.append("soal_images", q.attachment, `soal_${i}_${q.attachment.name}`);
-        }
-        return {
-          soal: { question: q.question, type: q.type, image: q.attachment instanceof File ? q.attachment.name : null },
-          options: hasOpts
-            ? q.options.filter((o) => o.value?.trim()).map((o) => ({ value: o.value, image: null }))
-            : [],
-        };
-      });
-      fd.append("data", JSON.stringify(payload));
-      const res = await fetch(`http://localhost:3000/form/soal?form_slug=${slug}`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        body: fd,
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg = data?.message || JSON.stringify(data) || "Gagal menyimpan soal.";
-        throw new Error(msg);
+      const token = localStorage.getItem("token");
+
+      // 1. Process deletions
+      if (deletedQuestionIds.length > 0) {
+        await Promise.all(
+          deletedQuestionIds.map((id) =>
+            fetch(`http://localhost:3000/form/soal/${id}`, {
+              method: "DELETE",
+              headers: { Authorization: `Bearer ${token}` },
+            })
+          )
+        );
+        setDeletedQuestionIds([]);
       }
-      showToast(`${newOnes.length} soal berhasil disimpan!`);
-      // Setelah simpan, reload dari DB
-      const res2 = await api.get("/form/slug", { params: { slug } });
-      const f = res2.data?.data;
-      if (f) {
-        setForm(f);
-        setQuestions(
-          (f?.soal ?? []).map((s) => ({
-            id: s.id, question: s.question, type: s.type, required: true,
-            options: (s.options ?? []).map((o) => ({
-              id: o.id, value: o.value ?? o.option_value, is_correct: o.is_correct,
-            })),
-          }))
+
+      // 2. Process updates to existing questions
+      const existingOnes = questions.filter((q) => q.id && !q._new);
+      if (existingOnes.length > 0) {
+        await Promise.all(
+          existingOnes.map((q) => {
+            const hasOpts = ["radio", "checkbox", "rating"].includes(q.type);
+            const payload = {
+              soal: { question: q.question, type: q.type },
+              options: hasOpts
+                ? (q.options || []).map((o, idx) => ({ id: o.id, value: o.value?.trim() || `Opsi ${idx + 1}`, is_correct: o.is_correct ?? false }))
+                : [],
+            };
+            return fetch(`http://localhost:3000/form/soal/${q.id}`, {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ data: JSON.stringify(payload) }),
+            });
+          })
         );
       }
+
+      // 3. Process new questions
+      const newOnes = questions.filter((q) => q._new);
+      if (newOnes.length > 0) {
+        const fd = new FormData();
+        const payload = newOnes.map((q, i) => {
+          const hasOpts = ["radio", "checkbox", "rating"].includes(q.type);
+          if (q.attachment instanceof File) {
+            fd.append("soal_images", q.attachment, `soal_${i}_${q.attachment.name}`);
+          }
+          return {
+            soal: { question: q.question, type: q.type, image: q.attachment instanceof File ? q.attachment.name : null },
+            options: hasOpts
+              ? q.options.map((o, idx) => ({ value: o.value?.trim() || `Opsi ${idx + 1}`, image: null, is_correct: o.is_correct ?? false }))
+              : [],
+          };
+        });
+        fd.append("data", JSON.stringify(payload));
+        const res = await fetch(`http://localhost:3000/form/soal?form_slug=${slug}`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: fd,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data?.message || "Gagal menyimpan soal baru.");
+        }
+      }
+
+      showToast("Perubahan soal berhasil disimpan!");
+      await loadForm();
     } catch (e) {
       setError(e.message || "Gagal menyimpan soal.");
       showToast("❌ " + (e.message || "Gagal menyimpan soal."));
     }
     finally { setSaving(false); }
   }
+
 
   async function updateStatus(status) {
     try {
@@ -445,34 +486,40 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemo
     <div className={`bg-white rounded-2xl border shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-6 transition-all hover:shadow-[0_14px_40px_rgba(23,64,120,0.12)] ${
       question._new ? "border-[#1a4fa0]/50 ring-1 ring-[#1a4fa0]/10" : "border-[#e5eef7]"
     }`}>
-      <div className="flex items-center gap-3 mb-5">
-        <button
-          type="button"
-          draggable
-          onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(index)); onDragHandleStart?.(); }}
-          onDragEnd={() => onDragHandleEnd?.()}
-          title="Tarik untuk urutkan soal"
-          className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-[#1a4fa0] transition-colors"
-        >
-          <GripVertical size={18} />
-        </button>
-        <span className="w-9 h-9 rounded-xl bg-[#eef5fb] text-[#1a4fa0] text-[14px] font-extrabold flex items-center justify-center shrink-0">
-          {index + 1}
-        </span>
-        <input
-          type="text"
-          value={question.question}
-          onChange={(e) => onUpdate("question", e.target.value)}
-          placeholder="Masukkan pertanyaan..."
-          className="flex-1 text-[16px] font-semibold text-[#102f56] outline-none border-b border-dashed border-gray-200 pb-1.5 focus:border-[#1a4fa0] transition-colors bg-transparent"
-        />
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            draggable
+            onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(index)); onDragHandleStart?.(); }}
+            onDragEnd={() => onDragHandleEnd?.()}
+            title="Tarik untuk urutkan soal"
+            className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-[#1a4fa0] transition-colors"
+          >
+            <GripVertical size={18} />
+          </button>
+          <span className="w-9 h-9 rounded-xl bg-[#eef5fb] text-[#1a4fa0] text-[14px] font-extrabold flex items-center justify-center shrink-0">
+            {index + 1}
+          </span>
+        </div>
         <select
           value={question.type}
           onChange={(e) => onUpdate("type", e.target.value)}
-          className="text-[13.5px] border border-[#d9e5f0] rounded-xl px-3.5 py-2.5 bg-white outline-none shrink-0 font-medium text-gray-700 shadow-sm focus:border-[#1a4fa0]"
+          className="text-[13.5px] border border-[#d9e5f0] rounded-xl px-3.5 py-2 bg-white outline-none shrink-0 font-medium text-gray-700 shadow-xs focus:border-[#1a4fa0]"
         >
           {QUESTION_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
+      </div>
+
+      <div className="mb-5">
+        <label className="block text-[12px] font-extrabold text-[#1a4fa0] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+         Pertanyaan:
+        </label>
+        <QuillEditor
+          value={question.question}
+          onChange={(val) => onUpdate("question", val)}
+          placeholder="Ketik pertanyaan di sini"
+        />
       </div>
 
       {hasOptions && (
@@ -503,6 +550,7 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemo
                 type="text"
                 value={opt.value}
                 onChange={(e) => onUpdateOpt(oIdx, e.target.value)}
+                placeholder={`Opsi ${oIdx + 1}`}
                 className="flex-1 text-[15px] text-gray-700 outline-none border-b border-dashed border-gray-100 focus:border-[#1a4fa0] transition-colors bg-transparent py-1"
               />
               <button onClick={() => onRemoveOpt(oIdx)} className="w-8 h-8 rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-all flex items-center justify-center shrink-0">✕</button>
@@ -561,13 +609,8 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemo
       <div className="flex items-center justify-between gap-2 mt-5 pt-4 border-t border-[#eef3f8]">
         <div className="flex items-center gap-1">
           <button title="Duplikat" onClick={onDuplicate} className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-400 hover:bg-[#eef5fb] hover:text-[#1a4fa0] transition-all"><Copy size={16} /></button>
-          <button title="Hapus" onClick={() => {
-            if (!question._new) {
-              onShowToast("Hapus soal yang sudah tersimpan belum tersedia. Minta teman backend untuk menambahkan endpoint DELETE soal.");
-              return;
-            }
-            onRemove();
-          }} className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all"><Trash2 size={16} /></button>
+          <button title="Hapus" onClick={onRemove} className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all"><Trash2 size={16} /></button>
+
         </div>
         <label className="flex items-center gap-2 text-[13.5px] font-medium text-gray-500 cursor-pointer select-none">
           Wajib diisi
@@ -679,7 +722,8 @@ function ResponsesTab({ formId, form }) {
                 <div className="flex justify-between items-start gap-4 mb-5">
                   <div>
                     <h3 className="m-0 text-[14px] font-semibold text-[#142d63] flex items-center gap-2 flex-wrap">
-                      {qi + 1}. {q.question}
+                      <span>{qi + 1}.</span>
+                      <RichTextDisplay content={q.question} />
                       <span className="px-2 py-1 rounded-full bg-[#edf4ff] text-[#075ee0] text-[9px] font-bold">Wajib</span>
                     </h3>
                     <p className="mt-1 mb-0 text-[10px] text-[#7384a4]">{total} respon</p>
