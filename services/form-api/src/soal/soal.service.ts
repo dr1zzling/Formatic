@@ -1,10 +1,26 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { KnexService } from '../database/knex.service'
+import { FormEventsGateway } from '../form/form-events.gateway'
 import * as mammoth from 'mammoth'
 
 @Injectable()
 export class SoalService {
-    constructor(private knexService: KnexService) { }
+    constructor(
+        private knexService: KnexService,
+        private formEventsGateway: FormEventsGateway
+    ) { }
+
+    private async broadcastFormUpdate(formId: number) {
+        try {
+            const form = await this.knexService.connection('forms').where('id', formId).first()
+            if (form) {
+                const updatedSoal = await this.getSoalByForm(formId)
+                this.formEventsGateway.notifyFormUpdated(form.id, form.slug, updatedSoal)
+            }
+        } catch (error) {
+            console.error('Broadcast update error:', error)
+        }
+    }
 
     async importDocx(form_slug, buffer: Buffer) {
         const result = await mammoth.extractRawText({ buffer })
@@ -146,6 +162,8 @@ export class SoalService {
             )
         })
 
+        await this.broadcastFormUpdate(form_slug.id)
+
         return {
             message: `Berhasil Membuat ${listSoal.length} list soal`,
             data: {
@@ -157,9 +175,17 @@ export class SoalService {
 
     // Delete Soal
     async deleteSoal(soal_id: number) {
+        const existingSoal = await this.knexService.connection("soal")
+            .where("id", soal_id)
+            .first()
+
         const del = await this.knexService.connection("soal")
             .delete()
             .where('id', soal_id)
+
+        if (existingSoal && existingSoal.form_id) {
+            await this.broadcastFormUpdate(existingSoal.form_id)
+        }
 
         return {
             message: "Berhasil Menghapus Soal"
@@ -183,29 +209,51 @@ export class SoalService {
         const options = body.options ? (Array.isArray(body.options) ? body.options : [body.options]) : []
 
         const updateOption = await this.knexService.connection.transaction(async (trx) => {
+            if (options.length > 0) {
+                const keepIds = options.filter((e) => e.id).map((e) => Number(e.id))
+                await trx("soal_option").where("soal_id", soal_id).whereNotIn("id", keepIds).delete()
+            } else {
+                await trx("soal_option").where("soal_id", soal_id).delete()
+            }
+
             return Promise.all(
                 options.map(async (e) => {
                     const payloadOption: any = {
                         value: e.value,
-                        is_correct: e.is_correct,
+                        is_correct: Boolean(e.is_correct),
                     }
 
                     if (e.image) {
                         payloadOption.image = e.image
                     }
 
-                    await trx("soal_option")
-                        .where("id", e.id)
-                        .update(payloadOption)
+                    if (e.id) {
+                        await trx("soal_option")
+                            .where("id", e.id)
+                            .update(payloadOption)
 
-                    const get = await trx("soal_option")
-                        .where("id", e.id)
-                        .first()
-
-                    return get
+                        return await trx("soal_option").where("id", e.id).first()
+                    } else {
+                        const [inserted] = await trx("soal_option")
+                            .insert({
+                                soal_id: soal_id,
+                                ...payloadOption
+                            })
+                            .returning("*")
+                        return inserted
+                    }
                 })
             )
         })
+
+
+        const existingSoal = await this.knexService.connection("soal")
+            .where("id", soal_id)
+            .first()
+
+        if (existingSoal && existingSoal.form_id) {
+            await this.broadcastFormUpdate(existingSoal.form_id)
+        }
 
         return {
             message: "Berhasil Mengubah Soal",
@@ -216,3 +264,4 @@ export class SoalService {
         }
     }
 }
+
