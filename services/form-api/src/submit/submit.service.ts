@@ -52,7 +52,6 @@ export class SubmitService {
       ...question,
       options: Array.isArray(question.options)
         ? question.options.map((option) => {
-          // FIX: Gunakan option.id (bukan option.option_value_id)
           const key = `${question.id}_${option.id}`
           return {
             ...option,
