@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/services/form_service.dart';
-import '../widgets/form_card.dart';
 import '../widgets/category_chip.dart';
 import '../../forms/screens/create_form_screen.dart';
 import '../../forms/screens/my_forms_screen.dart';
+import '../../forms/screens/form_editor_screen.dart';
 import '../../history/screens/history_screen.dart';
 import '../../profile/screens/profile_screen.dart';
 
@@ -130,9 +130,9 @@ class _HomeContentState extends State<_HomeContent> {
 
   final List<Map<String, dynamic>> _categories = [
     {'label': 'All', 'selected': true},
-    {'label': 'Public', 'selected': false},
-    {'label': 'Quiz', 'selected': false},
-    {'label': 'Survey', 'selected': false},
+    {'label': 'Ujian', 'selected': false},
+    {'label': 'Survei', 'selected': false},
+    {'label': 'Pengumpulan Data', 'selected': false},
   ];
 
   @override
@@ -662,7 +662,18 @@ class _HomeContentState extends State<_HomeContent> {
     final catBg = _getCategoryBgColor(category);
 
     return GestureDetector(
-      onTap: () {},
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => FormEditorScreen(
+              formId: form['form_id']?.toString() ?? form['id'].toString(),
+              formTitle: form['title'] ?? 'Untitled',
+              formSlug: form['slug'] ?? '',
+              formStatus: form['status'],
+            ),
+          ),
+        );
+      },
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(

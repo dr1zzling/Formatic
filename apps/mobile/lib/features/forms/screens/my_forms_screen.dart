@@ -21,7 +21,7 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
   List<Map<String, dynamic>> _myForms = [];
   List<Map<String, dynamic>> _filteredForms = [];
 
-  final List<String> _categories = ['All', 'Ujian', 'Survey'];
+  final List<String> _categories = ['All', 'Ujian', 'Survei', 'Pengumpulan Data'];
 
   @override
   void initState() {
@@ -44,7 +44,8 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
 
     if (result['success'] && mounted) {
       final responseData = result['data']['data'];
-      final List<dynamic> forms = responseData['forms'] ?? [];
+      final Map<String, dynamic> userData = responseData is Map ? Map<String, dynamic>.from(responseData) : {};
+      final List<dynamic> forms = userData['form'] ?? [];
 
       setState(() {
         _myForms = forms.map((form) => {

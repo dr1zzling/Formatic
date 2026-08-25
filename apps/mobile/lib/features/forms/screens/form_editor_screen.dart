@@ -25,7 +25,6 @@ class FormEditorScreen extends StatefulWidget {
 
 class _FormEditorScreenState extends State<FormEditorScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  Map<String, dynamic>? _formData;
   List<Map<String, dynamic>> _questions = [];
   bool _isLoading = true;
   String _errorMessage = '';
@@ -61,12 +60,18 @@ class _FormEditorScreenState extends State<FormEditorScreen> with SingleTickerPr
         final questionsResult = await FormService.getFormQuestions(formId);
 
         setState(() {
-          _formData = data;
           _isPublic = (data['form_status'] ?? data['status'] ?? 'private') == 'public';
 
           if (questionsResult['success']) {
-            final questionsData = questionsResult['data']['data'];
-            final listSoal = questionsData['list_soal'] as List? ?? [];
+            final questionsData = questionsResult['data'];
+            final List<dynamic> listSoal;
+            if (questionsData is List) {
+              listSoal = questionsData;
+            } else if (questionsData is Map && questionsData['data'] is List) {
+              listSoal = questionsData['data'];
+            } else {
+              listSoal = [];
+            }
             _questions = listSoal.asMap().entries.map((entry) {
               final index = entry.key;
               final soal = entry.value;
@@ -99,12 +104,23 @@ class _FormEditorScreenState extends State<FormEditorScreen> with SingleTickerPr
   }
 
   Future<void> _loadSubmitStats() async {
-    final result = await FormService.getSubmitStats(widget.formSlug);
+    final result = await FormService.getSubmitStats(widget.formId);
     if (result['success'] && mounted) {
-      final data = result['data']['data'];
-      setState(() {
-        _totalSubmissions = data is List ? data.length : 0;
-      });
+      final data = result['data'];
+      if (data is Map && data['data'] != null) {
+        final submissions = data['data'];
+        setState(() {
+          _totalSubmissions = submissions is List ? submissions.length : 1;
+        });
+      } else if (data is List) {
+        setState(() {
+          _totalSubmissions = data.length;
+        });
+      } else {
+        setState(() {
+          _totalSubmissions = 0;
+        });
+      }
     }
   }
 
@@ -561,11 +577,22 @@ class _ResponsesTabState extends State<_ResponsesTab> {
   Future<void> _loadResponses() async {
     setState(() => _isLoading = true);
 
-    final result = await FormService.getSubmitDetail(widget.formSlug);
+    final result = await FormService.getSubmitDetail(widget.formId);
     if (result['success'] && mounted) {
-      final data = result['data']['data'];
+      final data = result['data'];
+      List<dynamic> responsesList = [];
+      if (data is Map && data['data'] != null) {
+        final innerData = data['data'];
+        if (innerData is List) {
+          responsesList = innerData;
+        } else if (innerData is Map) {
+          responsesList = [innerData];
+        }
+      } else if (data is List) {
+        responsesList = data;
+      }
       setState(() {
-        _responses = data is List ? data : [];
+        _responses = responsesList;
         _isLoading = false;
       });
     } else {
@@ -683,11 +710,18 @@ class _ResponsesTabState extends State<_ResponsesTab> {
   }
 
   Widget _buildSummaryView() {
+    if (_responses.isEmpty) {
+      return const Center(
+        child: Text('No responses yet', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+      );
+    }
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: _responses.length,
       itemBuilder: (context, index) {
         final response = _responses[index];
+        if (response is! Map) return const SizedBox.shrink();
         final submittedAt = response['submitted_at'] ?? '';
         final questions = response['questions'] ?? response['soal'] ?? [];
 
@@ -709,13 +743,13 @@ class _ResponsesTabState extends State<_ResponsesTab> {
                   const Icon(Icons.person, size: 16, color: AppColors.primary),
                   const SizedBox(width: 8),
                   Text(
-                    'Responden #${index + 1}',
+                    response['username'] ?? 'Responden #${index + 1}',
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
                   const Spacer(),
-                  if (submittedAt.isNotEmpty)
+                  if (submittedAt is String && submittedAt.isNotEmpty)
                     Text(
-                      submittedAt.toString().substring(0, submittedAt.toString().length > 19 ? 19 : submittedAt.toString().length),
+                      submittedAt.substring(0, submittedAt.length > 19 ? 19 : submittedAt.length),
                       style: const TextStyle(fontSize: 11, color: AppColors.textHint),
                     ),
                 ],
@@ -733,11 +767,18 @@ class _ResponsesTabState extends State<_ResponsesTab> {
   }
 
   Widget _buildDetailView() {
+    if (_responses.isEmpty) {
+      return const Center(
+        child: Text('No responses yet', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+      );
+    }
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: _responses.length,
       itemBuilder: (context, index) {
         final response = _responses[index];
+        if (response is! Map) return const SizedBox.shrink();
         final questions = response['questions'] ?? response['soal'] ?? [];
 
         return Container(

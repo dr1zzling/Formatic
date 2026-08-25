@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
@@ -14,7 +13,7 @@ class CreateFormSheet extends StatefulWidget {
 }
 
 class _CreateFormSheetState extends State<CreateFormSheet> {
-  static const _categories = ['Quiz', 'Survey', 'Exam'];
+  static const _categories = ['Ujian', 'Survei', 'Pengumpulan Data'];
 
   final _titleController = TextEditingController();
   String _category = 'Quiz';
@@ -45,7 +44,10 @@ class _CreateFormSheetState extends State<CreateFormSheet> {
     final result = await FormService.createForm(
       title: _titleController.text.trim(),
       category: _category,
-      bannerFile: _bannerFile!,
+      tokenRespon: '',
+      bannerBytes: _bannerFile != null ? await _bannerFile!.readAsBytes() : null,
+      bannerName: _bannerFile?.name,
+      bannerMimeType: _bannerFile?.mimeType,
     );
 
     if (!mounted) return;
@@ -129,7 +131,7 @@ class _CreateFormSheetState extends State<CreateFormSheet> {
             _label('KATEGORI'),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              initialValue: _category,
+              value: _category,
               decoration: _inputDecoration(null),
               items: _categories
                   .map((c) => DropdownMenuItem(value: c, child: Text(c)))
@@ -151,12 +153,6 @@ class _CreateFormSheetState extends State<CreateFormSheet> {
                     color: const Color(0xFFE5E7EB),
                     style: BorderStyle.solid,
                   ),
-                  image: _bannerFile != null
-                      ? DecorationImage(
-                          image: FileImage(File(_bannerFile!.path)),
-                          fit: BoxFit.cover,
-                        )
-                      : null,
                 ),
                 child: _bannerFile != null
                     ? Align(

@@ -44,9 +44,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _error = '';
     });
 
-    final result = await AuthService.forgotPassword(
+    final result = await AuthService.resetPassword(
       username: _usernameController.text.trim(),
-      password: _passwordController.text,
+      newPassword: _passwordController.text,
     );
 
     if (!mounted) return;

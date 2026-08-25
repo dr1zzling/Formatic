@@ -160,9 +160,17 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: _buildCategoryOption(
-                                label: 'Survey',
+                                label: 'Survei',
                                 value: 'survei',
                                 icon: Icons.poll_outlined,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildCategoryOption(
+                                label: 'Data',
+                                value: 'pengumpulan data',
+                                icon: Icons.storage_outlined,
                               ),
                             ),
                           ],
@@ -176,18 +184,12 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
                         TextFormField(
                           controller: _tokenController,
                           decoration: InputDecoration(
-                            hintText: 'Masukkan token respon',
+                            hintText: 'Masukkan token respon (opsional)',
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: const BorderSide(color: AppColors.inputBorder),
                             ),
                           ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Token respon wajib diisi';
-                            }
-                            return null;
-                          },
                         ),
                         const SizedBox(height: 24),
                         Text(

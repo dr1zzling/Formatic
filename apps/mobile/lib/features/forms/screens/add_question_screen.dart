@@ -141,7 +141,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
       }
 
       final result = await FormService.createQuestions(
-        formSlug: widget.formSlug ?? '',
+        formId: int.parse(widget.formId),
         questions: questions,
       );
 

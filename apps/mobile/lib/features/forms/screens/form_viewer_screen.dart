@@ -46,13 +46,22 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
         final questionsResult = await FormService.getFormQuestions(formId);
 
         if (questionsResult['success']) {
-          final questionsData = questionsResult['data']['data'];
-          final listSoal = questionsData['list_soal'] as List;
+          final questionsData = questionsResult['data'];
+          final List<dynamic> listSoal;
+          String categoryFromQuestions = '';
+          if (questionsData is List) {
+            listSoal = questionsData;
+          } else if (questionsData is Map && questionsData['data'] is List) {
+            listSoal = questionsData['data'];
+            categoryFromQuestions = questionsData['category'] ?? '';
+          } else {
+            listSoal = [];
+          }
 
           setState(() {
             _formId = formId;
             _formTitle = data['form_title'] ?? 'Untitled Form';
-            _category = questionsData['category'] ?? '';
+            _category = data['category'] ?? categoryFromQuestions;
             _questions = listSoal.asMap().entries.map((entry) {
               final index = entry.key;
               final soal = entry.value;

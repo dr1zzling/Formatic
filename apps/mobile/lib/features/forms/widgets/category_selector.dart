@@ -13,7 +13,7 @@ class CategorySelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final categories = ['Exam', 'Quiz', 'Survey'];
+    final categories = ['Ujian', 'Survei', 'Pengumpulan Data'];
 
     return Row(
       children: categories.map((category) {

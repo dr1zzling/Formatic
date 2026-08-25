@@ -52,4 +52,35 @@ class AppColors {
   static const Color catSurveyBg = Color(0xFFE9F2FF);
   static const Color catDefault = Color(0xFF21A964);
   static const Color catDefaultBg = Color(0xFFE5FAEE);
+
+  // Gradients
+  static const LinearGradient primaryGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF1D93B4), Color(0xFF28ACCE)],
+  );
+
+  static const LinearGradient authGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color(0xFF06245A),
+      Color(0xFF0A438F),
+      Color(0xFF257DC6),
+    ],
+  );
+
+  static const LinearGradient avatarGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF1D93B4), Color(0xFF28ACCE)],
+  );
+
+  static const List<LinearGradient> cardGradients = [
+    LinearGradient(colors: [Color(0xFF667EEA), Color(0xFF764BA2)]),
+    LinearGradient(colors: [Color(0xFFF093FB), Color(0xFFF5576C)]),
+    LinearGradient(colors: [Color(0xFF4FACFE), Color(0xFF00F2FE)]),
+    LinearGradient(colors: [Color(0xFF43E97B), Color(0xFF38F9D7)]),
+    LinearGradient(colors: [Color(0xFFFA709A), Color(0xFFFEE140)]),
+  ];
 }

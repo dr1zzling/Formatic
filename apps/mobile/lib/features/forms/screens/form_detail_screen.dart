@@ -65,8 +65,15 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
       final result = await FormService.getFormQuestions(formId);
       
       if (result['success']) {
-        final data = result['data']['data'];
-        final listSoal = data['list_soal'] as List;
+        final questionsData = result['data'];
+        final List<dynamic> listSoal;
+        if (questionsData is List) {
+          listSoal = questionsData;
+        } else if (questionsData is Map && questionsData['data'] is List) {
+          listSoal = questionsData['data'];
+        } else {
+          listSoal = [];
+        }
         
         setState(() {
           _questions = listSoal.asMap().entries.map((entry) {
