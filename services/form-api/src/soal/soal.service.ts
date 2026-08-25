@@ -220,6 +220,7 @@ export class SoalService {
                 options.map(async (e) => {
                     const payloadOption: any = {
                         value: e.value,
+                        score: e.score,
                         is_correct: Boolean(e.is_correct),
                     }
 
