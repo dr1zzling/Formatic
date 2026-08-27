@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
 import { socket } from "../../utils/socket";
@@ -24,14 +24,25 @@ export default function FillForm() {
   const { slug }        = useParams();
   const navigate        = useNavigate();
 
+  const STORAGE_KEY = `fillform_answers_${slug}`;
+
   const [form, setForm]           = useState(null);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState("");
-  const [answers, setAnswers]     = useState({});
+  const [answers, setAnswers]     = useState(() => {
+    // Restore jawaban dari localStorage saat pertama load
+    try {
+      const saved = localStorage.getItem(`fillform_answers_${slug}`);
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  });
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone]           = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [liveNotice, setLiveNotice]   = useState("");
+  const [currentIdx, setCurrentIdx]   = useState(0);
+  const [errorSoalId, setErrorSoalId] = useState(null);
+  const soalRefs = useRef({});
 
   useEffect(() => {
     (async () => {
@@ -44,6 +55,17 @@ export default function FillForm() {
       } finally { setLoading(false); }
     })();
   }, [slug]);
+
+  // Auto-save jawaban ke localStorage setiap kali answers berubah
+  // File object tidak bisa diserialisasi, jadi di-skip
+  useEffect(() => {
+    try {
+      const serializable = Object.fromEntries(
+        Object.entries(answers).filter(([, v]) => v?.file == null)
+      );
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serializable));
+    } catch { /* storage penuh atau disabled, abaikan */ }
+  }, [answers, STORAGE_KEY]);
 
   useEffect(() => {
     if (!slug) return;
@@ -71,6 +93,8 @@ export default function FillForm() {
 
   function setAnswer(soalId, value) {
     setAnswers((prev) => ({ ...prev, [soalId]: value }));
+    // Hapus highlight error saat soal mulai dijawab
+    if (errorSoalId === soalId) setErrorSoalId(null);
   }
 
   function toggleOption(soal, opt) {
@@ -84,6 +108,8 @@ export default function FillForm() {
         list.includes(opt.id) ? list.filter((id) => id !== opt.id) : [...list, opt.id]
       );
     }
+    // Hapus highlight error saat soal mulai dijawab
+    if (errorSoalId === soal.id) setErrorSoalId(null);
   }
 
   function hasAnswer(soal) {
@@ -96,10 +122,16 @@ export default function FillForm() {
   async function submit() {
     const empty = (form?.soal ?? []).find((s) => !hasAnswer(s));
     if (empty) {
-      const cleanTitle = (empty.question || "Wajib").replace(/<[^>]*>/g, '').trim() || "Wajib";
-      setSubmitError(`Pertanyaan "${cleanTitle}" belum dijawab.`);
+      setErrorSoalId(empty.id);
+      setSubmitError("");
+      // Scroll ke card soal yang belum dijawab
+      const el = soalRefs.current[empty.id];
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
       return;
     }
+    setErrorSoalId(null);
 
     setSubmitting(true); setSubmitError("");
     try {
@@ -142,6 +174,8 @@ export default function FillForm() {
       }
       // Simpan ke history lokal
       saveToHistory(slug, form?.title ?? form?.form_title, form?.category);
+      // Hapus draft jawaban dari localStorage
+      localStorage.removeItem(STORAGE_KEY);
       setDone(true);
     } catch (e) {
       const status = e.response?.status;
@@ -194,7 +228,6 @@ export default function FillForm() {
   const soalList = form?.soal ?? [];
 
   // Quiz: step-by-step navigation
-  const [currentIdx, setCurrentIdx] = useState(0);
 
   if (isQuiz) {
     const soal        = soalList[currentIdx];
@@ -368,16 +401,32 @@ export default function FillForm() {
         </div>
 
         {/* Questions */}
-        {(form?.soal ?? []).map((soal, qi) => (
-          <div key={soal.id ?? qi} className="bg-white rounded-2xl border border-[#e5eef7] shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-6 mb-4">
+        {(form?.soal ?? []).map((soal, qi) => {
+          const isError = errorSoalId === soal.id;
+          return (
+          <div
+            key={soal.id ?? qi}
+            ref={el => { soalRefs.current[soal.id] = el; }}
+            className={`bg-white rounded-2xl border shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-6 mb-4 transition-all ${
+              isError ? "border-red-400 ring-2 ring-red-300" : "border-[#e5eef7]"
+            }`}
+          >
             <div className="flex items-start gap-3 mb-4">
-              <span className="w-9 h-9 rounded-xl bg-[#eef5fb] text-[#1a4fa0] text-[14px] font-extrabold grid place-items-center shrink-0 mt-0.5">{qi + 1}</span>
+              <span className={`w-9 h-9 rounded-xl text-[14px] font-extrabold grid place-items-center shrink-0 mt-0.5 ${
+                isError ? "bg-red-50 text-red-500" : "bg-[#eef5fb] text-[#1a4fa0]"
+              }`}>{qi + 1}</span>
               <div className="flex-1 min-w-0">
                 <RichTextDisplay content={soal.question} className="text-[16px] font-bold text-[#102f56] leading-snug" />
                 <span className="text-[12px] font-medium text-[#1a4fa0] block mt-1">{TYPE_LABEL[soal.type] ?? soal.type}</span>
               </div>
               <span className="text-[11px] font-semibold text-[#c9393f] shrink-0">*</span>
             </div>
+
+            {isError && (
+              <p className="text-[13px] text-red-500 font-semibold mb-3 flex items-center gap-1.5">
+                Pertanyaan ini wajib dijawab
+              </p>
+            )}
 
             {/* Attachment soal (file lampiran dari pembuat) */}
             {soal.image && (
@@ -466,7 +515,7 @@ export default function FillForm() {
               </div>
             )}
           </div>
-        ))}
+        ); })}
 
         {submitError && (
           <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-[14px] mb-4">{submitError}</div>
