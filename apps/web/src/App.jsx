@@ -25,13 +25,30 @@ function AuthRoute({ children }) {
 
 /* ── Route order ─────────────────────────────────────────────── */
 const ROUTE_ORDER = [
-  "/login", "/register", "/forgot-password",
   "/", "/home", "/my-forms", "/history", "/trash", "/profile",
+  "/login", "/register", "/forgot-password",
   "/fill/", "/form/",
 ];
+const NAV_COUNT = 6; // jumlah nav utama (/, /my-forms, /history, /trash, /profile)
+
 function getOrder(pathname) {
   const idx = ROUTE_ORDER.findIndex(r => pathname === r || (r.endsWith("/") && pathname.startsWith(r)));
-  return idx === -1 ? 5 : idx;
+  return idx === -1 ? 4 : idx;
+}
+
+function getDirection(fromOrder, toOrder) {
+  // Hanya apply circular logic untuk nav utama (index 0-5)
+  const isNavNav = fromOrder < NAV_COUNT && toOrder < NAV_COUNT;
+  if (!isNavNav) return toOrder >= fromOrder ? 1 : -1;
+
+  const diff = toOrder - fromOrder;
+  const total = NAV_COUNT;
+
+  // Jika lompatan > setengah total, artinya wrap around — balik arah
+  if (Math.abs(diff) > total / 2) {
+    return diff > 0 ? -1 : 1; // flip direction untuk wrap
+  }
+  return diff >= 0 ? 1 : -1;
 }
 
 /* ── Smooth slide transition ─────────────────────────────────── */
@@ -47,7 +64,7 @@ function AnimatedRoutes() {
 
   useEffect(() => {
     const currentOrder = getOrder(location.pathname);
-    const direction    = currentOrder >= prevOrderRef.current ? 1 : -1; // 1=down/forward, -1=up/back
+    const direction    = getDirection(prevOrderRef.current, currentOrder);
     prevOrderRef.current = currentOrder;
 
     if (transitioning) return;
