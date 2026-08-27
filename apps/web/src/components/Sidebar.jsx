@@ -62,8 +62,8 @@ export default function Sidebar() {
             const on = isActive({ id, path });
             return (
               <button key={id} onClick={() => navigate(path)}
-                className={`w-full h-[50px] flex items-center gap-4 px-4 rounded-xl text-[15px] font-medium transition-all border-none cursor-pointer ${
-                  on ? "text-white" : "text-white/70 hover:bg-white/10 hover:text-white"
+                className={`w-full h-[50px] flex items-center gap-4 px-4 rounded-xl text-[15px] font-medium transition-all duration-200 border-none cursor-pointer active:scale-95 ${
+                  on ? "text-white scale-[1.02]" : "text-white/70 hover:bg-white/10 hover:text-white"
                 }`}
                 style={on ? { background: "linear-gradient(90deg,rgba(95,171,255,0.35),rgba(255,255,255,0.12))" } : {}}
               >
@@ -118,19 +118,31 @@ export default function Sidebar() {
       </header>
 
       {/* ── Mobile bottom nav ─────────────────────── */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 flex bg-white border-t border-gray-200 shadow-[0_-2px_12px_rgba(0,0,0,0.08)]"
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200 shadow-[0_-2px_12px_rgba(0,0,0,0.08)]"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-        {BOTTOM_NAV.map(({ id, label, path, Icon }) => {
-          const on = isActive({ id, path });
-          return (
-            <button key={id} onClick={() => navigate(path)}
-              className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 bg-transparent border-none cursor-pointer"
-            >
-              <Icon size={21} className={on ? "text-[#1a4fa0]" : "text-gray-400"} strokeWidth={on ? 2.2 : 1.7} />
-              <span className={`text-[10px] font-semibold leading-tight ${on ? "text-[#1a4fa0]" : "text-gray-400"}`}>{label}</span>
-            </button>
-          );
-        })}
+        <div className="flex">
+          {BOTTOM_NAV.map(({ id, label, path, Icon }) => {
+            const on = isActive({ id, path });
+            return (
+              <button key={id} onClick={() => navigate(path)}
+                className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 bg-transparent border-none cursor-pointer relative transition-all duration-200 active:scale-95"
+              >
+                {/* Active indicator */}
+                {on && (
+                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full transition-all duration-300"
+                    style={{ background: "linear-gradient(90deg,#1a4fa0,#1e6fc7)" }} />
+                )}
+                <span className={`transition-all duration-200 ${on ? "scale-110 -translate-y-0.5" : "scale-100"}`}>
+                  <Icon size={21} className={`transition-colors duration-200 ${on ? "text-[#1a4fa0]" : "text-gray-400"}`}
+                    strokeWidth={on ? 2.2 : 1.7} />
+                </span>
+                <span className={`text-[10px] font-semibold leading-tight transition-all duration-200 ${on ? "text-[#1a4fa0]" : "text-gray-400"}`}>
+                  {label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </nav>
     </>
   );

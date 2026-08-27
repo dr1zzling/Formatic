@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../../components/Sidebar";
 import api, { FORM_API_URL } from "../../utils/api";
+import { addToTrash } from "./Trash";
 const CATEGORIES = ["All", "Survey", "Quiz / Ujian"];
 
 function getUsername() {
@@ -185,8 +186,10 @@ export default function MyForms() {
         },
       });
       if (!response.ok) throw new Error("Gagal menghapus data dari server");
+      // Simpan ke trash localStorage
+      addToTrash(form);
       setForms(prev => prev.filter(f => f.form_slug !== form.form_slug));
-      alert("Form berhasil dihapus!");
+      alert("Form berhasil dihapus dan dipindahkan ke Trash!");
     } catch (error) {
       console.error("Error delete:", error);
       alert("Gagal menghapus form.");
