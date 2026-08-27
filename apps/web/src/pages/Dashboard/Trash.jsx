@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../../components/Sidebar";
-import api from "../../utils/api";
+import api, { FORM_API_URL } from "../../utils/api";
 import { Search, Trash2, RotateCcw, Bell, FileText, AlertTriangle } from "lucide-react";
 
-const FORM_API = "http://localhost:3000";
 const FILTERS  = ["Semua", "Survey", "Quiz/Ujian"];
 
 const SCHEMES = [
@@ -15,19 +14,14 @@ const SCHEMES = [
   "linear-gradient(135deg,#ffe4e6,#fecdd3)",
 ];
 
-function getUser() {
-  try { const p = JSON.parse(atob(localStorage.getItem("token").split(".")[1])); return p.username || p.name || "User"; }
-  catch { return "User"; }
-}
-
 export default function Trash() {
-  const navigate  = useNavigate();
-  const username  = getUser();
-  const [filter, setFilter]   = useState("Semua");
-  const [search, setSearch]   = useState("");
-  const [forms, setForms]     = useState([]);
+  const navigate      = useNavigate();
+  const [forms, setForms]   = useState([]);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("Semua");
   const [loading, setLoading] = useState(true);
-  const [toast, setToast]     = useState("");
+  const [toast, setToast]   = useState("");
+  const username = localStorage.getItem("username") || "User";
 
   useEffect(() => { load(); }, []);
 
@@ -42,12 +36,7 @@ export default function Trash() {
 
   async function restore(form) {
     try {
-      const res = await fetch(`http://localhost:3000/form?form_slug=${form.form_slug}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
-        body: JSON.stringify({ status: "public" }),
-      });
-      if (!res.ok) throw new Error();
+      await api.patch(`/form?form_slug=${form.form_slug}`, { status: "public" });
       showToast("Form dipulihkan!"); load();
     } catch { showToast("Gagal memulihkan."); }
   }
@@ -55,11 +44,7 @@ export default function Trash() {
   async function destroy(form) {
     if (!window.confirm(`Hapus permanen "${form.form_title}"?`)) return;
     try {
-      const res = await fetch(`http://localhost:3000/form?form_slug=${form.form_slug}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
-      if (!res.ok) throw new Error();
+      await api.delete(`/form?form_slug=${form.form_slug}`);
       showToast("Form dihapus permanen."); load();
     } catch { showToast("Gagal menghapus."); }
   }
@@ -159,7 +144,7 @@ export default function Trash() {
                 <div className="w-16 sm:w-20 h-16 sm:h-[72px] shrink-0 overflow-hidden relative"
                   style={{ background: SCHEMES[i % SCHEMES.length] }}>
                   {banner
-                    ? <img src={`${FORM_API}${banner}`} className="w-full h-full object-cover" onError={e => { e.target.style.display = "none"; }} alt="" />
+                    ? <img src={`${FORM_API_URL}${banner}`} className="w-full h-full object-cover" onError={e => { e.target.style.display = "none"; }} alt="" />
                     : <div className="w-full h-full flex items-center justify-center"><FileText size={20} className="opacity-25 text-gray-600" /></div>
                   }
                 </div>

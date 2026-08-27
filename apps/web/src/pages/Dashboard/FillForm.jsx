@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import api from "../../utils/api";
+import api, { FORM_API_URL } from "../../utils/api";
 import { socket } from "../../utils/socket";
 import { ArrowLeft, Send, Check, CheckCircle2, UploadCloud, FileText, Bell, ArrowRight } from "lucide-react";
 import { saveToHistory } from "./History";
@@ -127,7 +127,7 @@ export default function FillForm() {
 
       // Kirim langsung dengan axios tanpa interceptor logout
       const token = localStorage.getItem("token");
-      const response = await fetch(`http://localhost:3000/form/submit?form_slug=${slug}`, {
+      const response = await fetch(`${FORM_API_URL}/form/submit?form_slug=${slug}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: fd,
@@ -388,7 +388,7 @@ export default function FillForm() {
                   <p className="text-[11.5px] text-blue-500 truncate">{soal.image}</p>
                 </div>
                 <a
-                  href={`http://localhost:3000/uploads/soal/${soal.image}`}
+                  href={`${FORM_API_URL}/uploads/soal/${soal.image}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="shrink-0 px-3 py-1.5 rounded-lg bg-[#1a4fa0] text-white text-[12px] font-semibold hover:opacity-90 transition"
