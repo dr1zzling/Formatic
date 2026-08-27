@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
-
-const FORM_API = FORM_API_URL;
 import { Bell, HelpCircle, Plus, ArrowRight, FileText, Search } from "lucide-react";
 import Sidebar from "../../components/Sidebar";
+
+const FORM_API = FORM_API_URL;
 
 function getUsername() {
   try {
@@ -316,10 +316,10 @@ export default function Home() {
     finally { setMyLoading(false); }
   }
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen overflow-hidden">
       <Sidebar />
-      <main className="flex-1 min-w-0 overflow-x-hidden">
-        <div className="min-h-screen px-4 sm:px-6 md:px-8 xl:px-11 py-16 md:py-9 pb-20 md:pb-16"
+      <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
+        <div className="px-4 sm:px-6 md:px-8 xl:px-11 py-16 md:py-9 pb-24 md:pb-16"
           style={{ background: "radial-gradient(circle at 85% 10%,rgba(93,174,255,0.1),transparent 28%),#f5f9ff" }}>
           <header className="flex items-start justify-between mb-6 gap-3">
             <div className="min-w-0">

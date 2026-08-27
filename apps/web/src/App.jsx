@@ -110,15 +110,18 @@ function AnimatedRoutes() {
         const outEl = kids[0]; // prev page
         const inEl  = kids[1]; // curr page
 
+        const isMobile = window.innerWidth < 768;
         const fromY = dir === 1 ? "100%" : "-100%";
         const toY   = dir === 1 ? "-30%" : "30%";
+        const fromX = dir === 1 ? "100%" : "-100%";
+        const toX   = dir === 1 ? "-30%" : "30%";
 
         // Reset — no transition
         outEl.style.transition = "none";
-        outEl.style.transform  = "translateY(0) scale(1)";
+        outEl.style.transform  = isMobile ? "translateX(0) scale(1)" : "translateY(0) scale(1)";
         outEl.style.opacity    = "1";
         inEl.style.transition  = "none";
-        inEl.style.transform   = `translateY(${fromY})`;
+        inEl.style.transform   = isMobile ? `translateX(${fromX})` : `translateY(${fromY})`;
         inEl.style.opacity     = "1";
 
         void container.offsetHeight; // force reflow
@@ -127,9 +130,9 @@ function AnimatedRoutes() {
         const ease = `${DURATION}ms cubic-bezier(0.32, 0.72, 0, 1)`;
         outEl.style.transition = `transform ${ease}, opacity ${ease}`;
         inEl.style.transition  = `transform ${ease}`;
-        outEl.style.transform  = `translateY(${toY}) scale(0.97)`;
+        outEl.style.transform  = isMobile ? `translateX(${toX}) scale(0.97)` : `translateY(${toY}) scale(0.97)`;
         outEl.style.opacity    = "0";
-        inEl.style.transform   = "translateY(0)";
+        inEl.style.transform   = isMobile ? "translateX(0)" : "translateY(0)";
 
         // After animation, remove prev
         timerRef.current = setTimeout(() => {
