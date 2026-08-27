@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, cloneElement } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Login          from "./pages/auth/Login";
 import Register       from "./pages/auth/Register";
@@ -17,104 +17,125 @@ function ProtectedRoute({ children }) {
   if (!token) return <Navigate to="/login" replace />;
   return children;
 }
-
 function AuthRoute({ children }) {
   const token = localStorage.getItem("token");
   if (token) return <Navigate to="/" replace />;
   return children;
 }
 
-/* ── Route order — urutan menentukan arah slide ──────────────── */
-// Desktop sidebar: atas → bawah
-// Mobile bottom nav: kiri → kanan
-// Slide ke bawah/kanan = go forward, ke atas/kiri = go back
-
+/* ── Route order ─────────────────────────────────────────────── */
 const ROUTE_ORDER = [
-  "/login",
-  "/register",
-  "/forgot-password",
-  "/",
-  "/home",
-  "/my-forms",
-  "/history",
-  "/trash",
-  "/profile",
-  "/fill/",
-  "/form/",
+  "/login", "/register", "/forgot-password",
+  "/", "/home", "/my-forms", "/history", "/trash", "/profile",
+  "/fill/", "/form/",
 ];
-
 function getOrder(pathname) {
   const idx = ROUTE_ORDER.findIndex(r => pathname === r || (r.endsWith("/") && pathname.startsWith(r)));
   return idx === -1 ? 5 : idx;
 }
 
-/* ── Page transition ─────────────────────────────────────────── */
-function PageTransition({ children }) {
-  const location = useLocation();
-  const ref      = useRef(null);
-  const prevPath = useRef(location.pathname);
-  const prevOrder = useRef(getOrder(location.pathname));
+/* ── Smooth slide transition ─────────────────────────────────── */
+const DURATION = 300; // ms
+
+function AnimatedRoutes() {
+  const location                    = useLocation();
+  const [pages, setPages]           = useState([{ key: location.key, location, order: getOrder(location.pathname) }]);
+  const [transitioning, setTrans]   = useState(false);
+  const containerRef                = useRef(null);
+  const prevOrderRef                = useRef(getOrder(location.pathname));
+  const animFrameRef                = useRef(null);
 
   useEffect(() => {
-    if (!ref.current) return;
-    if (prevPath.current === location.pathname) return;
-
     const currentOrder = getOrder(location.pathname);
-    const direction    = currentOrder >= prevOrder.current ? 1 : -1;
-    // direction 1  = going forward/down → slide in from bottom
-    // direction -1 = going back/up      → slide in from top
+    const direction    = currentOrder >= prevOrderRef.current ? 1 : -1; // 1=down/forward, -1=up/back
+    prevOrderRef.current = currentOrder;
 
-    prevPath.current  = location.pathname;
-    prevOrder.current = currentOrder;
+    if (transitioning) return;
+    setTrans(true);
 
-    const el = ref.current;
-    const offset = direction === 1 ? "20px" : "-20px";
+    // Add new page
+    setPages(prev => {
+      if (prev[prev.length - 1]?.location.pathname === location.pathname) return prev;
+      return [...prev.slice(-1), { key: location.key, location, order: currentOrder, direction, entering: true }];
+    });
 
-    el.style.transition = "none";
-    el.style.opacity    = "0";
-    el.style.transform  = `translateY(${offset})`;
+    // Animate
+    cancelAnimationFrame(animFrameRef.current);
+    animFrameRef.current = requestAnimationFrame(() => {
+      const children = containerRef.current?.children;
+      if (!children || children.length < 2) {
+        setTrans(false);
+        setPages(prev => prev.slice(-1).map(p => ({ ...p, entering: false })));
+        return;
+      }
 
-    void el.offsetHeight; // force reflow
+      const outgoing = children[0];
+      const incoming = children[1];
+      const offset   = direction === 1 ? "100%" : "-100%";
+      const outTarget = direction === 1 ? "-100%" : "100%";
 
-    el.style.transition = "opacity 220ms cubic-bezier(0.25,0.46,0.45,0.94), transform 220ms cubic-bezier(0.25,0.46,0.45,0.94)";
-    el.style.opacity    = "1";
-    el.style.transform  = "translateY(0)";
-  }, [location.pathname]);
+      // Set initial positions
+      outgoing.style.transition = "none";
+      outgoing.style.transform  = "translateY(0)";
+      incoming.style.transition = "none";
+      incoming.style.transform  = `translateY(${offset})`;
+
+      void outgoing.offsetHeight; // reflow
+
+      // Animate both simultaneously
+      const ease = `transform ${DURATION}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+      outgoing.style.transition = ease;
+      incoming.style.transition = ease;
+      outgoing.style.transform  = `translateY(${outTarget})`;
+      incoming.style.transform  = "translateY(0)";
+
+      setTimeout(() => {
+        setPages(prev => prev.slice(-1).map(p => ({ ...p, entering: false })));
+        setTrans(false);
+      }, DURATION);
+    });
+  }, [location.pathname, location.key]);
 
   return (
     <div
-      ref={ref}
-      style={{ opacity: 1, transform: "translateY(0)", willChange: "opacity, transform", minHeight: "100vh" }}
+      ref={containerRef}
+      style={{ position: "relative", overflow: "hidden", minHeight: "100vh" }}
     >
-      {children}
+      {pages.map((page, i) => (
+        <div
+          key={page.key}
+          style={{
+            position: i < pages.length - 1 ? "absolute" : "relative",
+            top: 0, left: 0, right: 0,
+            minHeight: "100vh",
+            willChange: "transform",
+          }}
+        >
+          <RouteContent location={page.location} />
+        </div>
+      ))}
     </div>
   );
 }
 
-function AnimatedRoutes() {
+/* ── Route content (keyed by location) ──────────────────────── */
+function RouteContent({ location }) {
   return (
-    <PageTransition>
-      <Routes>
-        {/* Auth */}
-        <Route path="/login"           element={<AuthRoute><Login /></AuthRoute>} />
-        <Route path="/register"        element={<AuthRoute><Register /></AuthRoute>} />
-        <Route path="/forgot-password" element={<AuthRoute><ForgotPassword /></AuthRoute>} />
-
-        {/* Dashboard */}
-        <Route path="/"           element={<ProtectedRoute><Home /></ProtectedRoute>} />
-        <Route path="/home"       element={<ProtectedRoute><Home /></ProtectedRoute>} />
-        <Route path="/my-forms"   element={<ProtectedRoute><MyForms /></ProtectedRoute>} />
-        <Route path="/form/:slug" element={<ProtectedRoute><FormEditor /></ProtectedRoute>} />
-        <Route path="/fill/:slug"             element={<ProtectedRoute><FillForm /></ProtectedRoute>} />
-        <Route path="/history"                element={<ProtectedRoute><History /></ProtectedRoute>} />
-        <Route path="/form/:slug/collaborate" element={<ProtectedRoute><Collaborate /></ProtectedRoute>} />
-        <Route path="/trash"      element={<ProtectedRoute><Trash /></ProtectedRoute>} />
-        <Route path="/profile"    element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </PageTransition>
+    <Routes location={location}>
+      <Route path="/login"           element={<AuthRoute><Login /></AuthRoute>} />
+      <Route path="/register"        element={<AuthRoute><Register /></AuthRoute>} />
+      <Route path="/forgot-password" element={<AuthRoute><ForgotPassword /></AuthRoute>} />
+      <Route path="/"           element={<ProtectedRoute><Home /></ProtectedRoute>} />
+      <Route path="/home"       element={<ProtectedRoute><Home /></ProtectedRoute>} />
+      <Route path="/my-forms"   element={<ProtectedRoute><MyForms /></ProtectedRoute>} />
+      <Route path="/form/:slug" element={<ProtectedRoute><FormEditor /></ProtectedRoute>} />
+      <Route path="/fill/:slug"             element={<ProtectedRoute><FillForm /></ProtectedRoute>} />
+      <Route path="/history"                element={<ProtectedRoute><History /></ProtectedRoute>} />
+      <Route path="/form/:slug/collaborate" element={<ProtectedRoute><Collaborate /></ProtectedRoute>} />
+      <Route path="/trash"      element={<ProtectedRoute><Trash /></ProtectedRoute>} />
+      <Route path="/profile"    element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 
