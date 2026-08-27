@@ -173,6 +173,26 @@ export default function MyForms() {
     finally { setLoading(false); }
   }
 
+  const handleDeleteForm = async (form) => {
+    const isConfirmed = window.confirm(`Yakin ingin menghapus form "${form.form_title}"?`);
+    if (!isConfirmed) return;
+    try {
+      const response = await fetch(`http://localhost:3000/form?form_slug=${form.form_slug}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      if (!response.ok) throw new Error("Gagal menghapus data dari server");
+      setForms(prev => prev.filter(f => f.form_slug !== form.form_slug));
+      alert("Form berhasil dihapus!");
+    } catch (error) {
+      console.error("Error delete:", error);
+      alert("Gagal menghapus form.");
+    }
+  };
+
   /* filter */
   const filtered = forms.filter(f => {
     const title = (f.form_title ?? "").toLowerCase();
@@ -298,8 +318,8 @@ export default function MyForms() {
                       </span>
                       <button
                         className="absolute top-2 right-2.5 w-7 h-7 rounded-full bg-white/90 text-[#183056] text-[18px] leading-none grid place-items-center hover:bg-white transition-colors"
-                        onClick={e => { e.stopPropagation(); }}
-                      >⋮</button>
+                        onClick={e => { e.stopPropagation(); handleDeleteForm(form); }}
+                      >🗑️</button>
                     </div>
 
                     {/* Content */}
