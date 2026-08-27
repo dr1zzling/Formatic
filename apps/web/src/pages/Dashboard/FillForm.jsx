@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../../utils/api";
 import { socket } from "../../utils/socket";
-import { ArrowLeft, Send, Check, CheckCircle2, UploadCloud, FileText, Bell } from "lucide-react";
+import { ArrowLeft, Send, Check, CheckCircle2, UploadCloud, FileText, Bell, ArrowRight } from "lucide-react";
 import { saveToHistory } from "./History";
 import RichTextDisplay from "../../components/RichTextDisplay";
 
@@ -190,7 +190,162 @@ export default function FillForm() {
   );
 
   const title = form?.title ?? form?.form_title ?? "Form";
+  const isQuiz = form?.category === "ujian";
+  const soalList = form?.soal ?? [];
 
+  // Quiz: step-by-step navigation
+  const [currentIdx, setCurrentIdx] = useState(0);
+
+  if (isQuiz) {
+    const soal        = soalList[currentIdx];
+    const isFirst     = currentIdx === 0;
+    const isLast      = currentIdx === soalList.length - 1;
+    const progress    = soalList.length > 0 ? ((currentIdx + 1) / soalList.length) * 100 : 0;
+
+    function goNext() {
+      if (!hasAnswer(soal)) {
+        const clean = (soal.question || "Wajib").replace(/<[^>]*>/g, "").trim();
+        setSubmitError(`Pertanyaan "${clean}" belum dijawab.`);
+        return;
+      }
+      setSubmitError("");
+      setCurrentIdx(i => Math.min(i + 1, soalList.length - 1));
+    }
+    function goPrev() {
+      setSubmitError("");
+      setCurrentIdx(i => Math.max(i - 1, 0));
+    }
+
+    return (
+      <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
+        {/* Top bar */}
+        <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-[#e5eef7] px-4 py-3">
+          <div className="max-w-2xl mx-auto">
+            <div className="flex items-center justify-between mb-2">
+              <button onClick={() => navigate("/")} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#1a4fa0] hover:underline">
+                <ArrowLeft size={15} /> Kembali
+              </button>
+              <span className="text-[13px] font-semibold text-gray-500">{currentIdx + 1} / {soalList.length}</span>
+            </div>
+            {/* Progress bar */}
+            <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full rounded-full transition-all duration-300" style={{ width: `${progress}%`, background: "linear-gradient(90deg,#1a4fa0,#1e6fc7)" }} />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full">
+          {liveNotice && (
+            <div className="mb-4 px-4 py-3 rounded-xl bg-blue-600 text-white text-[14px] font-semibold flex items-center gap-3 shadow-lg">
+              <Bell size={18} /><span>{liveNotice}</span>
+            </div>
+          )}
+
+          {/* Form title (first question only) */}
+          {currentIdx === 0 && (
+            <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-sm p-6 mb-4">
+              <h1 className="text-[20px] font-extrabold text-[#102f56] leading-snug">{title}</h1>
+              <p className="mt-1 text-[13px] text-gray-400">{form?.category}</p>
+            </div>
+          )}
+
+          {soal && (
+            <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-sm p-6 mb-4">
+              <div className="flex items-start gap-3 mb-5">
+                <span className="w-9 h-9 rounded-xl bg-[#eef5fb] text-[#1a4fa0] text-[14px] font-extrabold grid place-items-center shrink-0 mt-0.5">{currentIdx + 1}</span>
+                <div className="flex-1">
+                  <RichTextDisplay content={soal.question} className="text-[16px] font-bold text-[#102f56] leading-snug" />
+                  <span className="text-[12px] font-medium text-[#1a4fa0] block mt-1">{TYPE_LABEL[soal.type] ?? soal.type}</span>
+                </div>
+                <span className="text-[#c9393f] font-bold shrink-0">*</span>
+              </div>
+
+              {soal.image && (
+                <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-100 rounded-xl">
+                  <FileText size={18} className="text-[#1a4fa0] shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-semibold text-[#1a4fa0]">Lampiran Soal</p>
+                    <p className="text-[11.5px] text-blue-500 truncate">{soal.image}</p>
+                  </div>
+                  <a href={`http://localhost:3000/uploads/soal/${soal.image}`} target="_blank" rel="noopener noreferrer"
+                    className="shrink-0 px-3 py-1.5 rounded-lg bg-[#1a4fa0] text-white text-[12px] font-semibold hover:opacity-90 transition">
+                    Buka File
+                  </a>
+                </div>
+              )}
+
+              {(soal.type === "radio" || soal.type === "checkbox") && (
+                <div className="space-y-2.5">
+                  {(soal.options ?? []).map((opt, oi) => {
+                    const selected = soal.type === "radio"
+                      ? answers[soal.id] === opt.id
+                      : (Array.isArray(answers[soal.id]) && answers[soal.id].includes(opt.id));
+                    return (
+                      <button key={opt.id ?? oi} onClick={() => toggleOption(soal, opt)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
+                          selected ? "border-[#1a4fa0] bg-[#f0f6fe]" : "border-[#e2e9f1] hover:border-[#1a4fa0]/40 hover:bg-[#f7fafd]"
+                        }`}>
+                        <span className={`inline-grid place-items-center shrink-0 border-2 transition-all ${
+                          soal.type === "checkbox" ? "w-6 h-6 rounded-[8px]" : "w-6 h-6 rounded-full"
+                        } ${selected ? "border-[#1a4fa0] bg-[#1a4fa0]" : "border-[#5b6c7e] bg-[#eef2f6]"}`}>
+                          {selected && (soal.type === "checkbox"
+                            ? <Check size={15} strokeWidth={3} className="text-white" />
+                            : <span className="w-3 h-3 rounded-full bg-white" />)}
+                        </span>
+                        <span className="text-[15px] font-medium text-gray-700">{fallbackLabel(opt, oi)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {soal.type === "text" && (
+                <textarea rows={3} placeholder="Tulis jawabanmu di sini..."
+                  value={answers[soal.id] ?? ""} onChange={e => setAnswer(soal.id, e.target.value)}
+                  className={inputCls} />
+              )}
+              {soal.type === "file" && (
+                <label className="flex flex-col items-center justify-center gap-2 w-full rounded-xl border-2 border-dashed border-[#c3d4e4] bg-[#f7fafd] py-8 cursor-pointer hover:border-[#1a4fa0] hover:bg-[#f0f6fe] transition-all">
+                  {answers[soal.id]?.file
+                    ? <><FileText size={28} className="text-[#1a4fa0]" /><span className="text-[14px] font-semibold text-[#102f56]">{answers[soal.id].file.name}</span></>
+                    : <><UploadCloud size={28} className="text-[#1a4fa0]" /><span className="text-[14px] font-semibold">Unggah file jawaban</span></>}
+                  <input type="file" className="hidden" onChange={e => setAnswer(soal.id, { file: e.target.files?.[0] })} />
+                </label>
+              )}
+            </div>
+          )}
+
+          {submitError && (
+            <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-[14px] mb-4">{submitError}</div>
+          )}
+
+          {/* Navigation */}
+          <div className="flex items-center gap-3">
+            {!isFirst && (
+              <button onClick={goPrev}
+                className="flex-1 py-3 rounded-xl border border-gray-200 text-[14px] font-semibold text-gray-600 hover:bg-gray-50 transition flex items-center justify-center gap-2">
+                <ArrowLeft size={16} /> Sebelumnya
+              </button>
+            )}
+            {!isLast ? (
+              <button onClick={goNext}
+                className="flex-1 py-3 rounded-xl text-white text-[14px] font-bold flex items-center justify-center gap-2 hover:opacity-90 transition"
+                style={{ backgroundColor: "#1a4fa0" }}>
+                Selanjutnya <ArrowRight size={16} />
+              </button>
+            ) : (
+              <button onClick={submit} disabled={submitting}
+                className="flex-1 py-3 rounded-xl text-white text-[15px] font-bold flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-60 transition"
+                style={{ backgroundColor: "#1a4fa0" }}>
+                <Send size={17} /> {submitting ? "Mengirim..." : "Kirim Jawaban"}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Survey: scroll all
   return (
     <div className="min-h-screen px-4 py-8 md:py-12" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
       <div className="max-w-2xl mx-auto">
