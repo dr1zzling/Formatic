@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, cloneElement } from "react";
+import { useRef, useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Login          from "./pages/auth/Login";
 import Register       from "./pages/auth/Register";
@@ -23,119 +23,149 @@ function AuthRoute({ children }) {
   return children;
 }
 
-/* ── Route order ─────────────────────────────────────────────── */
-const ROUTE_ORDER = [
-  "/", "/home", "/my-forms", "/history", "/trash", "/profile",
-  "/login", "/register", "/forgot-password",
-  "/fill/", "/form/",
-];
-const NAV_COUNT = 6; // jumlah nav utama (/, /my-forms, /history, /trash, /profile)
+/* ── Nav order (hanya halaman nav utama) ─────────────────────── */
+// Urutan sirkuler: Home(0) → MyForm(1) → History(2) → Trash(3) → Profile(4)
+// Dari atas ke bawah = index naik = slide ke bawah
+// Dari bawah ke atas = index turun = slide ke atas
+// Wrap: Profile(4) → Home(0) = lompatan 4, lebih dari setengah 5 → flip ke atas
+const NAV = ["/", "/home", "/my-forms", "/history", "/trash", "/profile"];
 
-function getOrder(pathname) {
-  const idx = ROUTE_ORDER.findIndex(r => pathname === r || (r.endsWith("/") && pathname.startsWith(r)));
-  return idx === -1 ? 4 : idx;
+function getNavIndex(pathname) {
+  // exact match dulu
+  let i = NAV.indexOf(pathname);
+  if (i !== -1) return i;
+  // partial match
+  if (pathname.startsWith("/my-forms")) return 2;
+  if (pathname.startsWith("/history"))  return 3;
+  if (pathname.startsWith("/trash"))    return 4;
+  if (pathname.startsWith("/profile"))  return 5;
+  return -1; // bukan nav page
 }
 
-function getDirection(fromOrder, toOrder) {
-  // Hanya apply circular logic untuk nav utama (index 0-5)
-  const isNavNav = fromOrder < NAV_COUNT && toOrder < NAV_COUNT;
-  if (!isNavNav) return toOrder >= fromOrder ? 1 : -1;
+function calcDirection(fromPath, toPath) {
+  const fromIdx = getNavIndex(fromPath);
+  const toIdx   = getNavIndex(toPath);
 
-  const diff = toOrder - fromOrder;
-  const total = NAV_COUNT;
+  // Kalau salah satu bukan nav page, default slide ke bawah
+  if (fromIdx === -1 || toIdx === -1) return 1;
 
-  // Jika lompatan > setengah total, artinya wrap around — balik arah
-  if (Math.abs(diff) > total / 2) {
-    return diff > 0 ? -1 : 1; // flip direction untuk wrap
+  const n    = NAV.length; // 6
+  const diff = toIdx - fromIdx;
+
+  // Circular: cek apakah lebih cepat lewat wrap
+  // Forward normal: diff > 0
+  // Backward normal: diff < 0
+  // Wrap forward (e.g. Profile→Home): diff = 0-4 = -4, tapi |diff|=4 > n/2=3 → flip → slide atas
+  // Wrap backward (e.g. Home→Profile): diff = 4-0 = 4, |diff|=4 > n/2=3 → flip → slide bawah
+
+  if (Math.abs(diff) > n / 2) {
+    // Wrap around — flip direction
+    return diff < 0 ? 1 : -1;
   }
-  return diff >= 0 ? 1 : -1;
+  return diff > 0 ? 1 : -1;
 }
 
-/* ── Smooth slide transition ─────────────────────────────────── */
-const DURATION = 300; // ms
+/* ── Animated Routes ─────────────────────────────────────────── */
+const DURATION = 280;
 
 function AnimatedRoutes() {
-  const location                    = useLocation();
-  const [pages, setPages]           = useState([{ key: location.key, location, order: getOrder(location.pathname) }]);
-  const [transitioning, setTrans]   = useState(false);
-  const containerRef                = useRef(null);
-  const prevOrderRef                = useRef(getOrder(location.pathname));
-  const animFrameRef                = useRef(null);
+  const location    = useLocation();
+  const containerRef = useRef(null);
+  const prevPathRef  = useRef(location.pathname);
+  const directionRef = useRef(1);
+  const timerRef     = useRef(null);
+  const rafRef       = useRef(null);
+
+  // Track which locations to render (current + previous during transition)
+  const [displayLoc, setDisplayLoc] = useState({
+    prev: null,
+    curr: location,
+  });
 
   useEffect(() => {
-    const currentOrder = getOrder(location.pathname);
-    const direction    = getDirection(prevOrderRef.current, currentOrder);
-    prevOrderRef.current = currentOrder;
+    if (prevPathRef.current === location.pathname) return;
 
-    if (transitioning) return;
-    setTrans(true);
+    // Calculate direction BEFORE updating prev
+    const dir = calcDirection(prevPathRef.current, location.pathname);
+    directionRef.current = dir;
 
-    // Add new page
-    setPages(prev => {
-      if (prev[prev.length - 1]?.location.pathname === location.pathname) return prev;
-      return [...prev.slice(-1), { key: location.key, location, order: currentOrder, direction, entering: true }];
+    const prevLocation = { pathname: prevPathRef.current, search: "", hash: "", key: "prev" };
+    prevPathRef.current = location.pathname;
+
+    // Show both pages
+    setDisplayLoc({ prev: prevLocation, curr: location });
+
+    // Animate after render
+    clearTimeout(timerRef.current);
+    cancelAnimationFrame(rafRef.current);
+
+    rafRef.current = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const kids = container.children;
+        if (kids.length < 2) return;
+
+        const outEl = kids[0]; // prev page
+        const inEl  = kids[1]; // curr page
+
+        const fromY = dir === 1 ? "100%" : "-100%";
+        const toY   = dir === 1 ? "-30%" : "30%";
+
+        // Reset — no transition
+        outEl.style.transition = "none";
+        outEl.style.transform  = "translateY(0) scale(1)";
+        outEl.style.opacity    = "1";
+        inEl.style.transition  = "none";
+        inEl.style.transform   = `translateY(${fromY})`;
+        inEl.style.opacity     = "1";
+
+        void container.offsetHeight; // force reflow
+
+        // Animate
+        const ease = `${DURATION}ms cubic-bezier(0.32, 0.72, 0, 1)`;
+        outEl.style.transition = `transform ${ease}, opacity ${ease}`;
+        inEl.style.transition  = `transform ${ease}`;
+        outEl.style.transform  = `translateY(${toY}) scale(0.97)`;
+        outEl.style.opacity    = "0";
+        inEl.style.transform   = "translateY(0)";
+
+        // After animation, remove prev
+        timerRef.current = setTimeout(() => {
+          setDisplayLoc(d => ({ prev: null, curr: d.curr }));
+        }, DURATION + 20);
+      });
     });
 
-    // Animate
-    cancelAnimationFrame(animFrameRef.current);
-    animFrameRef.current = requestAnimationFrame(() => {
-      const children = containerRef.current?.children;
-      if (!children || children.length < 2) {
-        setTrans(false);
-        setPages(prev => prev.slice(-1).map(p => ({ ...p, entering: false })));
-        return;
-      }
-
-      const outgoing = children[0];
-      const incoming = children[1];
-      const offset   = direction === 1 ? "100%" : "-100%";
-      const outTarget = direction === 1 ? "-100%" : "100%";
-
-      // Set initial positions
-      outgoing.style.transition = "none";
-      outgoing.style.transform  = "translateY(0)";
-      incoming.style.transition = "none";
-      incoming.style.transform  = `translateY(${offset})`;
-
-      void outgoing.offsetHeight; // reflow
-
-      // Animate both simultaneously
-      const ease = `transform ${DURATION}ms cubic-bezier(0.4, 0, 0.2, 1)`;
-      outgoing.style.transition = ease;
-      incoming.style.transition = ease;
-      outgoing.style.transform  = `translateY(${outTarget})`;
-      incoming.style.transform  = "translateY(0)";
-
-      setTimeout(() => {
-        setPages(prev => prev.slice(-1).map(p => ({ ...p, entering: false })));
-        setTrans(false);
-      }, DURATION);
-    });
+    return () => {
+      clearTimeout(timerRef.current);
+      cancelAnimationFrame(rafRef.current);
+    };
   }, [location.pathname, location.key]);
 
   return (
-    <div
-      ref={containerRef}
-      style={{ position: "relative", overflow: "hidden", minHeight: "100vh" }}
-    >
-      {pages.map((page, i) => (
-        <div
-          key={page.key}
-          style={{
-            position: i < pages.length - 1 ? "absolute" : "relative",
-            top: 0, left: 0, right: 0,
-            minHeight: "100vh",
-            willChange: "transform",
-          }}
-        >
-          <RouteContent location={page.location} />
+    <div ref={containerRef} style={{ position: "relative", overflow: "hidden", minHeight: "100vh" }}>
+      {/* Previous page (outgoing) */}
+      {displayLoc.prev && (
+        <div style={{ position: "absolute", inset: 0, zIndex: 1, willChange: "transform, opacity" }}>
+          <RouteContent location={displayLoc.prev} />
         </div>
-      ))}
+      )}
+      {/* Current page (incoming) */}
+      <div style={{
+        position: displayLoc.prev ? "absolute" : "relative",
+        inset: displayLoc.prev ? 0 : undefined,
+        zIndex: 2,
+        willChange: "transform",
+        minHeight: "100vh",
+      }}>
+        <RouteContent location={displayLoc.curr} />
+      </div>
     </div>
   );
 }
 
-/* ── Route content (keyed by location) ──────────────────────── */
 function RouteContent({ location }) {
   return (
     <Routes location={location}>
