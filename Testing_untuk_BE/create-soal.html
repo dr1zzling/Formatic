@@ -41,7 +41,6 @@
                         <option value="manual">Manual Score</option>
                     </select>
 
-                    <!-- Tombol Save khusus Genius Score -->
                     <button type="button" id="btn-save-genius" onclick="handleSaveGeniusScore()"
                         class="hidden px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-semibold shadow-sm transition flex items-center gap-1">
                         💾 <span>Simpan Skor</span>
@@ -75,9 +74,9 @@
             <!-- Section List Soal Eksisting -->
             <section>
                 <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <span>📋</span> Soal yang Sudah Ada
+                    <span>📋</span> Soal yang Sudah Ada (Berdasarkan Halaman)
                 </h2>
-                <div id="existing-soal-list" class="space-y-4">
+                <div id="existing-soal-list" class="space-y-6">
                     <p class="text-sm text-slate-500 italic">Memuat daftar soal...</p>
                 </div>
             </section>
@@ -210,14 +209,19 @@
             <form id="form-edit-soal" onsubmit="handleUpdateSoal(event)" novalidate class="space-y-4">
                 <input type="hidden" id="edit-soal-id">
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div id="container-edit-question-text" class="md:col-span-3">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div id="container-edit-question-text" class="md:col-span-2">
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Pertanyaan Teks</label>
                         <input type="text" id="edit-soal-question" required
                             class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                     </div>
 
-                    <!-- Input Skor Edit (Hanya tampil di Manual Mode) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Halaman (Page)</label>
+                        <input type="number" id="edit-soal-page" min="1" value="1" required
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+
                     <div id="container-edit-soal-score" class="hidden">
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Skor Soal</label>
                         <input type="number" id="edit-soal-score" step="0.1"
@@ -287,23 +291,15 @@
         let currentScoreType = 'none';
 
         document.addEventListener('DOMContentLoaded', () => {
-            // 1. Ambil score type yang tersimpan (default ke 'none' jika belum ada)
             const savedScoreType = localStorage.getItem(`score_type_${formSlug}`) || 'none';
             currentScoreType = savedScoreType;
 
-            // 2. Setel nilai dropdown agar sesuai dengan yang tersimpan
             const selectEl = document.getElementById('select-score-type');
-            if (selectEl) {
-                selectEl.value = savedScoreType;
-            }
+            if (selectEl) selectEl.value = savedScoreType;
 
-            // 3. Tampilkan tombol Save Genius jika savedScoreType adalah genius
             const btnSaveGenius = document.getElementById('btn-save-genius');
-            if (btnSaveGenius && savedScoreType === 'genius') {
-                btnSaveGenius.classList.remove('hidden');
-            }
+            if (btnSaveGenius && savedScoreType === 'genius') btnSaveGenius.classList.remove('hidden');
 
-            // 4. Jalankan fungsi pendukung
             fetchExistingSoal();
             addQuestionCard();
         });
@@ -363,24 +359,17 @@
 
         function handleScoreTypeChange() {
             currentScoreType = document.getElementById('select-score-type').value;
-
-            // Simpan pilihan ke localStorage berdasarkan formSlug
             localStorage.setItem(`score_type_${formSlug}`, currentScoreType);
 
-            // Toggle tampilan container skor manual
             document.querySelectorAll('.create-score-container').forEach(el => {
                 if (currentScoreType === 'manual') el.classList.remove('hidden');
                 else el.classList.add('hidden');
             });
 
-            // Toggle tampilan tombol Save Genius Score
             const btnSaveGenius = document.getElementById('btn-save-genius');
             if (btnSaveGenius) {
-                if (currentScoreType === 'genius') {
-                    btnSaveGenius.classList.remove('hidden');
-                } else {
-                    btnSaveGenius.classList.add('hidden');
-                }
+                if (currentScoreType === 'genius') btnSaveGenius.classList.remove('hidden');
+                else btnSaveGenius.classList.add('hidden');
             }
 
             fetchExistingSoal();
@@ -399,64 +388,105 @@
                     if (result.data.token_collab) currentTokenCollab = result.data.token_collab;
                 }
 
-                const soalList = result.data && result.data.soal ? result.data.soal : [];
-                globalSoalCache = soalList;
+                const rawPagesList = result.data && result.data.soal ? result.data.soal : [];
 
-                if (res.ok && Array.isArray(soalList) && soalList.length > 0) {
-                    const totalSoal = soalList.length;
+                const pagesGroup = {};
+                globalSoalCache = [];
 
-                    soalList.forEach((soal, index) => {
-                        const soalCard = document.createElement('div');
-                        soalCard.className = "bg-white p-5 rounded-xl border border-slate-200 shadow-sm";
-
-                        let scoreBadgeHtml = '';
-                        if (currentScoreType === 'genius') {
-                            const geniusScorePerSoal = (100 / totalSoal).toFixed(1);
-                            scoreBadgeHtml = `<span class="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-200">🎯 ${geniusScorePerSoal} Pts (Genius)</span>`;
-                        } else if (currentScoreType === 'manual') {
-                            const manualScore = soal.score !== undefined ? soal.score : 0;
-                            scoreBadgeHtml = `<span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200">⭐ ${manualScore} Pts</span>`;
+                if (Array.isArray(rawPagesList) && rawPagesList.length > 0) {
+                    rawPagesList.forEach(group => {
+                        // Perbaikan penanganan struktur page baik berupa objek group ber-halaman maupun array datar
+                        if (group.soal && Array.isArray(group.soal)) {
+                            const pageNum = (group.page === null || group.page === undefined) ? 1 : group.page;
+                            if (!pagesGroup[pageNum]) pagesGroup[pageNum] = [];
+                            group.soal.forEach(s => {
+                                const questionObj = { ...s, page: parseInt(pageNum) };
+                                pagesGroup[pageNum].push(questionObj);
+                                globalSoalCache.push(questionObj);
+                            });
+                        } else {
+                            const pageNum = (group.page === null || group.page === undefined) ? 1 : parseInt(group.page);
+                            if (!pagesGroup[pageNum]) pagesGroup[pageNum] = [];
+                            const questionObj = { ...group, page: pageNum };
+                            pagesGroup[pageNum].push(questionObj);
+                            globalSoalCache.push(questionObj);
                         }
-
-                        let optionsHtml = '';
-                        if (soal.options && soal.options.length > 0) {
-                            optionsHtml = `<ul class="mt-3 space-y-2 pl-2 text-xs text-slate-600">` +
-                                soal.options.map(opt => `
-                      <li class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full ${opt.is_correct ? 'bg-green-500' : 'bg-slate-300'}"></span>
-                        <span class="${opt.is_correct ? 'font-bold text-green-700' : ''}">${opt.value}</span>
-                        ${currentScoreType === 'manual' && opt.score !== undefined && opt.score !== null ? `<span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono font-semibold">Skor: ${opt.score}</span>` : ''}
-                        ${opt.is_correct ? '<span class="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold">Jawaban Benar</span>' : ''}
-                        ${opt.image ? `<img src="${API_BASE_URL}${opt.image}" class="h-8 w-8 object-cover rounded border ml-2" />` : ''}
-                      </li>
-                    `).join('') + `</ul>`;
-                        }
-
-                        soalCard.innerHTML = `
-                  <div class="flex items-start justify-between gap-4">
-                    <div class="flex-1">
-                      <div class="flex items-center gap-2 flex-wrap">
-                        <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600 uppercase font-mono tracking-wider">${soal.type}</span>
-                        ${scoreBadgeHtml}
-                      </div>
-                      <h4 class="font-semibold text-slate-800 mt-2 text-sm">${index + 1}. ${soal.question}</h4>
-                    </div>
-                    <div class="flex items-center gap-3 flex-shrink-0">
-                        ${soal.image ? `<img src="${API_BASE_URL}${soal.image}" class="h-16 w-16 object-cover rounded-lg border shadow-sm" />` : ''}
-                        <button onclick="deleteSoal(${soal.id})" 
-                            class="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-semibold transition border border-red-200 flex items-center gap-1">
-                            🗑️ <span class="hidden sm:inline">Hapus</span>
-                        </button>
-                        <button onclick="openEditModal(${soal.id})" 
-                            class="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-semibold transition border border-blue-200 flex items-center gap-1">
-                            ✏️ <span class="hidden sm:inline">Edit</span>
-                        </button>
-                    </div>
-                  </div>
-                  ${optionsHtml}
-                `;
-                        container.appendChild(soalCard);
                     });
+                }
+
+                const totalSoal = globalSoalCache.length;
+
+                if (res.ok && totalSoal > 0) {
+                    let globalIndex = 0;
+
+                    Object.keys(pagesGroup).sort((a, b) => Number(a) - Number(b)).forEach(pageNum => {
+                        const pageSection = document.createElement('div');
+                        pageSection.className = "space-y-4 bg-slate-100/70 p-4 rounded-2xl border border-slate-200";
+
+                        let pageHeader = `<div class="flex items-center justify-between border-b border-slate-200 pb-2 mb-3">
+                            <span class="text-xs font-bold text-slate-700 bg-white px-3 py-1 rounded-md border border-slate-200 shadow-sm">
+                               📄 Halaman ${pageNum}
+                            </span>
+                            <span class="text-[11px] text-slate-500 font-medium">${pagesGroup[pageNum].length} Soal</span>
+                        </div>`;
+
+                        let cardsHtml = '';
+                        pagesGroup[pageNum].forEach(soal => {
+                            globalIndex++;
+                            let scoreBadgeHtml = '';
+                            if (currentScoreType === 'genius') {
+                                const geniusScorePerSoal = (100 / totalSoal).toFixed(1);
+                                scoreBadgeHtml = `<span class="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-200">🎯 ${geniusScorePerSoal} Pts (Genius)</span>`;
+                            } else if (currentScoreType === 'manual') {
+                                const manualScore = soal.score !== undefined && soal.score !== null ? soal.score : 0;
+                                scoreBadgeHtml = `<span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200">⭐ ${manualScore} Pts</span>`;
+                            }
+
+                            let optionsHtml = '';
+                            if (soal.options && soal.options.length > 0) {
+                                optionsHtml = `<ul class="mt-3 space-y-2 pl-2 text-xs text-slate-600">` +
+                                    soal.options.map(opt => `
+                                        <li class="flex items-center gap-2">
+                                            <span class="w-2 h-2 rounded-full ${opt.is_correct ? 'bg-green-500' : 'bg-slate-300'}"></span>
+                                            <span class="${opt.is_correct ? 'font-bold text-green-700' : ''}">${opt.value}</span>
+                                            ${currentScoreType === 'manual' && opt.score !== undefined && opt.score !== null ? `<span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono font-semibold">Skor: ${opt.score}</span>` : ''}
+                                            ${opt.is_correct ? '<span class="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold">Jawaban Benar</span>' : ''}
+                                            ${opt.image ? `<img src="${API_BASE_URL}${opt.image}" class="h-8 w-8 object-cover rounded border ml-2" />` : ''}
+                                        </li>
+                                    `).join('') + `</ul>`;
+                            }
+
+                            cardsHtml += `
+                                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                                    <div class="flex items-start justify-between gap-4">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2 flex-wrap">
+                                                <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600 uppercase font-mono tracking-wider">${soal.type}</span>
+                                                ${scoreBadgeHtml}
+                                            </div>
+                                            <h4 class="font-semibold text-slate-800 mt-2 text-sm">${globalIndex}. ${soal.question}</h4>
+                                        </div>
+                                        <div class="flex items-center gap-3 flex-shrink-0">
+                                            ${soal.image ? `<img src="${API_BASE_URL}${soal.image}" class="h-16 w-16 object-cover rounded-lg border shadow-sm" />` : ''}
+                                            <button onclick="deleteSoal(${soal.id})" 
+                                                class="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-semibold transition border border-red-200 flex items-center gap-1">
+                                                🗑️ <span class="hidden sm:inline">Hapus</span>
+                                            </button>
+                                            <button onclick="openEditModal(${soal.id})" 
+                                                class="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-semibold transition border border-blue-200 flex items-center gap-1">
+                                                ✏️ <span class="hidden sm:inline">Edit</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    ${optionsHtml}
+                                </div>
+                            `;
+                        });
+
+                        pageSection.innerHTML = pageHeader + `<div class="space-y-3">${cardsHtml}</div>`;
+                        container.appendChild(pageSection);
+                    });
+
                 } else {
                     container.innerHTML = `<p class="text-xs text-slate-400 italic">Belum ada soal pada form ini.</p>`;
                 }
@@ -480,9 +510,7 @@
                 if (res.ok) {
                     showAlert(result.message || 'Berhasil Menghapus Soal', true);
                     await fetchExistingSoal();
-                    if (currentScoreType === 'genius') {
-                        await syncGeniusScores();
-                    }
+                    if (currentScoreType === 'genius') await syncGeniusScores();
                 } else {
                     showAlert(result.message || 'Gagal menghapus soal');
                 }
@@ -502,7 +530,8 @@
                     soal: {
                         question: soal.question,
                         type: soal.type,
-                        score: newScorePerSoal
+                        score: newScorePerSoal,
+                        page: parseInt(soal.page) || 1
                     },
                     options: (soal.options || []).map(o => ({
                         id: o.id,
@@ -540,10 +569,15 @@
                   <button type="button" onclick="removeQuestionCard(this)" class="text-xs text-red-500 hover:text-red-700 font-medium">Hapus Soal</button>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div class="${isManual ? 'md:col-span-2' : 'md:col-span-2'} q-text-wrapper">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div class="md:col-span-2 q-text-wrapper">
                     <label class="block text-xs font-semibold text-slate-600 mb-1">Pertanyaan Teks</label>
                     <input type="text" class="q-question w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Isikan pertanyaan...">
+                  </div>
+
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Halaman (Page)</label>
+                    <input type="number" min="1" value="1" class="q-page w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                   </div>
 
                   <div class="create-score-container ${isManual ? '' : 'hidden'}">
@@ -551,7 +585,7 @@
                     <input type="number" step="0.1" class="q-score w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="0">
                   </div>
 
-                  <div>
+                  <div class="md:col-span-4">
                     <label class="block text-xs font-semibold text-slate-600 mb-1">Tipe Pertanyaan</label>
                     <select class="q-type w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white" onchange="toggleOptionSection(this, ${qId})">
                       <option value="radio">Pilihan Ganda (Radio)</option>
@@ -629,10 +663,12 @@
 
             let hasError = false;
 
-            questionCards.forEach((card, index) => {
+            questionCards.forEach((card) => {
                 const questionInput = card.querySelector('.q-question');
                 const questionText = questionInput.value.trim();
                 const type = card.querySelector('.q-type').value;
+                const pageInput = card.querySelector('.q-page');
+                const pageVal = pageInput ? parseInt(pageInput.value) || 1 : 1;
                 const qImageInput = card.querySelector('.q-image');
 
                 if (!questionText) {
@@ -650,7 +686,12 @@
                     finalScore = scoreVal ? parseFloat(scoreVal) : 0;
                 }
 
-                const soalObject = { question: questionText, type: type, score: finalScore };
+                const soalObject = {
+                    question: questionText,
+                    type: type,
+                    score: finalScore,
+                    page: pageVal
+                };
 
                 if (qImageInput.files && qImageInput.files[0]) {
                     const file = qImageInput.files[0];
@@ -701,7 +742,8 @@
                 return;
             }
 
-            formData.append('data', JSON.stringify(payloadData));
+            const finalPayload = payloadData.length === 1 ? payloadData[0] : payloadData;
+            formData.append('data', JSON.stringify(finalPayload));
 
             try {
                 const res = await fetch(`${API_BASE_URL}/form/soal?form_slug=${encodeURIComponent(formSlug)}`, {
@@ -713,9 +755,7 @@
                 const result = await res.json();
 
                 if (res.ok) {
-                    if (currentScoreType === 'genius') {
-                        await syncGeniusScores();
-                    }
+                    if (currentScoreType === 'genius') await syncGeniusScores();
 
                     showAlert(result.message || 'Soal berhasil disimpan!', true);
                     document.getElementById('questions-container').innerHTML = '';
@@ -740,6 +780,7 @@
             document.getElementById('edit-soal-id').value = soal.id;
             document.getElementById('edit-soal-question').value = soal.question;
             document.getElementById('edit-soal-type').value = soal.type;
+            document.getElementById('edit-soal-page').value = soal.page || 1;
 
             const scoreContainer = document.getElementById('container-edit-soal-score');
             const scoreTextWrapper = document.getElementById('container-edit-question-text');
@@ -753,7 +794,6 @@
                 scoreContainer.classList.add('hidden');
                 scoreTextWrapper.className = "md:col-span-3";
                 scoreInput.value = 0;
-                scoreInput.removeAttribute('required');
             }
 
             const imgContainer = document.getElementById('edit-soal-current-image');
@@ -819,6 +859,7 @@
             const soalId = document.getElementById('edit-soal-id').value;
             const questionText = document.getElementById('edit-soal-question').value.trim();
             const type = document.getElementById('edit-soal-type').value;
+            const pageVal = parseInt(document.getElementById('edit-soal-page').value) || 1;
             const qImageInput = document.getElementById('edit-soal-image');
 
             if (!questionText) return alert('Pertanyaan teks tidak boleh kosong!');
@@ -840,7 +881,8 @@
             const soalObject = {
                 question: questionText,
                 type: type,
-                score: finalScore
+                score: finalScore,
+                page: pageVal
             };
 
             if (qImageInput.files && qImageInput.files[0]) {
@@ -916,8 +958,8 @@
                 const result = await res.json();
                 if (!res.ok) throw new Error(result.message || 'Gagal mengambil data respon');
 
-                const data = result.data;
-                const totalSubmit = data.total_submit || 0;
+                const data = result.data || {};
+                const totalSubmit = data.total_submit !== undefined ? data.total_submit : 0;
 
                 document.getElementById('stat-total-submit').textContent = totalSubmit;
                 document.getElementById('badge-total-submit').textContent = totalSubmit;
@@ -925,49 +967,82 @@
                 const container = document.getElementById('respon-aggregate-container');
                 container.innerHTML = '';
 
-                if (!data.questions || data.questions.length === 0) {
+                const rawPages = data.questions || [];
+
+                // Flatten semua array 'soal' dari tiap page menjadi 1 array datar
+                const allQuestions = [];
+                if (Array.isArray(rawPages)) {
+                    rawPages.forEach(pageGroup => {
+                        if (pageGroup && Array.isArray(pageGroup.soal)) {
+                            pageGroup.soal.forEach(s => {
+                                allQuestions.push({
+                                    ...s,
+                                    page: pageGroup.page
+                                });
+                            });
+                        }
+                    });
+                }
+
+                if (allQuestions.length === 0) {
                     container.innerHTML = `<p class="text-sm text-slate-400 italic">Belum ada soal atau jawaban tersedia.</p>`;
                     return;
                 }
 
-                data.questions.forEach((q, idx) => {
+                allQuestions.forEach((q, idx) => {
                     const card = document.createElement('div');
                     card.className = "bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3";
 
+                    const questionTitle = q.question || q.title || `Pertanyaan ${idx + 1}`;
+                    const optionsList = q.options || [];
+                    const textAnswersList = q.text_answers || q.answers || [];
+
                     let bodyContent = '';
-                    if (Array.isArray(q.options) && q.options.length > 0) {
-                        bodyContent = q.options.map(opt => {
-                            const count = opt.total_answer || 0;
+
+                    if (Array.isArray(optionsList) && optionsList.length > 0) {
+                        bodyContent = optionsList.map(opt => {
+                            const count = opt.total_answer !== undefined ? opt.total_answer : (opt.count || 0);
+                            const optionText = opt.value || opt.option_value || 'Opsi';
                             const percentage = totalSubmit > 0 ? Math.round((count / totalSubmit) * 100) : 0;
 
                             return `
-                                <div class="space-y-1">
-                                    <div class="flex justify-between text-xs font-medium">
-                                        <span class="text-slate-700">${opt.value || opt.option_value_id}</span>
-                                        <span class="text-slate-500">${count} respon (${percentage}%)</span>
-                                    </div>
-                                    <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                                        <div class="bg-indigo-600 h-2 rounded-full transition-all duration-500" style="width: ${percentage}%"></div>
-                                    </div>
-                                </div>
-                            `;
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-xs font-medium">
+                                <span class="text-slate-700">${optionText} ${opt.is_correct ? '<span class="text-[10px] text-emerald-600 font-bold">(Kunci)</span>' : ''}</span>
+                                <span class="text-slate-500">${count} respon (${percentage}%)</span>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                <div class="bg-indigo-600 h-2 rounded-full transition-all duration-500" style="width: ${percentage}%"></div>
+                            </div>
+                        </div>
+                    `;
                         }).join('');
+                    } else if (Array.isArray(textAnswersList) && textAnswersList.length > 0) {
+                        bodyContent = `<ul class="space-y-1.5 pl-2 text-xs text-slate-600 max-h-40 overflow-y-auto">` +
+                            textAnswersList.map(ans => `<li class="p-2 bg-slate-50 rounded border border-slate-100">💬 ${typeof ans === 'object' ? (ans.answer || ans.text) : ans}</li>`).join('') +
+                            `</ul>`;
                     } else {
-                        bodyContent = `<p class="text-xs text-slate-400 italic">Pertanyaan bertipe isian teks / bukan pilihan ganda.</p>`;
+                        bodyContent = `<p class="text-xs text-slate-400 italic">Pertanyaan bertipe isian teks / belum ada tanggapan.</p>`;
                     }
 
+                    const pageBadge = q.page ? `<span class="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 ml-2">Page ${q.page}</span>` : '';
+
                     card.innerHTML = `
-                        <div class="border-b border-slate-100 pb-2">
-                            <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Pertanyaan ${idx + 1}</span>
-                            <h4 class="font-bold text-slate-800 text-sm mt-0.5">${q.question}</h4>
-                        </div>
-                        <div class="space-y-3 pt-1">${bodyContent}</div>
-                    `;
+                <div class="border-b border-slate-100 pb-2 flex justify-between items-center">
+                    <div>
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Pertanyaan ${idx + 1} (${q.type})</span>
+                        ${pageBadge}
+                    </div>
+                </div>
+                <h4 class="font-bold text-slate-800 text-sm mt-0.5">${questionTitle}</h4>
+                ${q.image ? `<img src="${API_BASE_URL}${q.image}" class="h-24 object-cover rounded-lg border my-2" />` : ''}
+                <div class="space-y-3 pt-1">${bodyContent}</div>
+            `;
 
                     container.appendChild(card);
                 });
             } catch (err) {
-                console.error(err);
+                console.error('Error fetching aggregate data:', err);
                 document.getElementById('respon-aggregate-container').innerHTML = `<p class="text-xs text-red-500">Gagal memuat ringkasan tanggapan.</p>`;
             }
         }
@@ -982,7 +1057,26 @@
                 const result = await res.json();
                 if (!res.ok) throw new Error(result.message || 'Gagal mengambil detail');
 
-                globalDetailData = result.data || [];
+                // Extract & Flatten array soal dari tiap page di BE
+                const rawPages = result.data || [];
+                globalDetailData = [];
+
+                if (Array.isArray(rawPages)) {
+                    rawPages.forEach(pageGroup => {
+                        if (pageGroup && Array.isArray(pageGroup.soal)) {
+                            pageGroup.soal.forEach(s => {
+                                globalDetailData.push({
+                                    ...s,
+                                    page: pageGroup.page
+                                });
+                            });
+                        } else if (pageGroup && pageGroup.question) {
+                            // Fallback jika BE mengirimkan array datar
+                            globalDetailData.push(pageGroup);
+                        }
+                    });
+                }
+
                 const container = document.getElementById('respon-detail-cards-container');
 
                 if (globalDetailData.length === 0) {
@@ -990,9 +1084,14 @@
                     return;
                 }
 
+                // Kumpulkan semua submitted_id secara unik dari semua soal
                 const submittedIds = new Set();
                 globalDetailData.forEach(q => {
-                    (q.responses || []).forEach(r => submittedIds.add(r.submitted_id));
+                    const responses = q.responses || q.answers || [];
+                    responses.forEach(r => {
+                        const sId = r.submitted_id || r.submit_id || r.submission_id;
+                        if (sId !== undefined && sId !== null) submittedIds.add(sId);
+                    });
                 });
 
                 listSubmittedIds = Array.from(submittedIds);
@@ -1035,16 +1134,20 @@
                     const scorePerSoal = globalDetailData.length > 0 ? (100 / globalDetailData.length).toFixed(1) : 0;
                     scoreBadgeHtml = `<span class="text-[10px] bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full font-bold border border-indigo-100 flex items-center gap-1">🎯 ${scorePerSoal} Pts</span>`;
                 } else if (currentScoreType === 'manual') {
-                    const scorePerSoal = q.score !== undefined ? q.score : 0;
+                    const scorePerSoal = q.score !== undefined && q.score !== null ? q.score : 0;
                     scoreBadgeHtml = `<span class="text-[10px] bg-amber-50 text-amber-800 px-2.5 py-0.5 rounded-full font-bold border border-amber-100 flex items-center gap-1">⭐ ${scorePerSoal} Pts</span>`;
                 }
 
-                const respondentResponse = (q.responses || []).find(r => r.submitted_id === currentSubId);
+                // Cari respon spesifik untuk ID responden saat ini
+                const responses = q.responses || q.answers || [];
+                const respondentResponse = responses.find(r => (r.submitted_id || r.submit_id || r.submission_id) === currentSubId);
                 const rawAnswer = respondentResponse ? respondentResponse.answer : null;
 
                 let selectedOptionIds = [];
                 if (rawAnswer !== null && rawAnswer !== undefined) {
-                    if (typeof rawAnswer === 'number') {
+                    if (Array.isArray(rawAnswer)) {
+                        selectedOptionIds = rawAnswer.map(id => Number(id));
+                    } else if (typeof rawAnswer === 'number') {
                         selectedOptionIds.push(rawAnswer);
                     } else if (typeof rawAnswer === 'string' && (q.type === 'radio' || q.type === 'checkbox')) {
                         selectedOptionIds = rawAnswer.split(',').map(id => Number(id.trim())).filter(id => !isNaN(id));
@@ -1054,26 +1157,26 @@
                 let optionsHtml = '';
                 if (q.type === 'file') {
                     optionsHtml = `
-                <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono text-slate-700">
-                    ${rawAnswer ? `
-                        <div class="space-y-2">
-                            <span class="text-slate-500 font-sans block">File Diunggah:</span>
-                            <a href="${API_BASE_URL}${rawAnswer}" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 font-sans font-semibold border border-blue-200">
-                                📎 Lihat File / Gambar
-                            </a>
-                            ${rawAnswer.match(/\.(jpeg|jpg|gif|png)$/i) ? `<img src="${API_BASE_URL}${rawAnswer}" class="h-32 object-cover rounded-lg border mt-2" />` : ''}
-                        </div>
-                    ` : '<span class="text-slate-400 italic font-sans">Tidak ada file yang diunggah</span>'}
-                </div>`;
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono text-slate-700">
+                ${rawAnswer ? `
+                    <div class="space-y-2">
+                        <span class="text-slate-500 font-sans block">File Diunggah:</span>
+                        <a href="${API_BASE_URL}${rawAnswer}" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 font-sans font-semibold border border-blue-200">
+                            📎 Lihat File / Gambar
+                        </a>
+                        ${String(rawAnswer).match(/\.(jpeg|jpg|gif|png)$/i) ? `<img src="${API_BASE_URL}${rawAnswer}" class="h-32 object-cover rounded-lg border mt-2" />` : ''}
+                    </div>
+                ` : '<span class="text-slate-400 italic font-sans">Tidak ada file yang diunggah</span>'}
+            </div>`;
                 } else if (q.type === 'text') {
                     optionsHtml = `
-                <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono text-slate-700">
-                    ${rawAnswer ? rawAnswer : '<span class="text-slate-400 italic font-sans">Tidak dijawab</span>'}
-                </div>`;
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono text-slate-700">
+                ${rawAnswer ? rawAnswer : '<span class="text-slate-400 italic font-sans">Tidak dijawab</span>'}
+            </div>`;
                 } else if (Array.isArray(q.options) && q.options.length > 0) {
                     optionsHtml = `<div class="space-y-2 mt-3">` +
                         q.options.map(opt => {
-                            const isSelected = selectedOptionIds.includes(opt.id);
+                            const isSelected = selectedOptionIds.includes(opt.id) || selectedOptionIds.includes(opt.value) || rawAnswer === opt.id || rawAnswer === opt.value;
                             const activeBg = isSelected
                                 ? 'bg-indigo-50 border-indigo-500 text-indigo-900 font-semibold shadow-sm'
                                 : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100';
@@ -1082,27 +1185,33 @@
                                 : 'bg-white border-slate-300';
 
                             return `
-                        <div class="flex items-center justify-between p-3 border rounded-xl transition text-xs ${activeBg}">
-                            <div class="flex items-center gap-3">
-                                <span class="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${activeIndicator}">
-                                    ${isSelected ? '<span class="w-1.5 h-1.5 bg-white rounded-full"></span>' : ''}
-                                </span>
-                                <span>${opt.value}</span>
-                                ${opt.image ? `<img src="${API_BASE_URL}${opt.image}" class="h-8 w-8 object-cover rounded border ml-2" />` : ''}
-                            </div>
-                            <div class="flex items-center gap-2">
-                                ${opt.is_correct ? '<span class="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">Kunci Jawaban</span>' : ''}
-                                ${isSelected ? '<span class="text-[10px] bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full font-bold">Dipilih Responden</span>' : ''}
-                            </div>
-                        </div>`;
+                <div class="flex items-center justify-between p-3 border rounded-xl transition text-xs ${activeBg}">
+                    <div class="flex items-center gap-3">
+                        <span class="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${activeIndicator}">
+                            ${isSelected ? '<span class="w-1.5 h-1.5 bg-white rounded-full"></span>' : ''}
+                        </span>
+                        <span>${opt.value}</span>
+                        ${opt.image ? `<img src="${API_BASE_URL}${opt.image}" class="h-8 w-8 object-cover rounded border ml-2" />` : ''}
+                    </div>
+                    <div class="flex items-center gap-2">
+                        ${opt.is_correct ? '<span class="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">Kunci Jawaban</span>' : ''}
+                        ${isSelected ? '<span class="text-[10px] bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full font-bold">Dipilih Responden</span>' : ''}
+                    </div>
+                </div>`;
                         }).join('') + `</div>`;
+                } else {
+                    optionsHtml = `<p class="text-xs text-slate-400 italic">Tidak ada opsi jawaban.</p>`;
                 }
 
+                const pageBadge = q.page ? `<span class="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 ml-2">Halaman ${q.page}</span>` : '';
                 const soalImageHtml = q.image ? `<div class="mt-2"><img src="${API_BASE_URL}${q.image}" class="h-36 object-cover rounded-lg border shadow-sm" /></div>` : '';
 
                 card.innerHTML = `
             <div class="border-b border-slate-100 pb-2 flex justify-between items-center">
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Soal #${idx + 1} (${q.type})</span>
+                <div class="flex items-center">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Soal #${idx + 1} (${q.type})</span>
+                    ${pageBadge}
+                </div>
                 ${scoreBadgeHtml}
             </div>
             <h4 class="font-bold text-slate-800 text-sm">${q.question}</h4>
@@ -1156,9 +1265,7 @@
                     showAlert(result.message || 'Soal berhasil diimpor!', true);
                     closeImportModal();
                     await fetchExistingSoal();
-                    if (currentScoreType === 'genius') {
-                        await syncGeniusScores();
-                    }
+                    if (currentScoreType === 'genius') await syncGeniusScores();
                 } else {
                     showAlert(result.message || 'Gagal mengimpor file Word');
                 }
@@ -1195,7 +1302,6 @@
                 btn.innerHTML = '⏳ <span>Menyimpan...</span>';
                 hideAlert();
 
-                // Jalankan fungsi sinkronisasi skor ke database
                 await syncGeniusScores();
 
                 showAlert('Skor Genius (100/N) berhasil diperbarui ke semua soal eksisting!', true);

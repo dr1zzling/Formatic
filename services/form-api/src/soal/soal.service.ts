@@ -99,18 +99,31 @@ export class SoalService {
             .select("*")
             .whereIn("soal_id", soalId)
 
-        return getSoal.map((soal) => ({
-            id: soal.id,
-            question: soal.question,
-            type: soal.type,
-            image: soal.image,
-            score: soal.score,
-            options: getOption.filter((option) => option.soal_id == soal.id)
-        }))
+        const grouped = getSoal.reduce((acc, row) => {
+            if (!acc[row.page]) {
+                acc[row.page] = {
+                    page: row.page,
+                    soal: []
+                }
+            }
+            acc[row.page].soal.push({
+                id: row.id,
+                question: row.question,
+                type: row.type,
+                image: row.image,
+                score: row.score,
+                options: getOption.filter((option) => option.soal_id == row.id)
+            })
+
+            return acc
+        }, {})
+
+        return Object.values(grouped)
     }
 
     // Create Soal And Option
     async createSoalAndOption(form_slug, body: any) {
+        if (!body) throw new BadRequestException("Isi Yang Benar")
         // Validasi
         const listSoal = Array.isArray(body) ? body : [body]
         if (!body || listSoal.length === 0) {
@@ -130,9 +143,10 @@ export class SoalService {
                             question: soal.question,
                             type: soal.type,
                             score: soal.score,
-                            image: soal.image ?? null
+                            image: soal.image ?? null,
+                            page: soal.page
                         })
-                        .returning(['id', 'question', 'type', 'image'])
+                        .returning(['id', 'question', 'type', 'image', 'page'])
 
                     if (!optionTypes.includes(soal.type)) return insertSoal
 
@@ -220,8 +234,7 @@ export class SoalService {
                 options.map(async (e) => {
                     const payloadOption: any = {
                         value: e.value,
-                        score: e.score,
-                        is_correct: Boolean(e.is_correct),
+                        is_correct: Boolean(e.is_correct)
                     }
 
                     if (e.image) {

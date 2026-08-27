@@ -12,7 +12,7 @@ export class SubmitService {
   ) { }
 
   // Check Token
-  async checkTokenResponden(req: { id: number }, form, token: string) {
+  async checkTokenResponden(req: { id: number }, form: any, token: string) {
     const checkRole = await this.isCreator.isCreator(req.id, form.id)
 
     if (checkRole != false) throw new UnauthorizedException("Anda Tidak Berhak Sebagai Responden")
@@ -26,8 +26,8 @@ export class SubmitService {
   }
 
   // Get All Submit By Form
-  async getAllSubmitByForm(req: { id: number }, form) {
-    const getSoal = await this.soalService.getSoalByForm(form.id)
+  async getAllSubmitByForm(req: { id: number }, form: any) {
+    const getSoal: any[] = await this.soalService.getSoalByForm(form.id)
 
     const totalSubmit = await this.knexService.connection('form_submit')
       .count('* as total')
@@ -42,23 +42,41 @@ export class SubmitService {
       .whereNotNull('user_answer.soal_option_id')
       .groupBy('user_answer.soal_id', 'user_answer.soal_option_id')
 
-    const optionCountMap = optionCountRows.reduce((acc, row) => {
+    const optionCountMap = optionCountRows.reduce((acc: any, row: any) => {
       const key = `${row.soal_id}_${row.option_value_id}`
       acc[key] = Number(row.total)
       return acc
     }, {})
 
-    const questions = getSoal.map((question) => ({
-      ...question,
-      options: Array.isArray(question.options)
-        ? question.options.map((option) => {
-          const key = `${question.id}_${option.id}`
-          return {
-            ...option,
-            total_answer: optionCountMap[key] ?? 0,
-          }
-        })
-        : question.options,
+    const textAnswersRows = await this.knexService.connection('user_answer')
+      .innerJoin('form_submit', 'form_submit.id', 'user_answer.submitted_id')
+      .select('user_answer.soal_id', 'user_answer.answer_text')
+      .where('form_submit.form_id', form.id)
+      .whereNotNull('user_answer.answer_text')
+
+    const textAnswersMap = textAnswersRows.reduce((acc: any, row: any) => {
+      if (!acc[row.soal_id]) acc[row.soal_id] = []
+      if (row.answer_text) acc[row.soal_id].push(row.answer_text)
+      return acc
+    }, {})
+
+    const questions = getSoal.map((pageGroup: any) => ({
+      ...pageGroup,
+      soal: Array.isArray(pageGroup.soal)
+        ? pageGroup.soal.map((soalItem: any) => ({
+          ...soalItem,
+          options: Array.isArray(soalItem.options)
+            ? soalItem.options.map((option: any) => {
+              const key = `${soalItem.id}_${option.id}`
+              return {
+                ...option,
+                total_answer: optionCountMap[key] ?? 0,
+              }
+            })
+            : [],
+          text_answers: textAnswersMap[soalItem.id] || [],
+        }))
+        : [],
     }))
 
     return {
@@ -73,24 +91,26 @@ export class SubmitService {
     }
   }
 
-  async getAllSubmitResponseByForm(req: { id: number }, form) {
+  async getAllSubmitResponseByForm(req: { id: number }, form: any) {
     const checkRole = await this.isCreator.isCreator(req.id, form.id)
-    if (checkRole == false) throw new UnauthorizedException("Anda Tidak Berhak")
+    if (checkRole === false) throw new UnauthorizedException("Anda Tidak Berhak")
 
-    const getSoal = await this.soalService.getSoalByForm(form.id)
+    const getSoal: any[] = await this.soalService.getSoalByForm(form.id)
 
     const getAllSubmit = await this.knexService.connection("form_submit")
       .select("*")
       .where("form_id", form.id)
 
-    const submitId = getAllSubmit.map((item) => item.id)
+    const submitId = getAllSubmit.map((item: any) => item.id)
 
     if (submitId.length === 0) {
       return {
         message: "Berhasil Mendapatkan Detail Submit",
-        data: getSoal.map((soal) => ({
-          ...soal,
-          responses: []
+        data: getSoal.map((pageGroup: any) => ({
+          ...pageGroup,
+          soal: Array.isArray(pageGroup.soal)
+            ? pageGroup.soal.map((s: any) => ({ ...s, responses: [] }))
+            : []
         }))
       }
     }
@@ -99,7 +119,8 @@ export class SubmitService {
       .select("*")
       .whereIn("submitted_id", submitId)
 
-    const answersBySoal = getSubmittedDetail.reduce((acc, item) => {
+    // Grouping jawaban berdasarkan soal_id
+    const answersBySoal = getSubmittedDetail.reduce((acc: any, item: any) => {
       const soalId = item.soal_id
 
       if (!acc[soalId]) {
@@ -136,19 +157,24 @@ export class SubmitService {
       return acc
     }, {})
 
-    const result = getSoal.map((soal) => {
-      const rawResponses = answersBySoal[soal.id] || []
+    // Map nested structure: Page -> Soal -> Responses
+    const result = getSoal.map((pageGroup: any) => ({
+      ...pageGroup,
+      soal: Array.isArray(pageGroup.soal)
+        ? pageGroup.soal.map((soalItem: any) => {
+          const rawResponses = answersBySoal[soalItem.id] || []
+          const formattedResponses = rawResponses.map((res: any) => ({
+            submitted_id: res.submitted_id,
+            answer: Array.isArray(res.answer) ? res.answer.join(", ") : res.answer
+          }))
 
-      const formattedResponses = rawResponses.map((res: any) => ({
-        submitted_id: res.submitted_id,
-        answer: Array.isArray(res.answer) ? res.answer.join(", ") : res.answer
-      }))
-
-      return {
-        ...soal,
-        responses: formattedResponses
-      }
-    })
+          return {
+            ...soalItem,
+            responses: formattedResponses
+          }
+        })
+        : []
+    }))
 
     return {
       message: "Berhasil Mendapatkan Detail Submit",
@@ -156,7 +182,7 @@ export class SubmitService {
     }
   }
 
-  async submitForm(req: { id: number }, form, data: string, files: Express.Multer.File[] = []) {
+  async submitForm(req: { id: number }, form: any, data: string, files: Express.Multer.File[] = []) {
     const checkRole = await this.isCreator.isCreator(req.id, form.id)
     if (checkRole != false) throw new UnauthorizedException("Anda Tidak Berhak Sebagai Responden")
 
@@ -174,7 +200,7 @@ export class SubmitService {
     const questions: any[] = await this.knexService.connection('soal')
       .select('id', 'type')
       .where('form_id', form.id)
-    const questionMap = new Map(questions.map((question) => [question.id, question]))
+    const questionMap = new Map(questions.map((question: any) => [question.id, question]))
     const answers: any[] = []
     let fileIndex = 0
 
