@@ -113,12 +113,12 @@ export class FormController {
     return this.formService.changeRole(req.user, form_slug, token_collab)
   }
 
-  @Put('/time')
+  @Patch('/setting')
   @UseGuards(JwtAuthGuard)
   updateForm(
     @Request() req,
     @Query('form_slug', ValidateFormExist) form_slug: string,
-    @Body() body: { duration: number, start_at: number}
+    @Body() body: { duration: number, start_at: number, is_random: boolean}
   ){
     return this.formService.updateForm(req.user, form_slug, body)
   }

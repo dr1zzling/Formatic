@@ -64,7 +64,7 @@ export class FormService {
 
       if(!getForm) throw new NotFoundException("Tidak Ada Form")
       
-      const listSoal = await this.soalService.getSoalByForm(getForm.id)
+      const listSoal = await this.soalService.getSoalByForm(getForm.id, getForm.is_random)
 
       return {
         message: "Berhasil Mendapatkan Form",
@@ -174,7 +174,7 @@ export class FormService {
     }
   }
 
-  async updateForm(req: {id: number }, form, body: { duration: number, start_at: number}){
+  async updateForm(req: {id: number }, form, body: { duration: number, start_at: number, is_random: boolean}){
     const isCreator = await this.isCreator.isCreator(req.id, form.id)
     if(isCreator == false) throw new UnauthorizedException("Anda Tidak Berhak Update Form Ini")
 
@@ -182,7 +182,8 @@ export class FormService {
     const updateForm = await this.knexService.connection("forms")
     .update({
       duration: body.duration,
-      start_at: new Date(body.start_at)
+      start_at: new Date(body.start_at),
+      is_random: body.is_random
     })
     .where("id", form.id)
 

@@ -27,7 +27,7 @@ export class SubmitService {
 
   // Get All Submit By Form
   async getAllSubmitByForm(req: { id: number }, form: any) {
-    const getSoal: any[] = await this.soalService.getSoalByForm(form.id)
+    const getSoal: any[] = await this.soalService.getSoalByForm(form.id, form.is_random)
 
     const totalSubmit = await this.knexService.connection('form_submit')
       .count('* as total')
@@ -95,7 +95,7 @@ export class SubmitService {
     const checkRole = await this.isCreator.isCreator(req.id, form.id)
     if (checkRole === false) throw new UnauthorizedException("Anda Tidak Berhak")
 
-    const getSoal: any[] = await this.soalService.getSoalByForm(form.id)
+    const getSoal: any[] = await this.soalService.getSoalByForm(form.id, form.is_random)
 
     const getAllSubmit = await this.knexService.connection("form_submit")
       .select("*")

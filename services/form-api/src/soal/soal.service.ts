@@ -14,7 +14,7 @@ export class SoalService {
         try {
             const form = await this.knexService.connection('forms').where('id', formId).first()
             if (form) {
-                const updatedSoal = await this.getSoalByForm(formId)
+                const updatedSoal = await this.getSoalByForm(form.id, form.is_random)
                 this.formEventsGateway.notifyFormUpdated(form.id, form.slug, updatedSoal)
             }
         } catch (error) {
@@ -89,10 +89,19 @@ export class SoalService {
     }
 
     // Get Soal From Form
-    async getSoalByForm(id: number) {
+    async getSoalByForm(id: number, is_random: boolean) {
         const getSoal = await this.knexService.connection("soal")
             .select("*")
             .where("form_id", id)
+
+        function shuffleArray(array) {
+            const arr = [...array]
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]]
+            }
+            return arr
+        }
 
         const soalId = getSoal.map((soal) => soal.id)
         const getOption = await this.knexService.connection("soal_option")
@@ -106,19 +115,30 @@ export class SoalService {
                     soal: []
                 }
             }
+
+            let options = getOption.filter((option) => option.soal_id == row.id)
+            if (is_random) {
+                options = shuffleArray(options)
+            }
             acc[row.page].soal.push({
                 id: row.id,
                 question: row.question,
                 type: row.type,
                 image: row.image,
                 score: row.score,
-                options: getOption.filter((option) => option.soal_id == row.id)
+                options: options
             })
 
             return acc
         }, {})
 
-        return Object.values(grouped)
+        
+        const result = Object.values(grouped) as Array<{ page: number, soal: any[] }>
+
+        return result.map((pageGroup) => ({
+            ...pageGroup,
+            soal: is_random ? shuffleArray(pageGroup.soal) : pageGroup.soal
+        }))
     }
 
     // Create Soal And Option

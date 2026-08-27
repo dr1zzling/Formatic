@@ -27,25 +27,16 @@
                     Slug: Loading...
                 </span>
 
+                <!-- TOMBOL SETTING -->
+                <button onclick="openSettingModal()" id="btn-open-setting"
+                    class="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center gap-1.5">
+                    ⚙️ Setting Form
+                </button>
+
                 <button onclick="copyShareLink()" id="btn-share-link"
                     class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center gap-1.5">
                     <span>🔗</span> Bagikan Form
                 </button>
-
-                <!-- Select Tipe Penilaian -->
-                <div class="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200">
-                    <select id="select-score-type" onchange="handleScoreTypeChange()"
-                        class="bg-white text-xs font-semibold text-slate-700 px-2 py-1 rounded border border-slate-200 focus:outline-none">
-                        <option value="none">Tanpa Skor</option>
-                        <option value="genius">Genius Score (Otomatis 100/N)</option>
-                        <option value="manual">Manual Score</option>
-                    </select>
-
-                    <button type="button" id="btn-save-genius" onclick="handleSaveGeniusScore()"
-                        class="hidden px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-semibold shadow-sm transition flex items-center gap-1">
-                        💾 <span>Simpan Skor</span>
-                    </button>
-                </div>
             </div>
         </div>
 
@@ -268,6 +259,48 @@
         </div>
     </div>
 
+    <!-- Modal Setting Form -->
+    <div id="modal-setting-form"
+        class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 space-y-4 relative">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">⚙️ Setting Form</h3>
+                <button onclick="closeSettingModal()"
+                    class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
+            </div>
+
+            <form id="form-update-setting" onsubmit="handleSaveSetting(event)" novalidate class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Durasi Pengerjaan (Menit)</label>
+                    <input type="number" id="setting-duration" min="1" required placeholder="Contoh: 60"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Waktu Mulai (Start At)</label>
+                    <input type="datetime-local" id="setting-start-at" required
+                        class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+
+                <div class="flex items-center gap-2 pt-1">
+                    <input type="checkbox" id="setting-is-random"
+                        class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer">
+                    <label for="setting-is-random" class="text-xs font-semibold text-slate-700 cursor-pointer">
+                        Acak Urutan Soal & Option (Is Random)
+                    </label>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t">
+                    <button type="button" onclick="closeSettingModal()"
+                        class="px-4 py-2 bg-slate-100 text-slate-600 text-xs font-semibold rounded-lg hover:bg-slate-200">Batal</button>
+                    <button type="submit" id="btn-submit-setting"
+                        class="px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 shadow-sm">💾
+                        Simpan Setting</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         const API_BASE_URL = 'http://localhost:4000';
         const token = localStorage.getItem('token');
@@ -289,6 +322,7 @@
         let currentTokenCollab = null;
         let globalSoalCache = [];
         let currentScoreType = 'none';
+        let currentFormData = null;
 
         document.addEventListener('DOMContentLoaded', () => {
             const savedScoreType = localStorage.getItem(`score_type_${formSlug}`) || 'none';
@@ -357,24 +391,6 @@
             document.getElementById('alert-box').classList.add('hidden');
         }
 
-        function handleScoreTypeChange() {
-            currentScoreType = document.getElementById('select-score-type').value;
-            localStorage.setItem(`score_type_${formSlug}`, currentScoreType);
-
-            document.querySelectorAll('.create-score-container').forEach(el => {
-                if (currentScoreType === 'manual') el.classList.remove('hidden');
-                else el.classList.add('hidden');
-            });
-
-            const btnSaveGenius = document.getElementById('btn-save-genius');
-            if (btnSaveGenius) {
-                if (currentScoreType === 'genius') btnSaveGenius.classList.remove('hidden');
-                else btnSaveGenius.classList.add('hidden');
-            }
-
-            fetchExistingSoal();
-        }
-
         async function fetchExistingSoal() {
             try {
                 const res = await fetch(`${API_BASE_URL}/form/slug?slug=${encodeURIComponent(formSlug)}`, { headers });
@@ -384,18 +400,17 @@
                 container.innerHTML = '';
 
                 if (result.data) {
+                    currentFormData = result.data; // Menyimpan data form langsung
                     if (result.data.title) document.getElementById('form-title-header').textContent = result.data.title;
                     if (result.data.token_collab) currentTokenCollab = result.data.token_collab;
                 }
 
                 const rawPagesList = result.data && result.data.soal ? result.data.soal : [];
-
                 const pagesGroup = {};
                 globalSoalCache = [];
 
                 if (Array.isArray(rawPagesList) && rawPagesList.length > 0) {
                     rawPagesList.forEach(group => {
-                        // Perbaikan penanganan struktur page baik berupa objek group ber-halaman maupun array datar
                         if (group.soal && Array.isArray(group.soal)) {
                             const pageNum = (group.page === null || group.page === undefined) ? 1 : group.page;
                             if (!pagesGroup[pageNum]) pagesGroup[pageNum] = [];
@@ -969,7 +984,6 @@
 
                 const rawPages = data.questions || [];
 
-                // Flatten semua array 'soal' dari tiap page menjadi 1 array datar
                 const allQuestions = [];
                 if (Array.isArray(rawPages)) {
                     rawPages.forEach(pageGroup => {
@@ -1057,7 +1071,6 @@
                 const result = await res.json();
                 if (!res.ok) throw new Error(result.message || 'Gagal mengambil detail');
 
-                // Extract & Flatten array soal dari tiap page di BE
                 const rawPages = result.data || [];
                 globalDetailData = [];
 
@@ -1071,7 +1084,6 @@
                                 });
                             });
                         } else if (pageGroup && pageGroup.question) {
-                            // Fallback jika BE mengirimkan array datar
                             globalDetailData.push(pageGroup);
                         }
                     });
@@ -1084,7 +1096,6 @@
                     return;
                 }
 
-                // Kumpulkan semua submitted_id secara unik dari semua soal
                 const submittedIds = new Set();
                 globalDetailData.forEach(q => {
                     const responses = q.responses || q.answers || [];
@@ -1138,7 +1149,6 @@
                     scoreBadgeHtml = `<span class="text-[10px] bg-amber-50 text-amber-800 px-2.5 py-0.5 rounded-full font-bold border border-amber-100 flex items-center gap-1">⭐ ${scorePerSoal} Pts</span>`;
                 }
 
-                // Cari respon spesifik untuk ID responden saat ini
                 const responses = q.responses || q.answers || [];
                 const respondentResponse = responses.find(r => (r.submitted_id || r.submit_id || r.submission_id) === currentSubId);
                 const rawAnswer = respondentResponse ? respondentResponse.answer : null;
@@ -1289,29 +1299,77 @@
             });
         }
 
-        async function handleSaveGeniusScore() {
-            if (globalSoalCache.length === 0) {
-                return showAlert('Tidak ada soal eksisting untuk disinkronisasi.');
+        // Setting Modal Functions
+        function openSettingModal() {
+            if (currentFormData) {
+                if (currentFormData.duration) {
+                    document.getElementById('setting-duration').value = currentFormData.duration;
+                }
+                if (currentFormData.start_at) {
+                    const dateObj = new Date(currentFormData.start_at);
+                    const tzOffset = dateObj.getTimezoneOffset() * 60000;
+                    const localISOTime = (new Date(dateObj.getTime() - tzOffset)).toISOString().slice(0, 16);
+                    document.getElementById('setting-start-at').value = localISOTime;
+                }
+                document.getElementById('setting-is-random').checked = !!currentFormData.is_random;
             }
 
-            const btn = document.getElementById('btn-save-genius');
-            const originalText = btn.innerHTML;
+            document.getElementById('modal-setting-form').classList.remove('hidden');
+        }
+
+        function closeSettingModal() {
+            document.getElementById('modal-setting-form').classList.add('hidden');
+        }
+
+        async function handleSaveSetting(e) {
+            e.preventDefault();
+            hideAlert();
+
+            const duration = parseInt(document.getElementById('setting-duration').value);
+            const startAtRaw = document.getElementById('setting-start-at').value;
+            const isRandom = document.getElementById('setting-is-random').checked;
+
+            if (!duration || !startAtRaw) {
+                return alert('Durasi dan Waktu Mulai wajib diisi!');
+            }
+
+            const btnSubmit = document.getElementById('btn-submit-setting');
+            btnSubmit.disabled = true;
+            btnSubmit.textContent = '⏳ Menyimpan...';
+
+            const startAtTimestamp = new Date(startAtRaw).getTime();
+
+            const payload = {
+                duration: duration,
+                start_at: startAtTimestamp,
+                is_random: isRandom
+            };
 
             try {
-                btn.disabled = true;
-                btn.innerHTML = '⏳ <span>Menyimpan...</span>';
-                hideAlert();
+                const res = await fetch(`${API_BASE_URL}/form/setting?form_slug=${encodeURIComponent(formSlug)}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
 
-                await syncGeniusScores();
+                const result = await res.json();
 
-                showAlert('Skor Genius (100/N) berhasil diperbarui ke semua soal eksisting!', true);
-                await fetchExistingSoal();
+                if (res.ok) {
+                    showAlert(result.message || 'Berhasil Mengubah Waktu Pengerjaan', true);
+                    closeSettingModal();
+                    await fetchExistingSoal();
+                } else {
+                    showAlert(result.message || 'Gagal mengubah setting form');
+                }
             } catch (err) {
                 console.error(err);
-                showAlert('Gagal menyinkronkan Genius Score.');
+                showAlert('Terjadi kesalahan koneksi saat menyimpan setting.');
             } finally {
-                btn.disabled = false;
-                btn.innerHTML = originalText;
+                btnSubmit.disabled = false;
+                btnSubmit.textContent = '💾 Simpan Setting';
             }
         }
     </script>
