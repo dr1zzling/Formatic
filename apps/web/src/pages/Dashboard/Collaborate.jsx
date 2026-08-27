@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
-import api from "../../utils/api";
+import api, { FORM_API_URL } from "../../utils/api";
 import { Users, CheckCircle2, ArrowLeft, Loader2 } from "lucide-react";
 
 export default function Collaborate() {
@@ -26,7 +26,7 @@ export default function Collaborate() {
     setJoining(true); setError("");
     try {
       // Gunakan fetch langsung supaya interceptor logout tidak terpicu
-      const res = await fetch(`http://localhost:3000/form/share?form_slug=${slug}`, {
+      const res = await fetch(`${FORM_API_URL}/form/share?form_slug=${slug}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
