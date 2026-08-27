@@ -1,9 +1,9 @@
 import axios from "axios";
 
-const USER_API_URL = "http://localhost:3001";
-const FORM_API_URL = "http://localhost:3000";
+export const USER_API_URL = import.meta.env.VITE_USER_API_URL || "http://localhost:3001";
+export const FORM_API_URL = import.meta.env.VITE_FORM_API_URL || "http://localhost:3000";
 
-const API_BASE_URL = FORM_API_URL;
+export const API_BASE_URL = FORM_API_URL;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
