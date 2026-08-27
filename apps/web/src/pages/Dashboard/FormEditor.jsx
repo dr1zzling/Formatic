@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Sidebar from "../../components/Sidebar";
-import api from "../../utils/api";
+import api, { FORM_API_URL } from "../../utils/api";
 import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical } from "lucide-react";
 import QuillEditor from "../../components/QuillEditor";
 import RichTextDisplay from "../../components/RichTextDisplay";
@@ -134,7 +134,7 @@ export default function FormEditor() {
       if (deletedQuestionIds.length > 0) {
         await Promise.all(
           deletedQuestionIds.map((id) =>
-            fetch(`http://localhost:3000/form/soal/${id}`, {
+            fetch(`${FORM_API_URL}/form/soal/${id}`, {
               method: "DELETE",
               headers: { Authorization: `Bearer ${token}` },
             })
@@ -155,7 +155,7 @@ export default function FormEditor() {
                 ? (q.options || []).map((o, idx) => ({ id: o.id, value: o.value?.trim() || `Opsi ${idx + 1}`, is_correct: o.is_correct ?? false }))
                 : [],
             };
-            return fetch(`http://localhost:3000/form/soal/${q.id}`, {
+            return fetch(`${FORM_API_URL}/form/soal/${q.id}`, {
               method: "PATCH",
               headers: {
                 "Content-Type": "application/json",
@@ -184,7 +184,7 @@ export default function FormEditor() {
           };
         });
         fd.append("data", JSON.stringify(payload));
-        const res = await fetch(`http://localhost:3000/form/soal?form_slug=${slug}`, {
+        const res = await fetch(`${FORM_API_URL}/form/soal?form_slug=${slug}`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
           body: fd,
@@ -207,7 +207,7 @@ export default function FormEditor() {
 
   async function updateStatus(status) {
     try {
-      const res = await fetch(`http://localhost:3000/form?form_slug=${slug}`, {
+      const res = await fetch(`${FORM_API_URL}/form?form_slug=${slug}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: JSON.stringify({ status }),
@@ -221,7 +221,7 @@ export default function FormEditor() {
 
   async function deleteForm() {
     try {
-      const res = await fetch(`http://localhost:3000/form?form_slug=${slug}`, {
+      const res = await fetch(`${FORM_API_URL}/form?form_slug=${slug}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
@@ -956,7 +956,7 @@ function ImportDocxButton({ slug, onImported }) {
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch(`http://localhost:3000/form/soal/import?form_slug=${slug}`, {
+      const res = await fetch(`${FORM_API_URL}/form/soal/import?form_slug=${slug}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: fd,

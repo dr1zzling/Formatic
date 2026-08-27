@@ -1,9 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../../components/Sidebar";
-import api from "../../utils/api";
-
-const FORM_API = "http://localhost:3000";
+import api, { FORM_API_URL } from "../../utils/api";
 const CATEGORIES = ["All", "Survey", "Quiz / Ujian"];
 
 function getUsername() {
@@ -55,7 +53,7 @@ function CreateModal({ onClose, onCreated }) {
       fd.append("category", cat);
       fd.append("banner", banner);
       fd.append("token_respon", tokenRespon.trim());
-      const res  = await fetch(`${FORM_API}/form`, {
+      const res  = await fetch(`${FORM_API_URL}/form`, {
         method: "POST",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: fd,
@@ -281,7 +279,7 @@ export default function MyForms() {
                     {/* Image */}
                     <div className={`relative w-full overflow-hidden bg-[#dcecf4] ${large ? "h-[178px]" : "h-[145px]"}`}>
                       {banner ? (
-                        <img src={`${FORM_API}${banner}`} alt={form.form_title}
+                        <img src={`${FORM_API_URL}${banner}`} alt={form.form_title}
                           className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
                           onError={e => { e.target.style.display = "none"; }} />
                       ) : form.image ? (
@@ -385,7 +383,7 @@ function JoinModal({ onClose, onJoined }) {
     setLoading(true);
     try {
       // Gunakan fetch langsung supaya interceptor logout tidak terpicu
-      const res = await fetch(`http://localhost:3000/form/share?form_slug=${slug}`, {
+      const res = await fetch(`${FORM_API_URL}/form/share?form_slug=${slug}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
