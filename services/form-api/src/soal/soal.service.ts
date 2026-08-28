@@ -14,7 +14,7 @@ export class SoalService {
         try {
             const form = await this.knexService.connection('forms').where('id', formId).first()
             if (form) {
-                const updatedSoal = await this.getSoalByForm(formId)
+                const updatedSoal = await this.getSoalByForm(form.id, form.is_random)
                 this.formEventsGateway.notifyFormUpdated(form.id, form.slug, updatedSoal)
             }
         } catch (error) {
@@ -89,28 +89,61 @@ export class SoalService {
     }
 
     // Get Soal From Form
-    async getSoalByForm(id: number) {
+    async getSoalByForm(id: number, is_random: boolean) {
         const getSoal = await this.knexService.connection("soal")
             .select("*")
             .where("form_id", id)
+
+        function shuffleArray(array) {
+            const arr = [...array]
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]]
+            }
+            return arr
+        }
 
         const soalId = getSoal.map((soal) => soal.id)
         const getOption = await this.knexService.connection("soal_option")
             .select("*")
             .whereIn("soal_id", soalId)
 
-        return getSoal.map((soal) => ({
-            id: soal.id,
-            question: soal.question,
-            type: soal.type,
-            image: soal.image,
-            score: soal.score,
-            options: getOption.filter((option) => option.soal_id == soal.id)
+        const grouped = getSoal.reduce((acc, row) => {
+            if (!acc[row.page]) {
+                acc[row.page] = {
+                    page: row.page,
+                    soal: []
+                }
+            }
+
+            let options = getOption.filter((option) => option.soal_id == row.id)
+            if (is_random) {
+                options = shuffleArray(options)
+            }
+            acc[row.page].soal.push({
+                id: row.id,
+                question: row.question,
+                type: row.type,
+                image: row.image,
+                score: row.score,
+                options: options
+            })
+
+            return acc
+        }, {})
+
+        
+        const result = Object.values(grouped) as Array<{ page: number, soal: any[] }>
+
+        return result.map((pageGroup) => ({
+            ...pageGroup,
+            soal: is_random ? shuffleArray(pageGroup.soal) : pageGroup.soal
         }))
     }
 
     // Create Soal And Option
     async createSoalAndOption(form_slug, body: any) {
+        if (!body) throw new BadRequestException("Isi Yang Benar")
         // Validasi
         const listSoal = Array.isArray(body) ? body : [body]
         if (!body || listSoal.length === 0) {
@@ -130,9 +163,10 @@ export class SoalService {
                             question: soal.question,
                             type: soal.type,
                             score: soal.score,
-                            image: soal.image ?? null
+                            image: soal.image ?? null,
+                            page: soal.page
                         })
-                        .returning(['id', 'question', 'type', 'image'])
+                        .returning(['id', 'question', 'type', 'image', 'page'])
 
                     if (!optionTypes.includes(soal.type)) return insertSoal
 
@@ -220,8 +254,7 @@ export class SoalService {
                 options.map(async (e) => {
                     const payloadOption: any = {
                         value: e.value,
-                        score: e.score,
-                        is_correct: Boolean(e.is_correct),
+                        is_correct: Boolean(e.is_correct)
                     }
 
                     if (e.image) {

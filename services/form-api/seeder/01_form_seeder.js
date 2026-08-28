@@ -14,61 +14,71 @@ exports.seed = async function(knex) {
       title: 'Soal Matematika 2026',
       status: 'public',
       category: 'ujian',
-      banner: '/uploads/banner/soal-1'
+      banner: '/uploads/banner/soal-1',
+      is_random: true
     },
     {
       title: 'Soal Pendidikan Pancasila 2026',
       status: 'private',
       category: 'ujian',
-      banner: '/uploads/banner/soal-2'
+      banner: '/uploads/banner/soal-2',
+      is_random: true
     },
     {
       title: 'Soal Bahasa Asing 2026',
       status: 'public',
       category: 'ujian',
-      banner: '/uploads/banner/soal-3'
+      banner: '/uploads/banner/soal-3',
+      is_random: false
     },
     {
       title: 'Soal Fisika Dasar 2026',
       status: 'public',
       category: 'ujian',
-      banner: '/uploads/banner/soal-4'
+      banner: '/uploads/banner/soal-4',
+      is_random: false
     },
     {
       title: 'Survei Kepuasan Siswa 2026',
       status: 'public',
       category: 'survei',
-      banner: '/uploads/banner/soal-5'
+      banner: '/uploads/banner/soal-5',
+      is_random: true
     },
     {
       title: 'Soal Kimia Organik 2026',
       status: 'private',
       category: 'ujian',
-      banner: '/uploads/banner/soal-6'
+      banner: '/uploads/banner/soal-6',
+      is_random: true
     },
     {
       title: 'Survei Ekstrakurikuler yang diminati 2026',
       status: 'public',
       category: 'survei',
-      banner: '/uploads/banner/soal-7'
+      banner: '/uploads/banner/soal-7',
+      is_random: false
     },
     {
       title: 'Soal Biologi Umum 2026',
       status: 'public',
       category: 'ujian',
-      banner: '/uploads/banner/soal-8'
+      banner: '/uploads/banner/soal-8',
+      is_random: false
     },
     {
       title: 'Kuesioner Fasilitas Sekolah 2026',
       status: 'private',
       category: 'survei',
-      banner: '/uploads/banner/soal-9'
+      banner: '/uploads/banner/soal-9',
+      is_random: true
     },
     {
       title: 'Soal Sejarah Indonesia 2026',
       status: 'public',
       category: 'ujian',
-      banner: '/uploads/banner/soal-10'
+      banner: '/uploads/banner/soal-10',
+      is_random: true
     }
   ];
 

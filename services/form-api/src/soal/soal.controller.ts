@@ -12,12 +12,6 @@ import { ValidateSoalExist } from 'src/Pipe/validate.soal.exist'
 export class SoalController {
   constructor(private soalService: SoalService) { }
 
-  @Get('/:id')
-  @UseGuards(JwtAuthGuard)
-  getSoalByForm(@Param('id', ValidateFormExist) id: string) {
-    return this.soalService.getSoalByForm(Number(id))
-  }
-
   @Post('import')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))

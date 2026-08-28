@@ -51,21 +51,37 @@
                 <div class="p-6 md:p-8 space-y-3">
                     <div class="flex items-center justify-between gap-2">
                         <span id="form-status" class="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider"></span>
+                        <!-- Indicator Page Header -->
+                        <span id="page-indicator-badge" class="text-xs font-extrabold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
+                            Halaman 1
+                        </span>
                     </div>
                     <h1 id="form-title" class="text-2xl md:text-3xl font-extrabold text-slate-900 leading-tight"></h1>
                     <p class="text-xs text-slate-400">Pastikan Anda menjawab seluruh pertanyaan yang diberikan sebelum menekan tombol kirim.</p>
                 </div>
             </div>
 
-            <!-- Question Cards Container -->
+            <!-- Question Cards Container (Rendered Per Page) -->
             <div id="soal-container" class="space-y-6"></div>
 
-            <!-- Submit Button Section -->
-            <div class="flex justify-end pt-4">
-                <button type="submit" id="btn-submit"
-                    class="w-full md:w-auto px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 transition text-sm flex items-center justify-center gap-2">
-                    <span>🚀</span> Kirim Jawaban
+            <!-- Navigation Buttons (Prev / Next / Submit) -->
+            <div class="flex items-center justify-between pt-4 border-t border-slate-200">
+                <button type="button" id="btn-prev" onclick="changePage(-1)"
+                    class="px-6 py-3 bg-slate-200 hover:bg-slate-300 disabled:opacity-40 text-slate-700 font-bold rounded-xl transition text-sm flex items-center gap-2">
+                    ◀ Sebelumnya
                 </button>
+
+                <div class="flex items-center gap-2">
+                    <button type="button" id="btn-next" onclick="changePage(1)"
+                        class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 transition text-sm flex items-center gap-2">
+                        Selanjutnya ▶
+                    </button>
+
+                    <button type="submit" id="btn-submit"
+                        class="hidden px-8 py-3.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold rounded-xl shadow-lg shadow-emerald-200 transition text-sm flex items-center justify-center gap-2">
+                        <span>🚀</span> Kirim Jawaban
+                    </button>
+                </div>
             </div>
 
         </form>
@@ -91,6 +107,12 @@
 
         let timerInterval = null;
         let isTimeExpired = false;
+
+        // --- GLOBAL PAGINATION & ANSWER STATE ---
+        let sortedPageNumbers = [];
+        let pagesData = {}; // Format: { 1: [soalObj, ...], 2: [soalObj, ...] }
+        let currentPageIndex = 0;
+        let userAnswersState = {}; // Menyimpan jawaban pengguna sementara per soal_id
 
         // --- FETCH FORM DETAIL ---
         async function fetchFormDetail() {
@@ -167,13 +189,15 @@
             document.getElementById('timer-text-nav').textContent = "00:00:00";
             showGlobalAlert('⏰ Waktu pengerjaan telah habis! Mengirimkan jawaban Anda secara otomatis...', false);
 
+            saveCurrentPageAnswers(); // Simpan jawaban halaman saat ini sebelum submit
+
             const formInputs = document.querySelectorAll('#form-fill input, #form-fill button');
             formInputs.forEach(input => input.disabled = true);
 
             await processSubmit(true);
         }
 
-        // --- RENDER FORM UI ---
+        // --- RENDER FORM UI & STRUCTURING PAGINATION ---
         function renderFormUI(formData) {
             document.title = `${formData.title} - FormApp`;
             document.getElementById('header-category').textContent = formData.category || 'Survei';
@@ -189,26 +213,91 @@
                 ? 'text-[10px] font-bold px-2.5 py-0.5 rounded bg-emerald-100 text-emerald-800 uppercase tracking-wider'
                 : 'text-[10px] font-bold px-2.5 py-0.5 rounded bg-amber-100 text-amber-800 uppercase tracking-wider';
 
+            // Reset Structure Data
+            pagesData = {};
+            const rawSoal = formData.soal || [];
+
+            // Grouping Soal Per Halaman (Handling nested group & flat array)
+            if (Array.isArray(rawSoal) && rawSoal.length > 0) {
+                if (rawSoal[0] && Array.isArray(rawSoal[0].soal)) {
+                    // Berbentuk Nested Page Grouping: [{ page: 1, soal: [...] }]
+                    rawSoal.forEach(group => {
+                        const pageNum = (group.page === null || group.page === undefined) ? 1 : Number(group.page);
+                        if (!pagesData[pageNum]) pagesData[pageNum] = [];
+                        pagesData[pageNum].push(...group.soal);
+                    });
+                } else {
+                    // Berbentuk Flat Array Soal: [{ id: 1, page: 1, ... }]
+                    rawSoal.forEach(soalObj => {
+                        const pageNum = (soalObj.page === null || soalObj.page === undefined) ? 1 : Number(soalObj.page);
+                        if (!pagesData[pageNum]) pagesData[pageNum] = [];
+                        pagesData[pageNum].push(soalObj);
+                    });
+                }
+            }
+
+            sortedPageNumbers = Object.keys(pagesData).map(Number).sort((a, b) => a - b);
+            currentPageIndex = 0;
+
+            document.getElementById('loading-state').classList.add('hidden');
+            document.getElementById('form-fill').classList.remove('hidden');
+
+            renderCurrentPageSoal();
+        }
+
+        // --- RENDER SOAL PER HALAMAN AKTIF ---
+        function renderCurrentPageSoal() {
             const soalContainer = document.getElementById('soal-container');
             soalContainer.innerHTML = '';
 
-            const listSoal = formData.soal || [];
-
-            if (listSoal.length === 0) {
+            if (sortedPageNumbers.length === 0) {
                 soalContainer.innerHTML = `
                     <div class="bg-white p-6 rounded-2xl border border-slate-200 text-center text-slate-400 text-xs italic">
                         Formulir ini belum memiliki pertanyaan.
                     </div>
                 `;
-            } else {
-                listSoal.forEach((soal, index) => {
-                    const card = createSoalCard(soal, index + 1);
-                    soalContainer.appendChild(card);
-                });
+                document.getElementById('btn-prev').classList.add('hidden');
+                document.getElementById('btn-next').classList.add('hidden');
+                return;
             }
 
-            document.getElementById('loading-state').classList.add('hidden');
-            document.getElementById('form-fill').classList.remove('hidden');
+            const currentRealPage = sortedPageNumbers[currentPageIndex];
+            const currentSoalList = pagesData[currentRealPage] || [];
+
+            // Hitung nomor urut global untuk soal
+            let globalSoalIndexOffset = 0;
+            for (let i = 0; i < currentPageIndex; i++) {
+                const prevPageNum = sortedPageNumbers[i];
+                globalSoalIndexOffset += pagesData[prevPageNum].length;
+            }
+
+            currentSoalList.forEach((soal, index) => {
+                const globalNumber = globalSoalIndexOffset + index + 1;
+                const card = createSoalCard(soal, globalNumber);
+                soalContainer.appendChild(card);
+            });
+
+            // Restore Jawaban yang Pernah Diisi di Halaman Ini
+            restoreCurrentPageAnswers();
+
+            // Update Header & Navigasi Buttons
+            document.getElementById('page-indicator-badge').textContent = `Halaman ${currentPageIndex + 1} dari ${sortedPageNumbers.length}`;
+            
+            const btnPrev = document.getElementById('btn-prev');
+            const btnNext = document.getElementById('btn-next');
+            const btnSubmit = document.getElementById('btn-submit');
+
+            btnPrev.disabled = (currentPageIndex === 0);
+
+            if (currentPageIndex === sortedPageNumbers.length - 1) {
+                btnNext.classList.add('hidden');
+                btnSubmit.classList.remove('hidden');
+            } else {
+                btnNext.classList.remove('hidden');
+                btnSubmit.classList.add('hidden');
+            }
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         // --- CARD SOAL COMPONENT ---
@@ -251,14 +340,14 @@
             } else if (soal.type === 'text') {
                 optionsHtml = `
                     <div class="pt-2">
-                        <input type="text" name="question_${soal.id}" placeholder="Ketik jawaban Anda di sini..." required
+                        <input type="text" name="question_${soal.id}" placeholder="Ketik jawaban Anda di sini..."
                             class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-xs md:text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                     </div>
                 `;
             } else if (soal.type === 'file') {
                 optionsHtml = `
                     <div class="pt-2">
-                        <input type="file" name="question_file_${soal.id}" required
+                        <input type="file" name="question_file_${soal.id}"
                             class="w-full text-xs md:text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer border border-slate-200 p-1.5 rounded-xl">
                     </div>
                 `;
@@ -280,12 +369,129 @@
             return card;
         }
 
+        // --- PINDAH HALAMAN (NEXT / PREV) ---
+        function changePage(direction) {
+            hideGlobalAlert();
+
+            // Jika mau lanjut ke depan, simpan & validasi halaman saat ini
+            if (direction > 0) {
+                const isValid = validateAndSaveCurrentPage();
+                if (!isValid) {
+                    showGlobalAlert('Harap jawab seluruh pertanyaan pada halaman ini sebelum melanjutkan.', false);
+                    return;
+                }
+            } else {
+                saveCurrentPageAnswers(); // Simpan tanpa wajib validasi jika mundur
+            }
+
+            const targetIndex = currentPageIndex + direction;
+            if (targetIndex >= 0 && targetIndex < sortedPageNumbers.length) {
+                currentPageIndex = targetIndex;
+                renderCurrentPageSoal();
+            }
+        }
+
+        // --- SIMPAN & VALIDASI STATE JAWABAN HALAMAN SAAT INI ---
+        function validateAndSaveCurrentPage() {
+            let isCurrentPageValid = true;
+            saveCurrentPageAnswers((soalId, hasValue) => {
+                if (!hasValue) isCurrentPageValid = false;
+            });
+            return isCurrentPageValid;
+        }
+
+        function saveCurrentPageAnswers(onValidateCallback) {
+            const soalCards = document.querySelectorAll('#soal-container > div');
+            
+            soalCards.forEach((card) => {
+                const soalId = Number(card.getAttribute('data-soal-id'));
+                const soalType = card.getAttribute('data-soal-type');
+                let hasValue = false;
+
+                if (soalType === 'radio') {
+                    const selected = card.querySelector(`input[name="question_${soalId}"]:checked`);
+                    if (selected) {
+                        userAnswersState[soalId] = Number(selected.value);
+                        hasValue = true;
+                    } else {
+                        delete userAnswersState[soalId];
+                    }
+
+                } else if (soalType === 'checkbox') {
+                    const checkedList = card.querySelectorAll(`input[name="question_${soalId}"]:checked`);
+                    if (checkedList.length > 0) {
+                        userAnswersState[soalId] = Array.from(checkedList).map(chk => Number(chk.value));
+                        hasValue = true;
+                    } else {
+                        delete userAnswersState[soalId];
+                    }
+
+                } else if (soalType === 'text') {
+                    const textInput = card.querySelector(`input[name="question_${soalId}"]`);
+                    const val = textInput ? textInput.value.trim() : '';
+                    if (val !== '') {
+                        userAnswersState[soalId] = val;
+                        hasValue = true;
+                    } else {
+                        delete userAnswersState[soalId];
+                    }
+
+                } else if (soalType === 'file') {
+                    const fileInput = card.querySelector(`input[name="question_file_${soalId}"]`);
+                    if (fileInput && fileInput.files[0]) {
+                        userAnswersState[soalId] = fileInput.files[0];
+                        hasValue = true;
+                    }
+                    // Jika file sudah pernah diunggah sebelumnya di state, anggap valid
+                    if (userAnswersState[soalId] instanceof File) {
+                        hasValue = true;
+                    }
+                }
+
+                if (onValidateCallback) onValidateCallback(soalId, hasValue);
+            });
+        }
+
+        function restoreCurrentPageAnswers() {
+            const soalCards = document.querySelectorAll('#soal-container > div');
+
+            soalCards.forEach((card) => {
+                const soalId = Number(card.getAttribute('data-soal-id'));
+                const soalType = card.getAttribute('data-soal-type');
+                const savedVal = userAnswersState[soalId];
+
+                if (savedVal === undefined || savedVal === null) return;
+
+                if (soalType === 'radio') {
+                    const radioToSelect = card.querySelector(`input[name="question_${soalId}"][value="${savedVal}"]`);
+                    if (radioToSelect) radioToSelect.checked = true;
+
+                } else if (soalType === 'checkbox' && Array.isArray(savedVal)) {
+                    savedVal.forEach(optId => {
+                        const chk = card.querySelector(`input[name="question_${soalId}"][value="${optId}"]`);
+                        if (chk) chk.checked = true;
+                    });
+
+                } else if (soalType === 'text') {
+                    const textInput = card.querySelector(`input[name="question_${soalId}"]`);
+                    if (textInput) textInput.value = savedVal;
+                }
+            });
+        }
+
         // --- SUBMIT HANDLERS ---
         async function handleSubmitAnswers(e) {
             if (e) e.preventDefault();
 
             if (isTimeExpired) {
                 alert('Waktu pengerjaan telah habis.');
+                return;
+            }
+
+            // Simpan dan Validasi Halaman Terakhir
+            const isValid = validateAndSaveCurrentPage();
+            if (!isValid) {
+                showGlobalAlert('Harap jawab seluruh pertanyaan pada halaman ini sebelum mengirimkan.', false);
                 return;
             }
 
@@ -301,67 +507,69 @@
 
             const formData = new FormData();
             const payload = [];
-            const soalCards = document.querySelectorAll('#soal-container > div');
-            let isAllAnswered = true;
 
-            soalCards.forEach((card) => {
-                const soalId = Number(card.getAttribute('data-soal-id'));
-                const soalType = card.getAttribute('data-soal-type');
+            // Evaluasi Semua Soal Dari Seluruh Halaman
+            let totalQuestionsCount = 0;
+            let answeredQuestionsCount = 0;
 
-                if (soalType === 'radio') {
-                    const selected = card.querySelector(`input[name="question_${soalId}"]:checked`);
-                    if (selected) {
-                        payload.push({
-                            jawaban: {
-                                soal_id: soalId,
-                                soal_option_id: Number(selected.value),
-                                answer_text: null
-                            }
-                        });
-                    } else { isAllAnswered = false; }
+            sortedPageNumbers.forEach(pageNum => {
+                const soalList = pagesData[pageNum] || [];
+                soalList.forEach(soal => {
+                    totalQuestionsCount++;
+                    const soalId = soal.id;
+                    const savedVal = userAnswersState[soalId];
 
-                } else if (soalType === 'checkbox') {
-                    const checkedList = card.querySelectorAll(`input[name="question_${soalId}"]:checked`);
-                    if (checkedList.length > 0) {
-                        const optionIds = Array.from(checkedList).map(chk => Number(chk.value));
-                        payload.push({
-                            jawaban: {
-                                soal_id: soalId,
-                                soal_option_id: optionIds,
-                                answer_text: null
-                            }
-                        });
-                    } else { isAllAnswered = false; }
-
-                } else if (soalType === 'text') {
-                    const textInput = card.querySelector(`input[name="question_${soalId}"]`);
-                    if (textInput && textInput.value.trim() !== '') {
-                        payload.push({
-                            jawaban: {
-                                soal_id: soalId,
-                                soal_option_id: null,
-                                answer_text: textInput.value.trim()
-                            }
-                        });
-                    } else { isAllAnswered = false; }
-
-                } else if (soalType === 'file') {
-                    const fileInput = card.querySelector(`input[name="question_file_${soalId}"]`);
-                    if (fileInput && fileInput.files[0]) {
-                        formData.append('files', fileInput.files[0]);
-                        payload.push({
-                            jawaban: {
-                                soal_id: soalId,
-                                soal_option_id: null,
-                                answer_text: null
-                            }
-                        });
-                    } else { isAllAnswered = false; }
-                }
+                    if (soal.type === 'radio') {
+                        if (savedVal !== undefined && savedVal !== null) {
+                            answeredQuestionsCount++;
+                            payload.push({
+                                jawaban: {
+                                    soal_id: soalId,
+                                    soal_option_id: Number(savedVal),
+                                    answer_text: null
+                                }
+                            });
+                        }
+                    } else if (soal.type === 'checkbox') {
+                        if (Array.isArray(savedVal) && savedVal.length > 0) {
+                            answeredQuestionsCount++;
+                            payload.push({
+                                jawaban: {
+                                    soal_id: soalId,
+                                    soal_option_id: savedVal,
+                                    answer_text: null
+                                }
+                            });
+                        }
+                    } else if (soal.type === 'text') {
+                        if (typeof savedVal === 'string' && savedVal.trim() !== '') {
+                            answeredQuestionsCount++;
+                            payload.push({
+                                jawaban: {
+                                    soal_id: soalId,
+                                    soal_option_id: null,
+                                    answer_text: savedVal.trim()
+                                }
+                            });
+                        }
+                    } else if (soal.type === 'file') {
+                        if (savedVal instanceof File) {
+                            answeredQuestionsCount++;
+                            formData.append('files', savedVal);
+                            payload.push({
+                                jawaban: {
+                                    soal_id: soalId,
+                                    soal_option_id: null,
+                                    answer_text: null
+                                }
+                            });
+                        }
+                    }
+                });
             });
 
-            if (!bypassValidation && !isAllAnswered) {
-                showGlobalAlert('Harap isi seluruh pertanyaan sebelum mengirimkan.', false);
+            if (!bypassValidation && answeredQuestionsCount < totalQuestionsCount) {
+                showGlobalAlert('Harap isi seluruh pertanyaan dari semua halaman sebelum mengirimkan.', false);
                 btnSubmit.disabled = false;
                 btnSubmit.innerHTML = `<span>🚀</span> Kirim Jawaban`;
                 return;
