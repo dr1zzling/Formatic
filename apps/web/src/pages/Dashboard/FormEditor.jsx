@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
+import { socket } from "../../utils/socket";
 import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical } from "lucide-react";
 import QuillEditor from "../../components/QuillEditor";
 import RichTextDisplay from "../../components/RichTextDisplay";
@@ -26,8 +27,48 @@ export default function FormEditor() {
   const [error, setError]                   = useState("");
   const [toast, setToast]                   = useState("");
   const [showDelete, setShowDelete]         = useState(false);
+  const [collabNotice, setCollabNotice]     = useState("");
+  const [userRole, setUserRole]             = useState(null); // "Creator" | "Collaborator"
+  const isSavingRef = useRef(false);
 
   useEffect(() => { loadForm(); }, [slug]);
+
+  // ── Socket: join room & dengarkan perubahan dari collaborator ──
+  useEffect(() => {
+    if (!slug) return;
+
+    socket.connect();
+    socket.emit("joinForm", { slug });
+
+    const handleFormUpdated = (data) => {
+      // Abaikan event yang dipicu oleh diri sendiri (sedang saving)
+      if (isSavingRef.current) return;
+      if (!data?.soal) return;
+
+      // Update soal dari DB, pertahankan soal baru yang belum disimpan
+      setQuestions(prev => {
+        const fromDB = data.soal.map((s) => ({
+          id: s.id, question: s.question, type: s.type, required: true,
+          options: (s.options ?? []).map((o) => ({
+            id: o.id, value: o.value ?? o.option_value, is_correct: o.is_correct,
+          })),
+        }));
+        const unsaved = prev.filter(q => q._new);
+        return [...fromDB, ...unsaved];
+      });
+
+      setCollabNotice("✏️ Collaborator memperbarui soal");
+      setTimeout(() => setCollabNotice(""), 4000);
+    };
+
+    socket.on("formUpdated", handleFormUpdated);
+
+    return () => {
+      socket.emit("leaveForm", { slug });
+      socket.off("formUpdated", handleFormUpdated);
+      socket.disconnect();
+    };
+  }, [slug]);
 
   async function loadForm() {
     setLoading(true); setError("");
@@ -37,17 +78,23 @@ export default function FormEditor() {
       if (f) {
         setForm(f);
         setQuestions(prev => {
-          // Soal dari DB
           const fromDB = (f?.soal ?? []).map((s) => ({
             id: s.id, question: s.question, type: s.type, required: true,
             options: (s.options ?? []).map((o) => ({
               id: o.id, value: o.value ?? o.option_value, is_correct: o.is_correct,
             })),
           }));
-          // Pertahankan soal baru yang belum tersimpan (_new: true)
           const unsaved = prev.filter(q => q._new);
           return [...fromDB, ...unsaved];
         });
+
+        // Ambil role user untuk form ini dari endpoint my forms
+        try {
+          const myRes = await api.get("/form/user");
+          const myForms = myRes.data?.data?.forms ?? [];
+          const match = myForms.find(mf => mf.form_slug === slug);
+          setUserRole(match?.access_type ?? null);
+        } catch { setUserRole(null); }
       } else {
         setError("Form tidak ditemukan.");
       }
@@ -126,6 +173,7 @@ export default function FormEditor() {
     const isTextEmpty = (str) => !str || str.replace(/<[^>]*>/g, '').trim() === '';
     if (questions.find((q) => isTextEmpty(q.question))) { setError("Semua pertanyaan wajib diisi."); return; }
     setSaving(true); setError("");
+    isSavingRef.current = true;
     try {
       const token = localStorage.getItem("token");
 
@@ -195,12 +243,18 @@ export default function FormEditor() {
       }
 
       showToast("Perubahan soal berhasil disimpan!");
+      // Clear _new flag before loadForm so unsaved merge doesn't duplicate them
+      setQuestions(prev => prev.filter(q => !q._new));
       await loadForm();
     } catch (e) {
       setError(e.message || "Gagal menyimpan soal.");
       showToast("❌ " + (e.message || "Gagal menyimpan soal."));
     }
-    finally { setSaving(false); }
+    finally {
+      setSaving(false);
+      // Delay sedikit agar event socket dari save sendiri keburu lewat
+      setTimeout(() => { isSavingRef.current = false; }, 1000);
+    }
   }
 
 
@@ -282,17 +336,19 @@ export default function FormEditor() {
             <button onClick={copyLink} title="Salin link" className="hidden sm:flex w-10 h-10 rounded-xl items-center justify-center text-gray-400 hover:bg-[#eef5fb] hover:text-[#1a4fa0] transition-all">
               <Link2 size={17} />
             </button>
-            <button
-              onClick={() => {
-                const collabLink = `${window.location.origin}/form/${slug}/collaborate?token=${form?.token_collab ?? ""}`;
-                navigator.clipboard.writeText(collabLink);
-                showToast("Link collaborator berhasil disalin!");
-              }}
-              title="Undang Collaborator"
-              className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-semibold border border-violet-200 text-violet-600 bg-violet-50 hover:bg-violet-100 transition"
-            >
-              <Share2 size={14} /> Kolaborasi
-            </button>
+            {userRole !== "Collaborator" && (
+              <button
+                onClick={() => {
+                  const collabLink = `${window.location.origin}/form/${slug}/collaborate?token=${form?.token_collab ?? ""}`;
+                  navigator.clipboard.writeText(collabLink);
+                  showToast("Link collaborator berhasil disalin!");
+                }}
+                title="Undang Collaborator"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-semibold border border-violet-200 text-violet-600 bg-violet-50 hover:bg-violet-100 transition"
+              >
+                <Share2 size={14} /> Kolaborasi
+              </button>
+            )}
             <button onClick={() => setShowDelete(true)} className="hidden sm:flex w-10 h-10 rounded-xl items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all">
               <Trash2 size={17} />
             </button>
@@ -369,6 +425,13 @@ export default function FormEditor() {
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-sm px-5 py-3 rounded-xl shadow-lg z-50">
           ✅ {toast}
+        </div>
+      )}
+
+      {/* Collab notice */}
+      {collabNotice && (
+        <div className="fixed bottom-6 right-6 bg-violet-600 text-white text-sm px-5 py-3 rounded-xl shadow-lg z-50 flex items-center gap-2 animate-pulse">
+          {collabNotice}
         </div>
       )}
 
