@@ -70,8 +70,9 @@ export default function FormEditor() {
     };
   }, [slug]);
 
-  async function loadForm() {
-    setLoading(true); setError("");
+  async function loadForm(silent = false) {
+    if (!silent) setLoading(true);
+    setError("");
     try {
       const res = await api.get("/form/slug", { params: { slug } });
       const f   = res.data?.data;
@@ -410,6 +411,7 @@ export default function FormEditor() {
               onCopyLink={copyLink}
               onShowToast={showToast}
               onImported={loadForm}
+              onImportedSilent={() => loadForm(true)}
             />
           )}
           {activeTab === "Jawaban" && (
@@ -456,7 +458,7 @@ export default function FormEditor() {
 }
 
 /* ── Pertanyaan Tab ─────────────────────────────────────────── */
-function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ, onUpdateOpt, onAddOpt, onRemoveOpt, onRemoveQ, onDuplicateQ, onToggleCorrect, onReorder, onCopyLink, onShowToast, onImported }) {
+function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ, onUpdateOpt, onAddOpt, onRemoveOpt, onRemoveQ, onDuplicateQ, onToggleCorrect, onReorder, onCopyLink, onShowToast, onImported, onImportedSilent }) {
   const [dragFrom, setDragFrom]   = useState(null);
   const [dragOver, setDragOver]   = useState(null);
   return (
@@ -531,7 +533,7 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ,
       </button>
 
       {/* Import dari Word */}
-      <ImportDocxButton slug={slug} onImported={onImported} />
+      <ImportDocxButton slug={slug} onImported={onImported} onImportedSilent={onImportedSilent} />
     </div>
   );
 }
@@ -1098,7 +1100,7 @@ function Toggle({ value, onChange }) {
 }
 
 /* ── Import Docx Button ─────────────────────────────────────── */
-function ImportDocxButton({ slug, onImported }) {
+function ImportDocxButton({ slug, onImported, onImportedSilent }) {
   const [importing, setImporting] = useState(false);
   const [toast, setToast]         = useState("");
   const [error, setError]         = useState("");
@@ -1129,7 +1131,7 @@ function ImportDocxButton({ slug, onImported }) {
       if (!res.ok) throw new Error(data?.message || "Gagal import.");
       const count = data?.data?.length ?? 0;
       showMsg(`✅ ${count} soal berhasil diimport dari Word!`);
-      onImported?.();
+      setTimeout(() => { onImportedSilent?.(); }, 500);
     } catch (e) {
       showMsg(e.message || "Gagal import.", true);
     } finally {
