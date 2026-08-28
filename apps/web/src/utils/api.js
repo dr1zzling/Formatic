@@ -29,10 +29,15 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Hanya redirect ke login jika benar-benar 401 (token expired/invalid)
+    // Bukan network error (backend mati) atau error lainnya
     if (error.response?.status === 401) {
       const isAuthRequest =
         error.config?.url?.includes("/user/login") ||
-        error.config?.url?.includes("/user/register");
+        error.config?.url?.includes("/user/register") ||
+        error.config?.url?.includes("/form/submit") ||
+        error.config?.url?.includes("/form/share") ||
+        error.config?.url?.includes("/form/soal");
       const isAuthPage =
         window.location.pathname === "/login" ||
         window.location.pathname === "/register";

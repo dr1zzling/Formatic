@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Sidebar from "../../components/Sidebar";
 import api, { FORM_API_URL } from "../../utils/api";
+import { socket } from "../../utils/socket";
 import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical } from "lucide-react";
 import QuillEditor from "../../components/QuillEditor";
 import RichTextDisplay from "../../components/RichTextDisplay";
@@ -27,8 +28,48 @@ export default function FormEditor() {
   const [error, setError]                   = useState("");
   const [toast, setToast]                   = useState("");
   const [showDelete, setShowDelete]         = useState(false);
+  const [collabNotice, setCollabNotice]     = useState("");
+  const [userRole, setUserRole]             = useState(null); // "Creator" | "Collaborator"
+  const isSavingRef = useRef(false);
 
   useEffect(() => { loadForm(); }, [slug]);
+
+  // ── Socket: join room & dengarkan perubahan dari collaborator ──
+  useEffect(() => {
+    if (!slug) return;
+
+    socket.connect();
+    socket.emit("joinForm", { slug });
+
+    const handleFormUpdated = (data) => {
+      // Abaikan event yang dipicu oleh diri sendiri (sedang saving)
+      if (isSavingRef.current) return;
+      if (!data?.soal) return;
+
+      // Update soal dari DB, pertahankan soal baru yang belum disimpan
+      setQuestions(prev => {
+        const fromDB = data.soal.map((s) => ({
+          id: s.id, question: s.question, type: s.type, required: true,
+          options: (s.options ?? []).map((o) => ({
+            id: o.id, value: o.value ?? o.option_value, is_correct: o.is_correct,
+          })),
+        }));
+        const unsaved = prev.filter(q => q._new);
+        return [...fromDB, ...unsaved];
+      });
+
+      setCollabNotice("✏️ Collaborator memperbarui soal");
+      setTimeout(() => setCollabNotice(""), 4000);
+    };
+
+    socket.on("formUpdated", handleFormUpdated);
+
+    return () => {
+      socket.emit("leaveForm", { slug });
+      socket.off("formUpdated", handleFormUpdated);
+      socket.disconnect();
+    };
+  }, [slug]);
 
   async function loadForm() {
     setLoading(true); setError("");
@@ -38,17 +79,23 @@ export default function FormEditor() {
       if (f) {
         setForm(f);
         setQuestions(prev => {
-          // Soal dari DB
           const fromDB = (f?.soal ?? []).map((s) => ({
             id: s.id, question: s.question, type: s.type, required: true,
             options: (s.options ?? []).map((o) => ({
               id: o.id, value: o.value ?? o.option_value, is_correct: o.is_correct,
             })),
           }));
-          // Pertahankan soal baru yang belum tersimpan (_new: true)
           const unsaved = prev.filter(q => q._new);
           return [...fromDB, ...unsaved];
         });
+
+        // Ambil role user untuk form ini dari endpoint my forms
+        try {
+          const myRes = await api.get("/form/user");
+          const myForms = myRes.data?.data?.forms ?? [];
+          const match = myForms.find(mf => mf.form_slug === slug);
+          setUserRole(match?.access_type ?? null);
+        } catch { setUserRole(null); }
       } else {
         setError("Form tidak ditemukan.");
       }
@@ -127,6 +174,7 @@ export default function FormEditor() {
     const isTextEmpty = (str) => !str || str.replace(/<[^>]*>/g, '').trim() === '';
     if (questions.find((q) => isTextEmpty(q.question))) { setError("Semua pertanyaan wajib diisi."); return; }
     setSaving(true); setError("");
+    isSavingRef.current = true;
     try {
       const token = localStorage.getItem("token");
 
@@ -196,12 +244,18 @@ export default function FormEditor() {
       }
 
       showToast("Perubahan soal berhasil disimpan!");
+      // Clear _new flag before loadForm so unsaved merge doesn't duplicate them
+      setQuestions(prev => prev.filter(q => !q._new));
       await loadForm();
     } catch (e) {
       setError(e.message || "Gagal menyimpan soal.");
       showToast("❌ " + (e.message || "Gagal menyimpan soal."));
     }
-    finally { setSaving(false); }
+    finally {
+      setSaving(false);
+      // Delay sedikit agar event socket dari save sendiri keburu lewat
+      setTimeout(() => { isSavingRef.current = false; }, 1000);
+    }
   }
 
 
@@ -286,17 +340,19 @@ export default function FormEditor() {
             <button onClick={copyLink} title="Salin link" className="hidden sm:flex w-10 h-10 rounded-xl items-center justify-center text-gray-400 hover:bg-[#eef5fb] hover:text-[#1a4fa0] transition-all">
               <Link2 size={17} />
             </button>
-            <button
-              onClick={() => {
-                const collabLink = `${window.location.origin}/form/${slug}/collaborate?token=${form?.token_collab ?? ""}`;
-                navigator.clipboard.writeText(collabLink);
-                showToast("Link collaborator berhasil disalin!");
-              }}
-              title="Undang Collaborator"
-              className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-semibold border border-violet-200 text-violet-600 bg-violet-50 hover:bg-violet-100 transition"
-            >
-              <Share2 size={14} /> Kolaborasi
-            </button>
+            {userRole !== "Collaborator" && (
+              <button
+                onClick={() => {
+                  const collabLink = `${window.location.origin}/form/${slug}/collaborate?token=${form?.token_collab ?? ""}`;
+                  navigator.clipboard.writeText(collabLink);
+                  showToast("Link collaborator berhasil disalin!");
+                }}
+                title="Undang Collaborator"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-semibold border border-violet-200 text-violet-600 bg-violet-50 hover:bg-violet-100 transition"
+              >
+                <Share2 size={14} /> Kolaborasi
+              </button>
+            )}
             <button onClick={() => setShowDelete(true)} className="hidden sm:flex w-10 h-10 rounded-xl items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all">
               <Trash2 size={17} />
             </button>
@@ -364,7 +420,7 @@ export default function FormEditor() {
             <ResponsesTab formId={form?.id ?? form?.form_id} form={form} />
           )}
           {activeTab === "Setelan" && (
-            <SettingsTab form={form} onUpdateStatus={updateStatus} />
+            <SettingsTab form={form} onUpdateStatus={updateStatus} slug={slug} />
           )}
         </div>
       </div>
@@ -373,6 +429,13 @@ export default function FormEditor() {
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-sm px-5 py-3 rounded-xl shadow-lg z-50">
           ✅ {toast}
+        </div>
+      )}
+
+      {/* Collab notice */}
+      {collabNotice && (
+        <div className="fixed bottom-6 right-6 bg-violet-600 text-white text-sm px-5 py-3 rounded-xl shadow-lg z-50 flex items-center gap-2 animate-pulse">
+          {collabNotice}
         </div>
       )}
 
@@ -841,32 +904,76 @@ function buildQuestionStats(responses) {
 }
 
 /* ── Settings Tab ───────────────────────────────────────────── */
-function SettingsTab({ form, onUpdateStatus }) {
-  const isPublic = form?.status === "public" || form?.form_status === "public";
+function SettingsTab({ form, onUpdateStatus, slug }) {
+  const isPublic   = form?.status === "public" || form?.form_status === "public";
+  const isQuiz     = form?.category === "ujian";
+  const formId     = form?.id ?? form?.form_id;
+
+  // Timer state
+  const [duration, setDuration]   = useState(form?.duration ?? "");
+  const [startAt, setStartAt]     = useState(
+    form?.start_at ? new Date(form.start_at).toISOString().slice(0,16) : ""
+  );
+  const [timerSaving, setTimerSaving] = useState(false);
+  const [timerMsg, setTimerMsg]       = useState("");
+
+  // Score state
+  const [scoreType, setScoreType] = useState(() =>
+    localStorage.getItem(`score_type_${form?.slug ?? slug}`) ?? "none"
+  );
+  const [scoreSaving, setScoreSaving] = useState(false);
+  const [scoreMsg, setScoreMsg]       = useState("");
+
+  const questions = form?.soal ?? [];
+
+  async function saveTimer() {
+    if (!duration && !startAt) { setTimerMsg("Isi durasi atau waktu mulai."); return; }
+    setTimerSaving(true); setTimerMsg("");
+    try {
+      const res = await fetch(`http://localhost:3000/form?form_slug=${form?.slug ?? slug}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+        body: JSON.stringify({
+          duration: duration ? Number(duration) : null,
+          start_at: startAt ? new Date(startAt).getTime() : null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      setTimerMsg(res.ok ? "✅ Timer berhasil disimpan!" : (data?.message || "Gagal menyimpan."));
+    } catch { setTimerMsg("Gagal menyimpan."); }
+    finally { setTimerSaving(false); setTimeout(() => setTimerMsg(""), 3000); }
+  }
+
+  async function saveGeniusScore() {
+    if (!questions.length) { setScoreMsg("Tidak ada soal."); return; }
+    setScoreSaving(true); setScoreMsg("");
+    const perSoal = parseFloat((100 / questions.length).toFixed(2));
+    try {
+      for (const q of questions) {
+        if (!q.id) continue;
+        const fd = new FormData();
+        fd.append("data", JSON.stringify({ soal: { question: q.question, type: q.type, score: perSoal } }));
+        await fetch(`http://localhost:3000/form/soal/${q.id}`, {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          body: fd,
+        });
+      }
+      setScoreMsg(`✅ Genius Score (${perSoal} pts/soal) berhasil disimpan!`);
+    } catch { setScoreMsg("Gagal menyimpan score."); }
+    finally { setScoreSaving(false); setTimeout(() => setScoreMsg(""), 4000); }
+  }
+
+  function handleScoreTypeChange(val) {
+    setScoreType(val);
+    localStorage.setItem(`score_type_${form?.slug ?? slug}`, val);
+  }
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-4 space-y-4">
-      {/* Jadikan semua kuis */}
-      <SettingRow
-        icon="🏆"
-        title="Jadikan semua kuis"
-        desc="Penetapan poin yang tepat dan nilai pertanyaan"
-      />
-      {/* Jawaban */}
-      <SettingRow
-        icon="📋"
-        title="Jawaban"
-        desc="Mengoleksi data respon, nilai dan lainnya"
-      />
-      {/* Presentasi */}
-      <SettingRow
-        icon="🎨"
-        title="Presentasi"
-        desc="Pengaturan cara formulir dan respons ditampilkan"
-      />
 
-      {/* Status */}
-      <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-6 flex items-center justify-between gap-4">
+      {/* Status Publikasi */}
+      <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-sm p-6 flex items-center justify-between gap-4">
         <div>
           <p className="font-bold text-gray-700 text-[15px]">Status Publikasi</p>
           <p className="text-[13px] text-gray-400 mt-1">
@@ -876,41 +983,102 @@ function SettingsTab({ form, onUpdateStatus }) {
         <Toggle value={isPublic} onChange={() => onUpdateStatus(isPublic ? "private" : "public")} />
       </div>
 
-      {/* Default section */}
-      <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-6">
-        <p className="text-[13px] font-bold text-gray-400 uppercase tracking-wide mb-3">Default</p>
-        <div className="space-y-1">
-          <div className="flex items-center justify-between py-3 border-b border-gray-50">
+      {/* Score / Penilaian — hanya untuk kuis */}
+      {isQuiz && (
+        <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-sm p-6 space-y-4">
+          <div className="flex items-center gap-3 mb-1">
+            <span className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-lg shrink-0">🏆</span>
             <div>
-              <p className="text-[14.5px] text-gray-700 font-semibold">Formulir default</p>
-              <p className="text-[13px] text-gray-400">Gunakan pengaturan untuk formulir ini dan formulir baru</p>
+              <p className="font-bold text-gray-700 text-[15px]">Penilaian / Score</p>
+              <p className="text-[13px] text-gray-400">Atur sistem penilaian untuk kuis ini</p>
             </div>
-            <Toggle />
           </div>
-          <div className="flex items-center justify-between py-3">
-            <div>
-              <p className="text-[14.5px] text-gray-700 font-semibold">Pertanyaan default</p>
-              <p className="text-[13px] text-gray-400">Gunakan pengaturan sebagai pertanyaan baru</p>
-            </div>
-            <Toggle />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-function SettingRow({ icon, title, desc }) {
-  return (
-    <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-6 flex items-center justify-between gap-4">
-      <div className="flex items-center gap-4">
-        <span className="w-11 h-11 rounded-xl bg-[#eef5fb] flex items-center justify-center text-xl">{icon}</span>
-        <div>
-          <p className="font-bold text-gray-700 text-[15px]">{title}</p>
-          <p className="text-[13px] text-gray-400 mt-0.5">{desc}</p>
+          <div>
+            <label className="text-[12px] font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Tipe Skor</label>
+            <select
+              value={scoreType}
+              onChange={e => handleScoreTypeChange(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-[14px] bg-white outline-none focus:border-[#1a4fa0] focus:ring-2 focus:ring-[#1a4fa0]/10 transition"
+            >
+              <option value="none">Tanpa Skor</option>
+              <option value="genius">Genius Score (Otomatis 100/N soal)</option>
+              <option value="manual">Manual Score (per soal)</option>
+            </select>
+          </div>
+
+          {scoreType === "genius" && (
+            <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4">
+              <p className="text-[13px] text-indigo-700 font-medium mb-1">
+                🎯 Setiap soal mendapat <strong>{questions.length > 0 ? (100 / questions.length).toFixed(1) : "—"} pts</strong> (total 100 pts)
+              </p>
+              <p className="text-[12px] text-indigo-500 mb-3">Skor dibagi rata ke {questions.length} soal secara otomatis.</p>
+              <button onClick={saveGeniusScore} disabled={scoreSaving || !questions.length}
+                className="px-4 py-2 rounded-xl text-white text-[13px] font-semibold disabled:opacity-50 transition hover:opacity-90"
+                style={{ background: "linear-gradient(135deg,#4f46e5,#7c3aed)" }}>
+                {scoreSaving ? "Menyimpan..." : "💾 Simpan Genius Score"}
+              </button>
+              {scoreMsg && <p className="text-[12px] mt-2 text-indigo-700 font-medium">{scoreMsg}</p>}
+            </div>
+          )}
+
+          {scoreType === "manual" && (
+            <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+              <p className="text-[13px] text-amber-700 font-medium mb-2">
+                ⭐ Atur skor manual langsung di setiap soal di tab <strong>Pertanyaan</strong>.
+              </p>
+              <p className="text-[12px] text-amber-600">Setiap soal memiliki input score sendiri.</p>
+              {scoreMsg && <p className="text-[12px] mt-2 text-amber-700 font-medium">{scoreMsg}</p>}
+            </div>
+          )}
         </div>
+      )}
+
+      {/* Timer */}
+      <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-sm p-6 space-y-4">
+        <div className="flex items-center gap-3 mb-1">
+          <span className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-lg shrink-0">⏱️</span>
+          <div>
+            <p className="font-bold text-gray-700 text-[15px]">Timer Pengerjaan</p>
+            <p className="text-[13px] text-gray-400">Atur waktu mulai dan durasi pengerjaan form</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-[12px] font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Waktu Mulai</label>
+            <input type="datetime-local" value={startAt} onChange={e => setStartAt(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-[14px] bg-white outline-none focus:border-[#1a4fa0] focus:ring-2 focus:ring-[#1a4fa0]/10 transition" />
+            <p className="text-[11px] text-gray-400 mt-1">Kosongkan jika bisa dikerjakan kapan saja</p>
+          </div>
+          <div>
+            <label className="text-[12px] font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Durasi (menit)</label>
+            <input type="number" min="1" value={duration} onChange={e => setDuration(e.target.value)}
+              placeholder="contoh: 60"
+              className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-[14px] bg-white outline-none focus:border-[#1a4fa0] focus:ring-2 focus:ring-[#1a4fa0]/10 transition" />
+            <p className="text-[11px] text-gray-400 mt-1">Kosongkan jika tidak ada batas waktu</p>
+          </div>
+        </div>
+
+        <button onClick={saveTimer} disabled={timerSaving}
+          className="px-5 py-2.5 rounded-xl text-white text-[14px] font-semibold disabled:opacity-50 transition hover:opacity-90"
+          style={{ background: "linear-gradient(135deg,#1a4fa0,#1e6fc7)" }}>
+          {timerSaving ? "Menyimpan..." : "Simpan Timer"}
+        </button>
+        {timerMsg && <p className="text-[13px] font-medium text-[#1a4fa0]">{timerMsg}</p>}
       </div>
-      <Toggle />
+
+      {/* Presentasi */}
+      <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-sm p-6 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <span className="w-10 h-10 rounded-xl bg-[#eef5fb] flex items-center justify-center text-lg shrink-0">🎨</span>
+          <div>
+            <p className="font-bold text-gray-700 text-[15px]">Presentasi</p>
+            <p className="text-[13px] text-gray-400">Pengaturan tampilan formulir</p>
+          </div>
+        </div>
+        <Toggle />
+      </div>
     </div>
   );
 }

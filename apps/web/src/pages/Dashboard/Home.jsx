@@ -4,6 +4,8 @@ import api, { FORM_API_URL } from "../../utils/api";
 import { Bell, HelpCircle, Plus, ArrowRight, FileText, Search } from "lucide-react";
 import Sidebar from "../../components/Sidebar";
 
+const FORM_API = FORM_API_URL;
+
 function getUsername() {
   try {
     const p = JSON.parse(atob(localStorage.getItem("token").split(".")[1]));
@@ -164,38 +166,108 @@ function ManageFormsCard({ totalForms }) {
   );
 }
 
-/* ── Create Form Card ──────────────────────────────────────────── */
-function CreateFormCard({ onCreateClick }) {
+const CARD_COLORS = [
+  { from: "#dbeafe", to: "#bfdbfe" },
+  { from: "#ede9fe", to: "#ddd6fe" },
+  { from: "#d1fae5", to: "#a7f3d0" },
+  { from: "#fef3c7", to: "#fde68a" },
+  { from: "#ffe4e6", to: "#fecdd3" },
+  { from: "#e0f2fe", to: "#bae6fd" },
+];
+
+/* ── Fetch Forms Grid (ganti CreateFormCard) ───────────────────── */
+function FetchFormsGrid({ search, category }) {
+  const navigate = useNavigate();
+  const [forms, setForms]     = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => { load(); }, [category]);
+
+  async function load() {
+    setLoading(true);
+    try {
+      let res;
+      if (category === "All" || category === "Public") {
+        res = await api.get("/form");
+      } else {
+        const map = { Quiz: "ujian", Survey: "survei" };
+        res = await api.get("/form/category", { params: { category: map[category] ?? category.toLowerCase() } });
+      }
+      setForms(res.data?.data ?? []);
+    } catch { setForms([]); }
+    finally { setLoading(false); }
+  }
+
+  const filtered = forms.filter(f =>
+    (f.title ?? f.form_title ?? "").toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
-    <section className="relative flex items-center min-h-[355px] px-[45px] py-[42px] bg-white border border-[#e0eaf6] rounded-xl overflow-hidden shadow-[0_8px_25px_rgba(35,83,145,0.08)]"
-      style={{ background: "radial-gradient(circle at 85% 50%,rgba(84,164,255,0.14),transparent 32%),linear-gradient(135deg,#ffffff 0%,#f2f8ff 100%)" }}>
-      <div className="relative z-10">
-        <span className="text-[10px] font-bold tracking-[1px] text-[#3d8ad1] uppercase">FORM MAKER</span>
-        <h2 className="mt-3 mb-4 text-[29px] font-bold leading-[1.22] text-[#103b86]">Buat Form<br />Semudah Ini</h2>
-        <p className="m-0 text-[#7088a8] text-[13px] leading-relaxed">Buat form yang menarik, bagikan ke siapapun,<br />dan dapatkan respons dengan mudah.</p>
-        <button onClick={onCreateClick}
-          className="mt-6 h-11 inline-flex items-center gap-2 px-5 rounded-[7px] bg-[#1261df] text-white text-[13px] font-semibold border-none cursor-pointer shadow-[0_8px_17px_rgba(18,97,223,0.2)] hover:opacity-90 transition-opacity">
-          <Plus size={19} /> Create Form
+    <div className="mb-6">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-[15px] font-bold text-[#17366d]">Semua Form Tersedia</h2>
+        <button onClick={load} className="text-[12px] text-[#1764d6] hover:underline font-semibold">
+          Refresh
         </button>
       </div>
-      <div className="absolute right-[35px] top-[42px] w-[42%] h-[270px]">
-        <div className="absolute right-[45px] top-[15px] w-[250px] h-[220px] rounded-xl bg-white shadow-[0_18px_30px_rgba(25,84,150,0.16)] overflow-hidden rotate-[5deg]">
-          <div className="h-[29px] flex items-center gap-[5px] px-[11px] bg-[#1760ce]">
-            {[0,1,2].map(i => <span key={i} className="w-[7px] h-[7px] rounded-full bg-white/70" />)}
-          </div>
-          <div className="p-[17px]">
-            <div className="h-2 w-4/5 rounded bg-[#dce8f7] mb-2.5" /><div className="h-2 w-[55%] rounded bg-[#dce8f7] mb-2.5" />
-            {[0,1,2].map(i => (
-              <div key={i} className="flex items-center gap-2 p-2.5 mt-2 rounded-md bg-[#f5f8fc]">
-                <span className={`w-3 h-3 flex items-center justify-center border-2 border-[#5596d8] text-[#1767ce] text-[7px] ${i===1?"rounded-[3px] bg-[#e3f2ff]":"rounded-full"}`}>{i===1?"✓":""}</span>
-                <div className="flex-1"><span className="block h-[5px] rounded bg-[#dce7f3] mb-1" /><span className="block h-[5px] w-3/4 rounded bg-[#dce7f3]" /></div>
+
+      {loading && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white rounded-2xl overflow-hidden border border-gray-100 animate-pulse">
+              <div className="h-24 bg-gray-100" />
+              <div className="p-3 space-y-2">
+                <div className="h-3 bg-gray-100 rounded w-3/4" />
+                <div className="h-2.5 bg-gray-100 rounded w-1/2" />
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
-        <div className="absolute left-[15px] bottom-[20px] w-11 h-11 rounded-full bg-[#30bd76] text-white text-[20px] flex items-center justify-center shadow-[0_8px_18px_rgba(48,189,118,0.25)]">✓</div>
-      </div>
-    </section>
+      )}
+
+      {!loading && filtered.length === 0 && (
+        <div className="text-center py-10 bg-white rounded-2xl border border-gray-100">
+          <div className="text-3xl mb-2">📋</div>
+          <p className="text-[13px] text-gray-500 font-medium">Belum ada form tersedia</p>
+        </div>
+      )}
+
+      {!loading && filtered.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          {filtered.map((form, i) => {
+            const title  = form.title ?? form.form_title ?? "Untitled";
+            const banner = form.banner ?? form.form_banner;
+            const status = form.status ?? form.form_status ?? "private";
+            const cat    = form.category ?? "";
+            const clr    = CARD_COLORS[i % CARD_COLORS.length];
+            return (
+              <div key={form.id ?? i}
+                onClick={() => navigate(`/fill/${form.slug ?? form.form_slug}`)}
+                className="group bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-lg transition-all cursor-pointer flex flex-col"
+                style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}
+              >
+                <div className="h-24 relative overflow-hidden"
+                  style={{ background: `linear-gradient(135deg,${clr.from},${clr.to})` }}>
+                  {banner && (
+                    <img src={`${FORM_API}${banner}`} alt={title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={e => { e.target.style.display = "none"; }} />
+                  )}
+                  <span className={`absolute top-2 left-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                    status === "public" ? "bg-green-500/90 text-white" : "bg-black/25 text-white/90"
+                  }`}>{status}</span>
+                </div>
+                <div className="p-2.5 flex-1 flex flex-col">
+                  {cat && <span className="text-[9px] font-bold uppercase tracking-wide text-gray-400 mb-0.5">{cat}</span>}
+                  <h3 className="text-[12px] font-semibold text-gray-800 leading-snug line-clamp-2 flex-1">{title}</h3>
+                  <p className="text-[10px] text-gray-400 mt-1.5">0 respons</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -243,32 +315,35 @@ export default function Home() {
     } catch { setMyForms([]); }
     finally { setMyLoading(false); }
   }
-
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen overflow-hidden">
       <Sidebar />
-      <main className="flex-1 min-w-0" style={{ width: "calc(100% - 366px)" }}>
-        <div className="min-h-screen px-11 py-9 pb-16 max-[1300px]:px-8 max-[800px]:px-5 max-[800px]:py-7"
+      <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
+        <div className="px-4 sm:px-6 md:px-8 xl:px-11 py-16 md:py-9 pb-24 md:pb-16"
           style={{ background: "radial-gradient(circle at 85% 10%,rgba(93,174,255,0.1),transparent 28%),#f5f9ff" }}>
-          <header className="flex items-start justify-between mb-7">
-            <div>
-              <h1 className="m-0 text-[30px] font-bold text-[#102f68] leading-tight">Hi, {username}! 👋</h1>
-              <p className="mt-2 text-[14px] text-[#8195b2]">Fill out forms, give responses, and share your feedback.</p>
+          <header className="flex items-start justify-between mb-6 gap-3">
+            <div className="min-w-0">
+              <h1 className="m-0 text-[22px] sm:text-[28px] font-bold text-[#102f68] leading-tight">Hi, {username}! 👋</h1>
+              <p className="mt-1 text-[13px] text-[#8195b2] hidden sm:block">Fill out forms, give responses, and share your feedback.</p>
             </div>
-            <div className="flex items-center gap-4">
-              <button className="w-[38px] h-[38px] flex items-center justify-center text-[#143b75] bg-transparent border-none cursor-pointer"><Bell size={20} /></button>
-              <button className="w-[38px] h-[38px] flex items-center justify-center text-[#143b75] bg-transparent border-none cursor-pointer"><HelpCircle size={20} /></button>
-              <div className="w-[39px] h-[39px] rounded-full bg-[#1458d1] text-white text-[14px] font-bold flex items-center justify-center">{username[0]?.toUpperCase()}</div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button className="w-9 h-9 flex items-center justify-center text-[#143b75] bg-transparent border-none cursor-pointer"><Bell size={18} /></button>
+              <div className="w-9 h-9 rounded-full bg-[#1458d1] text-white text-[13px] font-bold flex items-center justify-center">{username[0]?.toUpperCase()}</div>
             </div>
           </header>
 
           <SearchFilter search={search} setSearch={setSearch} category={category} setCategory={setCategory} />
 
-          <div className="grid grid-cols-[minmax(0,1.75fr)_minmax(310px,0.9fr)] gap-5 items-stretch max-[1050px]:grid-cols-1">
-            <CreateFormCard onCreateClick={() => navigate("/my-forms")} />
+          {/* Fetch Forms Grid — ganti CreateFormCard */}
+          <FetchFormsGrid search={search} category={category} />
+
+          {/* Bottom row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
             <ActivityCard forms={myForms} loading={myLoading} />
-            <HistoryPengerjaan loading={myLoading} />
-            <ManageFormsCard totalForms={myForms.length} />
+            <div className="space-y-5">
+              <HistoryPengerjaan loading={myLoading} />
+              <ManageFormsCard totalForms={myForms.length} />
+            </div>
           </div>
         </div>
       </main>
