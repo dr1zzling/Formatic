@@ -225,6 +225,63 @@ export default function FillForm() {
 
   const title = form?.title ?? form?.form_title ?? "Form";
   const isQuiz = form?.category === "ujian";
+
+  // ── Token gate ────────────────────────────────────────────
+  const needsToken = Boolean(form?.token_respon);
+  const [tokenInput, setTokenInput]       = useState("");
+  const [tokenVerified, setTokenVerified] = useState(!needsToken);
+  const [tokenLoading, setTokenLoading]   = useState(false);
+  const [tokenError, setTokenError]       = useState("");
+
+  async function verifyToken() {
+    if (!tokenInput.trim()) { setTokenError("Masukkan token terlebih dahulu."); return; }
+    setTokenLoading(true); setTokenError("");
+    try {
+      const res = await fetch(`http://localhost:3000/form/submit/check-token?form_slug=${slug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+        body: JSON.stringify({ token: tokenInput.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setTokenError(data?.message || "Token salah atau tidak valid.");
+      } else {
+        setTokenVerified(true);
+      }
+    } catch { setTokenError("Tidak dapat terhubung ke server."); }
+    finally { setTokenLoading(false); }
+  }
+
+  // Tampilkan halaman input token jika belum diverifikasi
+  if (needsToken && !tokenVerified) return (
+    <div className="min-h-screen grid place-items-center px-4" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
+      <div className="bg-white rounded-3xl shadow-[0_16px_50px_rgba(23,64,120,0.12)] p-8 w-full max-w-sm border border-[#e5eef7] text-center">
+        <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-blue-50 flex items-center justify-center text-2xl">🔐</div>
+        <h2 className="text-[18px] font-extrabold text-[#102f56] mb-1">Form Terbatas</h2>
+        <p className="text-[13px] text-gray-400 mb-5">
+          Form <strong>"{title}"</strong> memerlukan token khusus untuk diakses.
+          Masukkan token yang diberikan oleh pembuat form.
+        </p>
+        <input
+          type="text"
+          value={tokenInput}
+          onChange={e => { setTokenInput(e.target.value); setTokenError(""); }}
+          onKeyDown={e => e.key === "Enter" && verifyToken()}
+          placeholder="Masukkan token..."
+          className="w-full border border-[#dbe5f0] rounded-xl px-4 py-3 text-[15px] text-[#102f56] outline-none focus:border-[#1a4fa0] focus:ring-4 focus:ring-[#1a4fa0]/10 transition-all mb-3 text-center tracking-widest font-semibold"
+        />
+        {tokenError && <p className="text-[13px] text-red-500 mb-3">{tokenError}</p>}
+        <button onClick={verifyToken} disabled={tokenLoading}
+          className="w-full py-3 rounded-xl text-white text-[15px] font-bold hover:opacity-90 disabled:opacity-60 transition"
+          style={{ backgroundColor: "#1a4fa0" }}>
+          {tokenLoading ? "Memverifikasi..." : "Masuk →"}
+        </button>
+        <button onClick={() => navigate("/")} className="mt-3 text-[13px] text-gray-400 hover:underline block w-full">
+          Kembali ke Beranda
+        </button>
+      </div>
+    </div>
+  );
   const soalList = form?.soal ?? [];
 
   // Quiz: step-by-step navigation
