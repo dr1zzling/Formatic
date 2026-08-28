@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
 import { Bell, HelpCircle, Plus, ArrowRight, FileText, Search } from "lucide-react";
-import Sidebar from "../../components/Sidebar";
 
 const FORM_API = FORM_API_URL;
 
@@ -187,7 +186,7 @@ function FetchFormsGrid({ search, category }) {
     setLoading(true);
     try {
       let res;
-      if (category === "All" || category === "Public") {
+      if (category === "All") {
         res = await api.get("/form");
       } else {
         const map = { Quiz: "ujian", Survey: "survei" };
@@ -273,7 +272,7 @@ function FetchFormsGrid({ search, category }) {
 
 /* ── Search + Filter ───────────────────────────────────────────── */
 function SearchFilter({ search, setSearch, category, setCategory }) {
-  const categories = ["All", "Public", "Quiz", "Survey"];
+  const categories = ["All", "Quiz", "Survey"];
   return (
     <div className="mb-7">
       <div className="h-12 flex items-center gap-3 px-[17px] bg-white border border-[#dce7f5] rounded-lg shadow-[0_3px_12px_rgba(35,83,145,0.04)] text-[#5280b5] mb-[14px]">
@@ -317,7 +316,6 @@ export default function Home() {
   }
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar />
       <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
         <div className="px-4 sm:px-6 md:px-8 xl:px-11 py-16 md:py-9 pb-24 md:pb-16"
           style={{ background: "radial-gradient(circle at 85% 10%,rgba(93,174,255,0.1),transparent 28%),#f5f9ff" }}>

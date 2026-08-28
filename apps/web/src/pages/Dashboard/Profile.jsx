@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Sidebar from "../../components/Sidebar";
 import { Bell, Camera, ChevronRight, LogOut, Shield, FileText, BarChart2, Eye, Calendar } from "lucide-react";
 import { authAPI } from "../../utils/api";
 
@@ -55,7 +54,6 @@ export default function Profile() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#F5F6FA]">
-      <Sidebar />
 
       <div className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-[52px] md:pt-0 pb-16 md:pb-0" style={{ width: "calc(100% - 366px)" }}>
 

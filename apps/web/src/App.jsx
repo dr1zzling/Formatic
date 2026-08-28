@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import Sidebar from "./components/Sidebar";
 import Login          from "./pages/auth/Login";
 import Register       from "./pages/auth/Register";
 import ForgotPassword from "./pages/auth/ForgotPassword";
@@ -23,60 +24,42 @@ function AuthRoute({ children }) {
   return children;
 }
 
-/* ── Nav order (hanya halaman nav utama) ─────────────────────── */
-// Urutan sirkuler: Home(0) → MyForm(1) → History(2) → Trash(3) → Profile(4)
-// Dari atas ke bawah = index naik = slide ke bawah
-// Dari bawah ke atas = index turun = slide ke atas
-// Wrap: Profile(4) → Home(0) = lompatan 4, lebih dari setengah 5 → flip ke atas
+/* ── Auth pages (no sidebar) ─────────────────────────────────── */
+const AUTH_PATHS = ["/login", "/register", "/forgot-password"];
+
+/* ── Nav order untuk arah slide ─────────────────────────────── */
 const NAV = ["/", "/home", "/my-forms", "/history", "/trash", "/profile"];
 
 function getNavIndex(pathname) {
-  // exact match dulu
   let i = NAV.indexOf(pathname);
   if (i !== -1) return i;
-  // partial match
   if (pathname.startsWith("/my-forms")) return 2;
   if (pathname.startsWith("/history"))  return 3;
   if (pathname.startsWith("/trash"))    return 4;
   if (pathname.startsWith("/profile"))  return 5;
-  return -1; // bukan nav page
+  return -1;
 }
 
 function calcDirection(fromPath, toPath) {
   const fromIdx = getNavIndex(fromPath);
   const toIdx   = getNavIndex(toPath);
-
-  // Kalau salah satu bukan nav page, default slide ke bawah
   if (fromIdx === -1 || toIdx === -1) return 1;
-
-  const n    = NAV.length; // 6
+  const n    = NAV.length;
   const diff = toIdx - fromIdx;
-
-  // Circular: cek apakah lebih cepat lewat wrap
-  // Forward normal: diff > 0
-  // Backward normal: diff < 0
-  // Wrap forward (e.g. Profile→Home): diff = 0-4 = -4, tapi |diff|=4 > n/2=3 → flip → slide atas
-  // Wrap backward (e.g. Home→Profile): diff = 4-0 = 4, |diff|=4 > n/2=3 → flip → slide bawah
-
-  if (Math.abs(diff) > n / 2) {
-    // Wrap around — flip direction
-    return diff < 0 ? 1 : -1;
-  }
+  if (Math.abs(diff) > n / 2) return diff < 0 ? 1 : -1; // wrap
   return diff > 0 ? 1 : -1;
 }
 
-/* ── Animated Routes ─────────────────────────────────────────── */
+/* ── Content area with slide animation ───────────────────────── */
 const DURATION = 280;
 
-function AnimatedRoutes() {
-  const location    = useLocation();
+function AnimatedContent({ children }) {
+  const location     = useLocation();
   const containerRef = useRef(null);
   const prevPathRef  = useRef(location.pathname);
-  const directionRef = useRef(1);
   const timerRef     = useRef(null);
   const rafRef       = useRef(null);
 
-  // Track which locations to render (current + previous during transition)
   const [displayLoc, setDisplayLoc] = useState({
     prev: null,
     curr: location,
@@ -85,17 +68,12 @@ function AnimatedRoutes() {
   useEffect(() => {
     if (prevPathRef.current === location.pathname) return;
 
-    // Calculate direction BEFORE updating prev
     const dir = calcDirection(prevPathRef.current, location.pathname);
-    directionRef.current = dir;
-
     const prevLocation = { pathname: prevPathRef.current, search: "", hash: "", key: "prev" };
     prevPathRef.current = location.pathname;
 
-    // Show both pages
     setDisplayLoc({ prev: prevLocation, curr: location });
 
-    // Animate after render
     clearTimeout(timerRef.current);
     cancelAnimationFrame(rafRef.current);
 
@@ -103,38 +81,33 @@ function AnimatedRoutes() {
       requestAnimationFrame(() => {
         const container = containerRef.current;
         if (!container) return;
-
         const kids = container.children;
         if (kids.length < 2) return;
 
-        const outEl = kids[0]; // prev page
-        const inEl  = kids[1]; // curr page
-
+        const outEl = kids[0];
+        const inEl  = kids[1];
         const isMobile = window.innerWidth < 768;
-        const fromY = dir === 1 ? "100%" : "-100%";
-        const toY   = dir === 1 ? "-30%" : "30%";
-        const fromX = dir === 1 ? "100%" : "-100%";
-        const toX   = dir === 1 ? "-30%" : "30%";
 
-        // Reset — no transition
+        const fromPos  = dir === 1 ? "100%"  : "-100%";
+        const toPos    = dir === 1 ? "-25%"  : "25%";
+        const axis     = isMobile ? "translateX" : "translateY";
+
         outEl.style.transition = "none";
-        outEl.style.transform  = isMobile ? "translateX(0) scale(1)" : "translateY(0) scale(1)";
+        outEl.style.transform  = `${axis}(0) scale(1)`;
         outEl.style.opacity    = "1";
         inEl.style.transition  = "none";
-        inEl.style.transform   = isMobile ? `translateX(${fromX})` : `translateY(${fromY})`;
+        inEl.style.transform   = `${axis}(${fromPos})`;
         inEl.style.opacity     = "1";
 
-        void container.offsetHeight; // force reflow
+        void container.offsetHeight;
 
-        // Animate
         const ease = `${DURATION}ms cubic-bezier(0.32, 0.72, 0, 1)`;
         outEl.style.transition = `transform ${ease}, opacity ${ease}`;
         inEl.style.transition  = `transform ${ease}`;
-        outEl.style.transform  = isMobile ? `translateX(${toX}) scale(0.97)` : `translateY(${toY}) scale(0.97)`;
+        outEl.style.transform  = `${axis}(${toPos}) scale(0.97)`;
         outEl.style.opacity    = "0";
-        inEl.style.transform   = isMobile ? "translateX(0)" : "translateY(0)";
+        inEl.style.transform   = `${axis}(0)`;
 
-        // After animation, remove prev
         timerRef.current = setTimeout(() => {
           setDisplayLoc(d => ({ prev: null, curr: d.curr }));
         }, DURATION + 20);
@@ -147,29 +120,39 @@ function AnimatedRoutes() {
     };
   }, [location.pathname, location.key]);
 
+  const isAuth = AUTH_PATHS.includes(location.pathname);
+
   return (
-    <div ref={containerRef} style={{ position: "relative", overflow: "hidden", minHeight: "100vh" }}>
-      {/* Previous page (outgoing) */}
-      {displayLoc.prev && (
-        <div style={{ position: "absolute", inset: 0, zIndex: 1, willChange: "transform, opacity" }}>
-          <RouteContent location={displayLoc.prev} />
+    <div style={{ display: "flex", minHeight: "100vh" }}>
+      {/* Sidebar tetap diam — tidak ikut animasi */}
+      {!isAuth && <Sidebar />}
+
+      {/* Hanya konten yang slide */}
+      <div
+        ref={containerRef}
+        style={{ flex: 1, minWidth: 0, position: "relative", overflow: "hidden" }}
+      >
+        {displayLoc.prev && (
+          <div style={{ position: "absolute", inset: 0, zIndex: 1, willChange: "transform, opacity" }}>
+            <PageContent location={displayLoc.prev} />
+          </div>
+        )}
+        <div style={{
+          position: displayLoc.prev ? "absolute" : "relative",
+          inset: displayLoc.prev ? 0 : undefined,
+          zIndex: 2,
+          willChange: "transform",
+          minHeight: "100vh",
+        }}>
+          <PageContent location={displayLoc.curr} />
         </div>
-      )}
-      {/* Current page (incoming) */}
-      <div style={{
-        position: displayLoc.prev ? "absolute" : "relative",
-        inset: displayLoc.prev ? 0 : undefined,
-        zIndex: 2,
-        willChange: "transform",
-        minHeight: "100vh",
-      }}>
-        <RouteContent location={displayLoc.curr} />
       </div>
     </div>
   );
 }
 
-function RouteContent({ location }) {
+/* ── Page content tanpa sidebar ─────────────────────────────── */
+function PageContent({ location }) {
   return (
     <Routes location={location}>
       <Route path="/login"           element={<AuthRoute><Login /></AuthRoute>} />
@@ -192,7 +175,9 @@ function RouteContent({ location }) {
 function App() {
   return (
     <Router>
-      <AnimatedRoutes />
+      <AnimatedContent>
+        <PageContent />
+      </AnimatedContent>
     </Router>
   );
 }

@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import Sidebar from "../../components/Sidebar";
 import api from "../../utils/api";
 import { Clock, CheckCircle2, FileText, RefreshCw, Bell, ArrowUpRight, Search } from "lucide-react";
 
@@ -109,7 +108,6 @@ export default function History() {
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "#F5F6FA" }}>
-      <Sidebar />
 
       <div className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-[52px] md:pt-0 pb-16 md:pb-0">
 

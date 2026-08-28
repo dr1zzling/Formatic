@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Sidebar from "../../components/Sidebar";
 import api, { FORM_API_URL } from "../../utils/api";
 import { Search, Trash2, RotateCcw, Bell, FileText, AlertTriangle, Clock } from "lucide-react";
 
@@ -120,7 +119,6 @@ export default function Trash() {
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "#F5F6FA" }}>
-      <Sidebar />
 
       <div className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-[52px] md:pt-0 pb-20 md:pb-0">
 

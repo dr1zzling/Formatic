@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import Sidebar from "../../components/Sidebar";
 import api, { FORM_API_URL } from "../../utils/api";
 import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical } from "lucide-react";
 import QuillEditor from "../../components/QuillEditor";
@@ -240,7 +239,6 @@ export default function FormEditor() {
 
   if (loading) return (
     <div className="flex h-screen overflow-hidden" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
-      <Sidebar />
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <div className="w-10 h-10 border-2 border-[#1a4fa0] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
@@ -252,7 +250,6 @@ export default function FormEditor() {
 
   if (error && !form) return (
     <div className="flex h-screen overflow-hidden" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
-      <Sidebar />
       <div className="flex-1 flex items-center justify-center text-center px-4">
         <div>
           <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center text-2xl mx-auto mb-4">😕</div>
@@ -268,7 +265,6 @@ export default function FormEditor() {
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
-      <Sidebar />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden pt-[52px] md:pt-0">
         {/* ── Top Bar ───────────────────────────────────── */}

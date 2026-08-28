@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Sidebar from "../../components/Sidebar";
 import api, { FORM_API_URL } from "../../utils/api";
 import { addToTrash } from "./Trash";
 const CATEGORIES = ["All", "Survey", "Quiz / Ujian"];
@@ -210,7 +209,6 @@ export default function MyForms() {
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar />
 
       <main className="flex-1 min-w-0" style={{ width: "calc(100% - 366px)" }}>
         <div
