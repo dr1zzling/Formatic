@@ -41,13 +41,21 @@ export default function FormEditor() {
     socket.emit("joinForm", { slug });
 
     const handleFormUpdated = (data) => {
-      // Abaikan event yang dipicu oleh diri sendiri (sedang saving)
       if (isSavingRef.current) return;
       if (!data?.soal) return;
 
-      // Update soal dari DB, pertahankan soal baru yang belum disimpan
+      // Handle format baru: array of pages { page, soal: [] }
+      let soalFlat = [];
+      if (Array.isArray(data.soal)) {
+        if (data.soal.length > 0 && data.soal[0]?.soal) {
+          soalFlat = data.soal.flatMap(p => p.soal ?? []);
+        } else {
+          soalFlat = data.soal;
+        }
+      }
+
       setQuestions(prev => {
-        const fromDB = data.soal.map((s) => ({
+        const fromDB = soalFlat.map((s) => ({
           id: s.id, question: s.question, type: s.type, required: true,
           options: (s.options ?? []).map((o) => ({
             id: o.id, value: o.value ?? o.option_value, is_correct: o.is_correct,
@@ -79,7 +87,18 @@ export default function FormEditor() {
       if (f) {
         setForm(f);
         setQuestions(prev => {
-          const fromDB = (f?.soal ?? []).map((s) => ({
+          // Backend return soal sebagai array of { page, soal: [...] } atau flat array
+          let soalFlat = [];
+          if (Array.isArray(f?.soal)) {
+            // Cek apakah format baru (array of pages) atau lama (flat)
+            if (f.soal.length > 0 && f.soal[0]?.soal) {
+              // Format baru: { page, soal: [] }[]
+              soalFlat = f.soal.flatMap(p => p.soal ?? []);
+            } else {
+              soalFlat = f.soal;
+            }
+          }
+          const fromDB = soalFlat.map((s) => ({
             id: s.id, question: s.question, type: s.type, required: true,
             options: (s.options ?? []).map((o) => ({
               id: o.id, value: o.value ?? o.option_value, is_correct: o.is_correct,
