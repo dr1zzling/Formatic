@@ -3,6 +3,7 @@
  * @returns { Promise<void> }
  */
 exports.seed = async function (knex) {
+  // Hapus data lama (opsional: tambahkan reset auto-increment jika menggunakan PostgreSQL/MySQL)
   await knex('soal_option').del()
   await knex('soal').del()
 
