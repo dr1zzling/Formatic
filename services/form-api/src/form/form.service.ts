@@ -22,7 +22,8 @@ export class FormService {
         title: 'forms.title',
         category: 'forms.category',
         banner: 'forms.banner',
-        status: 'forms.status'
+        status: 'forms.status',
+        token_respon: 'forms.token_respon'
       })
       .where('status', 'public')
 
@@ -43,9 +44,10 @@ export class FormService {
         slug: 'forms.slug',
         title: 'forms.title',
         category: 'forms.category',
-        banner: 'forms.banner'
+        banner: 'forms.banner',
+        status: 'forms.status'
       })
-      .where("category", lower)
+      .where({"category": lower, "status:": "public"})
 
     if (get.length === 0) throw new NotFoundException('Tidak Ada Form Dari Category Tersebut')
 
