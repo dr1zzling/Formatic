@@ -244,7 +244,7 @@ export default function FormEditor() {
             fd.append("soal_images", q.attachment, `soal_${i}_${q.attachment.name}`);
           }
           return {
-            soal: { question: q.question, type: q.type, image: q.attachment instanceof File ? q.attachment.name : null },
+            soal: { question: q.question, type: q.type, image: q.attachment instanceof File ? q.attachment.name : null, page: q.page ?? 1 },
             options: hasOpts
               ? q.options.map((o, idx) => ({ value: o.value?.trim() || `Opsi ${idx + 1}`, image: null, is_correct: o.is_correct ?? false }))
               : [],
@@ -582,13 +582,26 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemo
             {index + 1}
           </span>
         </div>
-        <select
-          value={question.type}
-          onChange={(e) => onUpdate("type", e.target.value)}
-          className="text-[13.5px] border border-[#d9e5f0] rounded-xl px-3.5 py-2 bg-white outline-none shrink-0 font-medium text-gray-700 shadow-xs focus:border-[#1a4fa0]"
-        >
-          {QUESTION_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-        </select>
+        <div className="flex items-center gap-2">
+          {/* Page selector */}
+          <div className="flex items-center gap-1.5 bg-[#f0f6fe] border border-[#d4e5fa] rounded-lg px-2 py-1">
+            <span className="text-[11px] font-semibold text-[#1a4fa0]">Hal.</span>
+            <input
+              type="number" min="1" max="99"
+              value={question.page ?? 1}
+              onChange={(e) => onUpdate("page", Math.max(1, parseInt(e.target.value) || 1))}
+              className="w-10 text-[13px] font-bold text-[#1a4fa0] bg-transparent border-none outline-none text-center"
+            />
+          </div>
+          {/* Type selector */}
+          <select
+            value={question.type}
+            onChange={(e) => onUpdate("type", e.target.value)}
+            className="text-[13.5px] border border-[#d9e5f0] rounded-xl px-3.5 py-2 bg-white outline-none shrink-0 font-medium text-gray-700 shadow-xs focus:border-[#1a4fa0]"
+          >
+            {QUESTION_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+        </div>
       </div>
 
       <div className="mb-5">
@@ -924,7 +937,6 @@ function buildQuestionStats(responses) {
 function SettingsTab({ form, onUpdateStatus, slug }) {
   const isPublic   = form?.status === "public" || form?.form_status === "public";
   const isQuiz     = form?.category === "ujian";
-  const formId     = form?.id ?? form?.form_id;
 
   // Timer state
   const [duration, setDuration]   = useState(form?.duration ?? "");
@@ -933,6 +945,11 @@ function SettingsTab({ form, onUpdateStatus, slug }) {
   );
   const [timerSaving, setTimerSaving] = useState(false);
   const [timerMsg, setTimerMsg]       = useState("");
+
+  // Shuffle state
+  const [isRandom, setIsRandom]   = useState(form?.is_random ?? false);
+  const [shuffleSaving, setShuffleSaving] = useState(false);
+  const [shuffleMsg, setShuffleMsg]       = useState("");
 
   // Score state
   const [scoreType, setScoreType] = useState(() =>
@@ -947,18 +964,38 @@ function SettingsTab({ form, onUpdateStatus, slug }) {
     if (!duration && !startAt) { setTimerMsg("Isi durasi atau waktu mulai."); return; }
     setTimerSaving(true); setTimerMsg("");
     try {
-      const res = await fetch(`http://localhost:3000/form?form_slug=${form?.slug ?? slug}`, {
+      const res = await fetch(`http://localhost:3000/form/setting?form_slug=${form?.slug ?? slug}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: JSON.stringify({
           duration: duration ? Number(duration) : null,
           start_at: startAt ? new Date(startAt).getTime() : null,
+          is_random: isRandom,
         }),
       });
       const data = await res.json().catch(() => ({}));
-      setTimerMsg(res.ok ? "✅ Timer berhasil disimpan!" : (data?.message || "Gagal menyimpan."));
+      setTimerMsg(res.ok ? "✅ Berhasil disimpan!" : (data?.message || "Gagal menyimpan."));
     } catch { setTimerMsg("Gagal menyimpan."); }
     finally { setTimerSaving(false); setTimeout(() => setTimerMsg(""), 3000); }
+  }
+
+  async function saveShuffleSetting(val) {
+    setIsRandom(val);
+    setShuffleSaving(true); setShuffleMsg("");
+    try {
+      const res = await fetch(`http://localhost:3000/form/setting?form_slug=${form?.slug ?? slug}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+        body: JSON.stringify({
+          duration: duration ? Number(duration) : null,
+          start_at: startAt ? new Date(startAt).getTime() : null,
+          is_random: val,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      setShuffleMsg(res.ok ? `✅ Shuffle ${val ? "diaktifkan" : "dinonaktifkan"}` : (data?.message || "Gagal."));
+    } catch { setShuffleMsg("Gagal menyimpan."); }
+    finally { setShuffleSaving(false); setTimeout(() => setShuffleMsg(""), 3000); }
   }
 
   async function saveGeniusScore() {
@@ -1048,6 +1085,30 @@ function SettingsTab({ form, onUpdateStatus, slug }) {
               {scoreMsg && <p className="text-[12px] mt-2 text-amber-700 font-medium">{scoreMsg}</p>}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Shuffle soal */}
+      {isQuiz && (
+        <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-sm p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-lg shrink-0">🔀</span>
+              <div>
+                <p className="font-bold text-gray-700 text-[15px]">Acak Urutan Soal</p>
+                <p className="text-[13px] text-gray-400">Setiap responden mendapat urutan soal yang berbeda</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {shuffleSaving && <span className="text-[12px] text-gray-400">Menyimpan...</span>}
+              <button onClick={() => saveShuffleSetting(!isRandom)}
+                className={`w-12 h-7 rounded-full relative transition-colors shrink-0 ${isRandom ? "bg-[#1a4fa0]" : "bg-gray-200"}`}
+                disabled={shuffleSaving}>
+                <span className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow transition-all ${isRandom ? "left-[22px]" : "left-0.5"}`} />
+              </button>
+            </div>
+          </div>
+          {shuffleMsg && <p className="text-[13px] font-medium text-[#1a4fa0] mt-2">{shuffleMsg}</p>}
         </div>
       )}
 

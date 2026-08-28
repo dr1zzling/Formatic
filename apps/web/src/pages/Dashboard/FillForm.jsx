@@ -120,7 +120,7 @@ export default function FillForm() {
   }
 
   async function submit() {
-    const empty = (form?.soal ?? []).find((s) => !hasAnswer(s));
+    const empty = (allSoal ?? []).find((s) => !hasAnswer(s));
     if (empty) {
       setErrorSoalId(empty.id);
       setSubmitError("");
@@ -138,7 +138,7 @@ export default function FillForm() {
       const fd = new FormData();
       const payload = [];
 
-      for (const soal of form?.soal ?? []) {
+      for (const soal of allSoal ?? []) {
         const a = answers[soal.id];
         const jawaban = { soal_id: soal.id };
 
@@ -282,29 +282,112 @@ export default function FillForm() {
       </div>
     </div>
   );
-  const soalList = form?.soal ?? [];
+  // Flatten soal dari format baru {page, soal:[]} atau format lama flat[]
+  const rawSoal = form?.soal ?? [];
+  const soalList = rawSoal.length > 0 && rawSoal[0]?.soal
+    ? rawSoal.flatMap(p => p.soal ?? [])
+    : rawSoal;
 
+  // Untuk quiz: grup per page
+  const pageGroups = rawSoal.length > 0 && rawSoal[0]?.soal
+    ? rawSoal.map(p => ({ page: p.page ?? 1, soal: p.soal ?? [] }))
+    : [{ page: 1, soal: rawSoal }];
+
+  // Fix submit — pakai soalList flat
+  const allSoal = soalList;
   // Quiz: step-by-step navigation
 
   if (isQuiz) {
-    const soal        = soalList[currentIdx];
+    const totalPages  = pageGroups.length;
+    const currPage    = pageGroups[currentIdx] ?? { page: 1, soal: [] };
     const isFirst     = currentIdx === 0;
-    const isLast      = currentIdx === soalList.length - 1;
-    const progress    = soalList.length > 0 ? ((currentIdx + 1) / soalList.length) * 100 : 0;
+    const isLast      = currentIdx === totalPages - 1;
+    const progress    = totalPages > 0 ? ((currentIdx + 1) / totalPages) * 100 : 0;
+    const pageNum     = currPage.page ?? (currentIdx + 1);
 
     function goNext() {
-      if (!hasAnswer(soal)) {
-        const clean = (soal.question || "Wajib").replace(/<[^>]*>/g, "").trim();
+      const unanswered = (currPage.soal ?? []).find(s => !hasAnswer(s));
+      if (unanswered) {
+        const clean = (unanswered.question || "Wajib").replace(/<[^>]*>/g, "").trim();
         setSubmitError(`Pertanyaan "${clean}" belum dijawab.`);
         return;
       }
       setSubmitError("");
-      setCurrentIdx(i => Math.min(i + 1, soalList.length - 1));
+      setCurrentIdx(i => Math.min(i + 1, totalPages - 1));
     }
     function goPrev() {
       setSubmitError("");
       setCurrentIdx(i => Math.max(i - 1, 0));
     }
+
+    const SoalItem = ({ soal, idx }) => {
+      const isError = errorSoalId === soal.id;
+      return (
+        <div ref={el => { if (el) soalRefs.current[soal.id] = el; }}
+          className={`bg-white rounded-2xl border shadow-sm p-6 mb-4 transition-all ${isError ? "border-red-400 ring-2 ring-red-100" : "border-[#e5eef7]"}`}>
+          <div className="flex items-start gap-3 mb-5">
+            <span className="w-9 h-9 rounded-xl bg-[#eef5fb] text-[#1a4fa0] text-[14px] font-extrabold grid place-items-center shrink-0 mt-0.5">{idx + 1}</span>
+            <div className="flex-1">
+              <RichTextDisplay content={soal.question} className="text-[16px] font-bold text-[#102f56] leading-snug" />
+              <span className="text-[12px] font-medium text-[#1a4fa0] block mt-1">{TYPE_LABEL[soal.type] ?? soal.type}</span>
+            </div>
+            <span className="text-[#c9393f] font-bold shrink-0">*</span>
+          </div>
+
+          {soal.image && (
+            <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-100 rounded-xl">
+              <FileText size={18} className="text-[#1a4fa0] shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-semibold text-[#1a4fa0]">Lampiran Soal</p>
+              </div>
+              <a href={`http://localhost:3000${soal.image.startsWith('/') ? soal.image : '/uploads/soal/' + soal.image}`}
+                target="_blank" rel="noopener noreferrer"
+                className="shrink-0 px-3 py-1.5 rounded-lg bg-[#1a4fa0] text-white text-[12px] font-semibold hover:opacity-90 transition">
+                Buka File
+              </a>
+            </div>
+          )}
+
+          {(soal.type === "radio" || soal.type === "checkbox") && (
+            <div className="space-y-2.5">
+              {(soal.options ?? []).map((opt, oi) => {
+                const selected = soal.type === "radio"
+                  ? answers[soal.id] === opt.id
+                  : (Array.isArray(answers[soal.id]) && answers[soal.id].includes(opt.id));
+                return (
+                  <button key={opt.id ?? oi} onClick={() => toggleOption(soal, opt)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
+                      selected ? "border-[#1a4fa0] bg-[#f0f6fe]" : "border-[#e2e9f1] hover:border-[#1a4fa0]/40 hover:bg-[#f7fafd]"
+                    }`}>
+                    <span className={`inline-grid place-items-center shrink-0 border-2 transition-all ${
+                      soal.type === "checkbox" ? "w-6 h-6 rounded-[8px]" : "w-6 h-6 rounded-full"
+                    } ${selected ? "border-[#1a4fa0] bg-[#1a4fa0]" : "border-[#5b6c7e] bg-[#eef2f6]"}`}>
+                      {selected && (soal.type === "checkbox"
+                        ? <Check size={15} strokeWidth={3} className="text-white" />
+                        : <span className="w-3 h-3 rounded-full bg-white" />)}
+                    </span>
+                    <span className="text-[15px] font-medium text-gray-700">{fallbackLabel(opt, oi)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {soal.type === "text" && (
+            <textarea rows={3} placeholder="Tulis jawabanmu di sini..."
+              value={answers[soal.id] ?? ""} onChange={e => setAnswer(soal.id, e.target.value)}
+              className={inputCls} />
+          )}
+          {soal.type === "file" && (
+            <label className="flex flex-col items-center justify-center gap-2 w-full rounded-xl border-2 border-dashed border-[#c3d4e4] bg-[#f7fafd] py-8 cursor-pointer hover:border-[#1a4fa0] hover:bg-[#f0f6fe] transition-all">
+              {answers[soal.id]?.file
+                ? <><FileText size={28} className="text-[#1a4fa0]" /><span className="text-[14px] font-semibold text-[#102f56]">{answers[soal.id].file.name}</span></>
+                : <><UploadCloud size={28} className="text-[#1a4fa0]" /><span className="text-[14px] font-semibold">Unggah file jawaban</span></>}
+              <input type="file" className="hidden" onChange={e => setAnswer(soal.id, { file: e.target.files?.[0] })} />
+            </label>
+          )}
+        </div>
+      );
+    };
 
     return (
       <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
@@ -315,9 +398,10 @@ export default function FillForm() {
               <button onClick={() => navigate("/")} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#1a4fa0] hover:underline">
                 <ArrowLeft size={15} /> Kembali
               </button>
-              <span className="text-[13px] font-semibold text-gray-500">{currentIdx + 1} / {soalList.length}</span>
+              <span className="text-[13px] font-semibold text-gray-500">
+                Halaman {currentIdx + 1} / {totalPages}
+              </span>
             </div>
-            {/* Progress bar */}
             <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
               <div className="h-full rounded-full transition-all duration-300" style={{ width: `${progress}%`, background: "linear-gradient(90deg,#1a4fa0,#1e6fc7)" }} />
             </div>
@@ -331,7 +415,7 @@ export default function FillForm() {
             </div>
           )}
 
-          {/* Form title (first question only) */}
+          {/* Form title (halaman pertama saja) */}
           {currentIdx === 0 && (
             <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-sm p-6 mb-4">
               <h1 className="text-[20px] font-extrabold text-[#102f56] leading-snug">{title}</h1>
@@ -339,70 +423,11 @@ export default function FillForm() {
             </div>
           )}
 
-          {soal && (
-            <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-sm p-6 mb-4">
-              <div className="flex items-start gap-3 mb-5">
-                <span className="w-9 h-9 rounded-xl bg-[#eef5fb] text-[#1a4fa0] text-[14px] font-extrabold grid place-items-center shrink-0 mt-0.5">{currentIdx + 1}</span>
-                <div className="flex-1">
-                  <RichTextDisplay content={soal.question} className="text-[16px] font-bold text-[#102f56] leading-snug" />
-                  <span className="text-[12px] font-medium text-[#1a4fa0] block mt-1">{TYPE_LABEL[soal.type] ?? soal.type}</span>
-                </div>
-                <span className="text-[#c9393f] font-bold shrink-0">*</span>
-              </div>
-
-              {soal.image && (
-                <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-100 rounded-xl">
-                  <FileText size={18} className="text-[#1a4fa0] shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-semibold text-[#1a4fa0]">Lampiran Soal</p>
-                    <p className="text-[11.5px] text-blue-500 truncate">{soal.image}</p>
-                  </div>
-                  <a href={`http://localhost:3000/uploads/soal/${soal.image}`} target="_blank" rel="noopener noreferrer"
-                    className="shrink-0 px-3 py-1.5 rounded-lg bg-[#1a4fa0] text-white text-[12px] font-semibold hover:opacity-90 transition">
-                    Buka File
-                  </a>
-                </div>
-              )}
-
-              {(soal.type === "radio" || soal.type === "checkbox") && (
-                <div className="space-y-2.5">
-                  {(soal.options ?? []).map((opt, oi) => {
-                    const selected = soal.type === "radio"
-                      ? answers[soal.id] === opt.id
-                      : (Array.isArray(answers[soal.id]) && answers[soal.id].includes(opt.id));
-                    return (
-                      <button key={opt.id ?? oi} onClick={() => toggleOption(soal, opt)}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
-                          selected ? "border-[#1a4fa0] bg-[#f0f6fe]" : "border-[#e2e9f1] hover:border-[#1a4fa0]/40 hover:bg-[#f7fafd]"
-                        }`}>
-                        <span className={`inline-grid place-items-center shrink-0 border-2 transition-all ${
-                          soal.type === "checkbox" ? "w-6 h-6 rounded-[8px]" : "w-6 h-6 rounded-full"
-                        } ${selected ? "border-[#1a4fa0] bg-[#1a4fa0]" : "border-[#5b6c7e] bg-[#eef2f6]"}`}>
-                          {selected && (soal.type === "checkbox"
-                            ? <Check size={15} strokeWidth={3} className="text-white" />
-                            : <span className="w-3 h-3 rounded-full bg-white" />)}
-                        </span>
-                        <span className="text-[15px] font-medium text-gray-700">{fallbackLabel(opt, oi)}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              {soal.type === "text" && (
-                <textarea rows={3} placeholder="Tulis jawabanmu di sini..."
-                  value={answers[soal.id] ?? ""} onChange={e => setAnswer(soal.id, e.target.value)}
-                  className={inputCls} />
-              )}
-              {soal.type === "file" && (
-                <label className="flex flex-col items-center justify-center gap-2 w-full rounded-xl border-2 border-dashed border-[#c3d4e4] bg-[#f7fafd] py-8 cursor-pointer hover:border-[#1a4fa0] hover:bg-[#f0f6fe] transition-all">
-                  {answers[soal.id]?.file
-                    ? <><FileText size={28} className="text-[#1a4fa0]" /><span className="text-[14px] font-semibold text-[#102f56]">{answers[soal.id].file.name}</span></>
-                    : <><UploadCloud size={28} className="text-[#1a4fa0]" /><span className="text-[14px] font-semibold">Unggah file jawaban</span></>}
-                  <input type="file" className="hidden" onChange={e => setAnswer(soal.id, { file: e.target.files?.[0] })} />
-                </label>
-              )}
-            </div>
-          )}
+          {/* Semua soal di halaman ini */}
+          {(currPage.soal ?? []).map((soal, idx) => {
+            const globalIdx = allSoal.findIndex(s => s.id === soal.id);
+            return <SoalItem key={soal.id ?? idx} soal={soal} idx={globalIdx >= 0 ? globalIdx : idx} />;
+          })}
 
           {submitError && (
             <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-[14px] mb-4">{submitError}</div>
