@@ -244,7 +244,7 @@ export default function FormEditor() {
             fd.append("soal_images", q.attachment, `soal_${i}_${q.attachment.name}`);
           }
           return {
-            soal: { question: q.question, type: q.type, image: q.attachment instanceof File ? q.attachment.name : null, page: q.page ?? 1 },
+            soal: { question: q.question, type: q.type, image: q.attachment instanceof File ? q.attachment.name : null, page: q.page ?? 1, score: q.score ?? null },
             options: hasOpts
               ? q.options.map((o, idx) => ({ value: o.value?.trim() || `Opsi ${idx + 1}`, image: null, is_correct: o.is_correct ?? false }))
               : [],
@@ -478,8 +478,22 @@ export default function FormEditor() {
 
 /* ── Pertanyaan Tab ─────────────────────────────────────────── */
 function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ, onUpdateOpt, onAddOpt, onRemoveOpt, onRemoveQ, onDuplicateQ, onToggleCorrect, onReorder, onCopyLink, onShowToast, onImported, onImportedSilent }) {
-  const [dragFrom, setDragFrom]   = useState(null);
-  const [dragOver, setDragOver]   = useState(null);
+  const [dragFrom, setDragFrom] = useState(null);
+  const [dragOver, setDragOver] = useState(null);
+  // Baca scoreType dari localStorage supaya badge score realtime ikut berubah
+  const [scoreType, setScoreType] = useState(() =>
+    localStorage.getItem(`score_type_${form?.slug ?? slug}`) ?? "none"
+  );
+  // Sync saat form berubah
+  useEffect(() => {
+    const key = `score_type_${form?.slug ?? slug}`;
+    const stored = localStorage.getItem(key) ?? "none";
+    setScoreType(stored);
+    // Listen storage changes (ketika user ganti di Setelan tab)
+    const handler = (e) => { if (e.key === key) setScoreType(e.newValue ?? "none"); };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, [form?.slug, slug]);
   return (
     <div className="max-w-3xl mx-auto py-8 px-4 md:px-6 xl:px-8 space-y-5" style={{ paddingBottom: 80 }}>
       {/* Form header card */}
@@ -540,6 +554,8 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ,
             onDragHandleStart={() => setDragFrom(qIdx)}
             onDragHandleEnd={() => { setDragFrom(null); setDragOver(null); }}
             onShowToast={onShowToast}
+            scoreType={scoreType}
+            totalSoal={questions.length}
           />
         </div>
       ))}
@@ -558,7 +574,7 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ,
 }
 
 /* ── Question Card ──────────────────────────────────────────── */
-function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemoveOpt, onToggleCorrect, onRemove, onDuplicate, onDragHandleStart, onDragHandleEnd, onShowToast }) {
+function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemoveOpt, onToggleCorrect, onRemove, onDuplicate, onDragHandleStart, onDragHandleEnd, onShowToast, scoreType, totalSoal }) {
   const hasOptions = ["radio", "checkbox"].includes(question.type);
   // Semua soal bisa diedit (tidak hanya yang baru)
   const editable = true;
@@ -703,12 +719,33 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemo
         <div className="flex items-center gap-1">
           <button title="Duplikat" onClick={onDuplicate} className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-400 hover:bg-[#eef5fb] hover:text-[#1a4fa0] transition-all"><Copy size={16} /></button>
           <button title="Hapus" onClick={onRemove} className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all"><Trash2 size={16} /></button>
-
         </div>
-        <label className="flex items-center gap-2 text-[13.5px] font-medium text-gray-500 cursor-pointer select-none">
-          Wajib diisi
-          <input type="checkbox" checked={question.required} onChange={(e) => onUpdate("required", e.target.checked)} className="accent-[#1a4fa0]" style={{ width: 18, height: 18 }} />
-        </label>
+
+        <div className="flex items-center gap-3">
+          {/* Score badge — tampil sesuai tipe score */}
+          {scoreType === "genius" && totalSoal > 0 && (
+            <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-[11px] font-bold text-indigo-700">
+              🎯 {(100 / totalSoal).toFixed(1)} pts
+            </span>
+          )}
+          {scoreType === "manual" && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[12px] font-semibold text-amber-600">⭐ Score:</span>
+              <input
+                type="number" min="0" max="100"
+                value={question.score ?? 0}
+                onChange={(e) => onUpdate("score", Number(e.target.value))}
+                className="w-16 h-7 border border-amber-200 rounded-lg px-2 text-[12px] font-bold text-amber-700 bg-amber-50 outline-none focus:border-amber-400 text-center"
+              />
+              <span className="text-[11px] text-amber-500">pts</span>
+            </div>
+          )}
+
+          <label className="flex items-center gap-2 text-[13.5px] font-medium text-gray-500 cursor-pointer select-none">
+            Wajib diisi
+            <input type="checkbox" checked={question.required} onChange={(e) => onUpdate("required", e.target.checked)} className="accent-[#1a4fa0]" style={{ width: 18, height: 18 }} />
+          </label>
+        </div>
       </div>
     </div>
   );
@@ -1020,7 +1057,10 @@ function SettingsTab({ form, onUpdateStatus, slug }) {
 
   function handleScoreTypeChange(val) {
     setScoreType(val);
-    localStorage.setItem(`score_type_${form?.slug ?? slug}`, val);
+    const key = `score_type_${form?.slug ?? slug}`;
+    localStorage.setItem(key, val);
+    // Dispatch storage event supaya PertanyaanTab ikut update
+    window.dispatchEvent(new StorageEvent("storage", { key, newValue: val }));
   }
 
   return (
