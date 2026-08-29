@@ -177,8 +177,44 @@ const CARD_COLORS = [
 /* ── Fetch Forms Grid (ganti CreateFormCard) ───────────────────── */
 function FetchFormsGrid({ search, category }) {
   const navigate = useNavigate();
-  const [forms, setForms]     = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [forms, setForms]         = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [tokenModal, setTokenModal] = useState(null); // { slug, title }
+  const [tokenInput, setTokenInput] = useState("");
+  const [tokenErr, setTokenErr]     = useState("");
+  const [tokenLoading, setTokenLoading] = useState(false);
+
+  function handleCardClick(form) {
+    const slug  = form.slug ?? form.form_slug;
+    const token = form.token_respon;
+    if (token && token.trim() !== "") {
+      // Ada token — tampilkan modal
+      setTokenModal({ slug, title: form.title ?? form.form_title ?? "Form" });
+      setTokenInput(""); setTokenErr("");
+    } else {
+      navigate(`/fill/${slug}`);
+    }
+  }
+
+  async function handleTokenSubmit() {
+    if (!tokenInput.trim()) { setTokenErr("Masukkan token terlebih dahulu."); return; }
+    setTokenLoading(true); setTokenErr("");
+    try {
+      const res = await fetch(`http://localhost:3000/form/submit/check-token?form_slug=${tokenModal.slug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+        body: JSON.stringify({ token: tokenInput.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setTokenErr(data?.message || "Token salah atau tidak valid.");
+      } else {
+        setTokenModal(null);
+        navigate(`/fill/${tokenModal.slug}`);
+      }
+    } catch { setTokenErr("Tidak dapat terhubung ke server."); }
+    finally { setTokenLoading(false); }
+  }
 
   useEffect(() => { load(); }, [category]);
 
@@ -241,7 +277,7 @@ function FetchFormsGrid({ search, category }) {
             const clr    = CARD_COLORS[i % CARD_COLORS.length];
             return (
               <div key={form.id ?? i}
-                onClick={() => navigate(`/fill/${form.slug ?? form.form_slug}`)}
+                onClick={() => handleCardClick(form)}
                 className="group bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-lg transition-all cursor-pointer flex flex-col"
                 style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}
               >
@@ -264,6 +300,41 @@ function FetchFormsGrid({ search, category }) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Modal Token */}
+      {tokenModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          onClick={() => setTokenModal(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center"
+            onClick={e => e.stopPropagation()}>
+            <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-blue-50 flex items-center justify-center text-2xl">🔐</div>
+            <h3 className="text-[16px] font-extrabold text-[#102f56] mb-1">Form Terbatas</h3>
+            <p className="text-[13px] text-gray-400 mb-4">
+              Masukkan token untuk mengisi <strong>"{tokenModal.title}"</strong>
+            </p>
+            <input
+              type="text"
+              value={tokenInput}
+              onChange={e => { setTokenInput(e.target.value); setTokenErr(""); }}
+              onKeyDown={e => e.key === "Enter" && handleTokenSubmit()}
+              placeholder="Masukkan token..."
+              className="w-full border border-[#dbe5f0] rounded-xl px-4 py-3 text-[14px] text-center tracking-widest font-semibold outline-none focus:border-[#1a4fa0] focus:ring-4 focus:ring-[#1a4fa0]/10 transition-all mb-2"
+            />
+            {tokenErr && <p className="text-[12px] text-red-500 mb-2">{tokenErr}</p>}
+            <div className="flex gap-2 mt-2">
+              <button onClick={() => setTokenModal(null)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-[13px] font-semibold text-gray-600 hover:bg-gray-50 transition">
+                Batal
+              </button>
+              <button onClick={handleTokenSubmit} disabled={tokenLoading}
+                className="flex-1 py-2.5 rounded-xl text-white text-[13px] font-bold hover:opacity-90 disabled:opacity-60 transition"
+                style={{ backgroundColor: "#1a4fa0" }}>
+                {tokenLoading ? "Memverifikasi..." : "Masuk →"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
