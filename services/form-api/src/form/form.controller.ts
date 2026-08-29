@@ -30,10 +30,12 @@ export class FormController {
 
   // Get Form By Slug
   @Get('/slug/')
+  @UseGuards(JwtAuthGuard)
   getFormBySlug(
+    @Request() req,
     @Query('slug') slug: string
   ) {
-    return this.formService.getFormBySlug(slug)
+    return this.formService.getFormBySlug(req.user, slug)
   }
 
   // Create Form

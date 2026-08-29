@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { KnexService } from '../database/knex.service';
 import { SoalService } from '../soal/soal.service';
 import { ValidateIsCreator } from '../Pipe/validate.is.creator';
@@ -59,13 +59,16 @@ export class FormService {
   }
 
   // Get By Slug
-  async getFormBySlug(slug: string) {
+  async getFormBySlug(req: {id: number}, slug: string) {
       const getForm = await this.knexService.connection("forms")
       .select("*")
       .where("slug", slug)
       .first()
 
       if(!getForm) throw new NotFoundException("Tidak Ada Form")
+
+      const isCreator = await this.isCreator.isCreator(req.id, getForm.id)
+      if(isCreator == false && getForm.status == 'private') throw new ForbiddenException("Maaf tapi form belum dibuka, silahkan hubungi creator") 
       
       const listSoal = await this.soalService.getSoalByForm(getForm.id, getForm.is_random)
 
