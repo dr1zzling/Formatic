@@ -44,6 +44,12 @@ export default function FillForm() {
   const [errorSoalId, setErrorSoalId] = useState(null);
   const soalRefs = useRef({});
 
+  // ── Token gate hooks — harus di atas semua early returns ──
+  const [tokenInput, setTokenInput]       = useState("");
+  const [tokenVerified, setTokenVerified] = useState(false);
+  const [tokenLoading, setTokenLoading]   = useState(false);
+  const [tokenError, setTokenError]       = useState("");
+
   useEffect(() => {
     (async () => {
       try {
@@ -90,6 +96,14 @@ export default function FillForm() {
     };
   }, [slug]);
 
+
+  // Sync token verified state setelah form load
+  useEffect(() => {
+    if (form) {
+      const needsToken = Boolean(form?.token_respon);
+      if (!needsToken) setTokenVerified(true);
+    }
+  }, [form]);
 
   function setAnswer(soalId, value) {
     setAnswers((prev) => ({ ...prev, [soalId]: value }));
@@ -228,10 +242,6 @@ export default function FillForm() {
 
   // ── Token gate ────────────────────────────────────────────
   const needsToken = Boolean(form?.token_respon);
-  const [tokenInput, setTokenInput]       = useState("");
-  const [tokenVerified, setTokenVerified] = useState(!needsToken);
-  const [tokenLoading, setTokenLoading]   = useState(false);
-  const [tokenError, setTokenError]       = useState("");
 
   async function verifyToken() {
     if (!tokenInput.trim()) { setTokenError("Masukkan token terlebih dahulu."); return; }
@@ -284,17 +294,7 @@ export default function FillForm() {
   );
   // Flatten soal dari format baru {page, soal:[]} atau format lama flat[]
   const rawSoal = form?.soal ?? [];
-  const soalList = rawSoal.length > 0 && rawSoal[0]?.soal
-    ? rawSoal.flatMap(p => p.soal ?? [])
-    : rawSoal;
 
-  // Untuk quiz: grup per page
-  const pageGroups = rawSoal.length > 0 && rawSoal[0]?.soal
-    ? rawSoal.map(p => ({ page: p.page ?? 1, soal: p.soal ?? [] }))
-    : [{ page: 1, soal: rawSoal }];
-
-  // Fix submit — pakai soalList flat
-  const allSoal = soalList;
   // Quiz: step-by-step navigation
 
   if (isQuiz) {
