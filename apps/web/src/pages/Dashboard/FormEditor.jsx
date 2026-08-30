@@ -603,10 +603,15 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemo
           <div className="flex items-center gap-1.5 bg-[#f0f6fe] border border-[#d4e5fa] rounded-lg px-2 py-1">
             <span className="text-[11px] font-semibold text-[#1a4fa0]">Hal.</span>
             <input
-              type="number" min="1" max="99"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={question.page ?? 1}
-              onChange={(e) => onUpdate("page", Math.max(1, parseInt(e.target.value) || 1))}
-              className="w-10 text-[13px] font-bold text-[#1a4fa0] bg-transparent border-none outline-none text-center"
+              onChange={(e) => {
+                const v = parseInt(e.target.value.replace(/\D/g, "")) || 1;
+                onUpdate("page", Math.max(1, v));
+              }}
+              className="w-8 text-[13px] font-bold text-[#1a4fa0] bg-transparent border-none outline-none text-center"
             />
           </div>
           {/* Type selector */}
@@ -975,6 +980,13 @@ function SettingsTab({ form, onUpdateStatus, slug }) {
   const isPublic   = form?.status === "public" || form?.form_status === "public";
   const isQuiz     = form?.category === "ujian";
 
+  // Token state
+  const [tokenActive, setTokenActive]   = useState(Boolean(form?.token_respon));
+  const [tokenValue, setTokenValue]     = useState(form?.token_respon ?? "");
+  const [tokenMode, setTokenMode]       = useState("random"); // "random" | "manual"
+  const [tokenSaving, setTokenSaving]   = useState(false);
+  const [tokenMsg, setTokenMsg]         = useState("");
+
   // Timer state
   const [duration, setDuration]   = useState(form?.duration ?? "");
   const [startAt, setStartAt]     = useState(
@@ -996,6 +1008,30 @@ function SettingsTab({ form, onUpdateStatus, slug }) {
   const [scoreMsg, setScoreMsg]       = useState("");
 
   const questions = form?.soal ?? [];
+
+  function generateRandomToken() {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    return Array.from({length: 8}, () => chars[Math.floor(Math.random()*chars.length)]).join("");
+  }
+
+  async function saveToken(active, value) {
+    setTokenSaving(true); setTokenMsg("");
+    try {
+      const res = await fetch(`http://localhost:3000/form/setting?form_slug=${form?.slug ?? slug}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+        body: JSON.stringify({
+          duration: duration ? Number(duration) : null,
+          start_at: startAt ? new Date(startAt).getTime() : null,
+          is_random: isRandom,
+          token_respon: active ? (value || null) : null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      setTokenMsg(res.ok ? "✅ Token berhasil disimpan!" : (data?.message || "Gagal."));
+    } catch { setTokenMsg("Gagal menyimpan."); }
+    finally { setTokenSaving(false); setTimeout(() => setTokenMsg(""), 3000); }
+  }
 
   async function saveTimer() {
     if (!duration && !startAt) { setTimerMsg("Isi durasi atau waktu mulai."); return; }
@@ -1075,6 +1111,67 @@ function SettingsTab({ form, onUpdateStatus, slug }) {
           </p>
         </div>
         <Toggle value={isPublic} onChange={() => onUpdateStatus(isPublic ? "private" : "public")} />
+      </div>
+
+      {/* Token Responden */}
+      <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-sm p-6 space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-lg shrink-0">🔐</span>
+            <div>
+              <p className="font-bold text-gray-700 text-[15px]">Token Responden</p>
+              <p className="text-[13px] text-gray-400">Batasi siapa yang bisa mengisi form ini</p>
+            </div>
+          </div>
+          <Toggle value={tokenActive} onChange={v => {
+            setTokenActive(v);
+            if (!v) saveToken(false, "");
+          }} />
+        </div>
+
+        {tokenActive && (
+          <div className="space-y-3 pt-2 border-t border-gray-50">
+            <div className="flex gap-2">
+              <button onClick={() => setTokenMode("random")}
+                className={`flex-1 py-2 rounded-lg text-[13px] font-semibold border transition ${tokenMode === "random" ? "bg-[#1a4fa0] text-white border-[#1a4fa0]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"}`}>
+                🎲 Generate Otomatis
+              </button>
+              <button onClick={() => setTokenMode("manual")}
+                className={`flex-1 py-2 rounded-lg text-[13px] font-semibold border transition ${tokenMode === "manual" ? "bg-[#1a4fa0] text-white border-[#1a4fa0]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"}`}>
+                ✏️ Buat Manual
+              </button>
+            </div>
+
+            {tokenMode === "random" ? (
+              <div className="flex items-center gap-2">
+                <div className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl font-mono font-bold text-[15px] text-gray-800 tracking-widest">
+                  {tokenValue || <span className="text-gray-400 font-normal text-[13px]">Belum digenerate</span>}
+                </div>
+                <button onClick={() => { const t = generateRandomToken(); setTokenValue(t); }}
+                  className="px-4 py-2.5 rounded-xl border border-gray-200 text-[13px] font-semibold text-gray-600 hover:bg-gray-50 transition whitespace-nowrap">
+                  Generate
+                </button>
+              </div>
+            ) : (
+              <input type="text" value={tokenValue} onChange={e => setTokenValue(e.target.value)}
+                placeholder="Tulis token kamu..."
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-[14px] font-mono font-bold tracking-widest outline-none focus:border-[#1a4fa0] focus:ring-2 focus:ring-[#1a4fa0]/10 transition" />
+            )}
+
+            {tokenValue && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-100 rounded-xl">
+                <span className="text-amber-600 text-[12px]">⚠️ Bagikan token ini ke responden yang berhak mengisi form.</span>
+              </div>
+            )}
+
+            <button onClick={() => saveToken(true, tokenValue)} disabled={tokenSaving || !tokenValue}
+              className="w-full py-2.5 rounded-xl text-white text-[13px] font-semibold disabled:opacity-50 transition hover:opacity-90"
+              style={{ background: "linear-gradient(135deg,#1a4fa0,#1e6fc7)" }}>
+              {tokenSaving ? "Menyimpan..." : "Simpan Token"}
+            </button>
+            {tokenMsg && <p className="text-[12px] font-medium text-[#1a4fa0]">{tokenMsg}</p>}
+          </div>
+        )}
       </div>
 
       {/* Score / Penilaian — hanya untuk kuis */}

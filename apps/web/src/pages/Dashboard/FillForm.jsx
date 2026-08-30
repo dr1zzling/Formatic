@@ -380,8 +380,12 @@ export default function FillForm() {
             </div>
           )}
           {soal.type === "text" && (
-            <textarea rows={3} placeholder="Tulis jawabanmu di sini..."
-              value={answers[soal.id] ?? ""} onChange={e => setAnswer(soal.id, e.target.value)}
+            <textarea
+              key={`text-quiz-${soal.id}`}
+              rows={3} placeholder="Tulis jawabanmu di sini..."
+              defaultValue={answers[soal.id] ?? ""}
+              onBlur={e => setAnswer(soal.id, e.target.value)}
+              onChange={e => setAnswer(soal.id, e.target.value)}
               className={inputCls} />
           )}
           {soal.type === "file" && (
@@ -467,157 +471,167 @@ export default function FillForm() {
     );
   }
 
-  // Survey: scroll all
-  return (
-    <div className="min-h-screen px-4 py-8 md:py-12" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
-      <div className="max-w-2xl mx-auto">
-        <button onClick={() => navigate("/")} className="inline-flex items-center gap-2 text-[14px] font-semibold text-[#1a4fa0] hover:underline mb-6">
-          <ArrowLeft size={16} /> Kembali
-        </button>
+  // Survey: per page (sama seperti quiz tapi category survei)
+  const totalPagesS  = pageGroups.length;
+  const currPageS    = pageGroups[currentIdx] ?? { page: 1, soal: [] };
+  const isFirstS     = currentIdx === 0;
+  const isLastS      = currentIdx === totalPagesS - 1;
+  const progressS    = totalPagesS > 0 ? ((currentIdx + 1) / totalPagesS) * 100 : 0;
 
+  function goNextS() {
+    const unanswered = (currPageS.soal ?? []).find(s => !hasAnswer(s));
+    if (unanswered) {
+      setErrorSoalId(unanswered.id);
+      const el = soalRefs.current[unanswered.id];
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    setErrorSoalId(null);
+    setCurrentIdx(i => Math.min(i + 1, totalPagesS - 1));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function goPrevS() {
+    setErrorSoalId(null);
+    setCurrentIdx(i => Math.max(i - 1, 0));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
+      {/* Top bar */}
+      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-[#e5eef7] px-4 py-3">
+        <div className="max-w-2xl mx-auto">
+          <div className="flex items-center justify-between mb-2">
+            <button onClick={() => navigate("/")} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#1a4fa0] hover:underline">
+              <ArrowLeft size={15} /> Kembali
+            </button>
+            <span className="text-[13px] font-semibold text-gray-500">
+              {totalPagesS > 1 ? `Halaman ${currentIdx + 1} / ${totalPagesS}` : title}
+            </span>
+          </div>
+          {totalPagesS > 1 && (
+            <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full rounded-full transition-all duration-300" style={{ width: `${progressS}%`, background: "linear-gradient(90deg,#1a4fa0,#1e6fc7)" }} />
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full">
         {liveNotice && (
-          <div className="mb-4 px-4 py-3 rounded-xl bg-blue-600 text-white text-[14px] font-semibold flex items-center gap-3 shadow-lg animate-bounce">
-            <Bell size={18} />
-            <span>{liveNotice}</span>
+          <div className="mb-4 px-4 py-3 rounded-xl bg-blue-600 text-white text-[14px] font-semibold flex items-center gap-3 shadow-lg">
+            <Bell size={18} /><span>{liveNotice}</span>
           </div>
         )}
 
-        {/* Form header */}
-        <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-7 mb-5">
+        {/* Form header (halaman pertama) */}
+        {currentIdx === 0 && (
+          <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-7 mb-5">
+            <h1 className="text-[24px] font-extrabold tracking-tight text-[#102f56] leading-snug">{title}</h1>
+            <p className="mt-1 text-[13.5px] text-gray-400">{form?.category}</p>
+          </div>
+        )}
 
-          <h1 className="text-[24px] font-extrabold tracking-tight text-[#102f56] leading-snug">{title}</h1>
-          <p className="mt-1 text-[13.5px] text-gray-400">{form?.category}</p>
-        </div>
-
-        {/* Questions */}
-        {(form?.soal ?? []).map((soal, qi) => {
+        {/* Soal di halaman ini */}
+        {(currPageS.soal ?? []).map((soal, qi) => {
+          const globalIdx = allSoal.findIndex(s => s.id === soal.id);
           const isError = errorSoalId === soal.id;
           return (
-          <div
-            key={soal.id ?? qi}
-            ref={el => { soalRefs.current[soal.id] = el; }}
-            className={`bg-white rounded-2xl border shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-6 mb-4 transition-all ${
-              isError ? "border-red-400 ring-2 ring-red-300" : "border-[#e5eef7]"
-            }`}
-          >
-            <div className="flex items-start gap-3 mb-4">
-              <span className={`w-9 h-9 rounded-xl text-[14px] font-extrabold grid place-items-center shrink-0 mt-0.5 ${
-                isError ? "bg-red-50 text-red-500" : "bg-[#eef5fb] text-[#1a4fa0]"
-              }`}>{qi + 1}</span>
-              <div className="flex-1 min-w-0">
-                <RichTextDisplay content={soal.question} className="text-[16px] font-bold text-[#102f56] leading-snug" />
-                <span className="text-[12px] font-medium text-[#1a4fa0] block mt-1">{TYPE_LABEL[soal.type] ?? soal.type}</span>
-              </div>
-              <span className="text-[11px] font-semibold text-[#c9393f] shrink-0">*</span>
-            </div>
-
-            {isError && (
-              <p className="text-[13px] text-red-500 font-semibold mb-3 flex items-center gap-1.5">
-                Pertanyaan ini wajib dijawab
-              </p>
-            )}
-
-            {/* Attachment soal (file lampiran dari pembuat) */}
-            {soal.image && (
-              <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-100 rounded-xl">
-                <FileText size={18} className="text-[#1a4fa0] shrink-0" />
+            <div key={soal.id ?? qi} ref={el => { if (el) soalRefs.current[soal.id] = el; }}
+              className={`bg-white rounded-2xl border shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-6 mb-4 transition-all ${isError ? "border-red-400 ring-2 ring-red-100" : "border-[#e5eef7]"}`}>
+              <div className="flex items-start gap-3 mb-4">
+                <span className="w-9 h-9 rounded-xl bg-[#eef5fb] text-[#1a4fa0] text-[14px] font-extrabold grid place-items-center shrink-0 mt-0.5">
+                  {(globalIdx >= 0 ? globalIdx : qi) + 1}
+                </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold text-[#1a4fa0]">Lampiran Soal</p>
-                  <p className="text-[11.5px] text-blue-500 truncate">{soal.image}</p>
+                  <RichTextDisplay content={soal.question} className="text-[16px] font-bold text-[#102f56] leading-snug" />
+                  <span className="text-[12px] font-medium text-[#1a4fa0] block mt-1">{TYPE_LABEL[soal.type] ?? soal.type}</span>
                 </div>
-                <a
-                  href={`${FORM_API_URL}/uploads/soal/${soal.image}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="shrink-0 px-3 py-1.5 rounded-lg bg-[#1a4fa0] text-white text-[12px] font-semibold hover:opacity-90 transition"
-                >
-                  Buka File
-                </a>
+                <span className="text-[11px] font-semibold text-[#c9393f] shrink-0">*</span>
               </div>
-            )}
 
-            {/* Radio / Checkbox */}
-            {(soal.type === "radio" || soal.type === "checkbox") && (
-              <div className="space-y-2.5">
-                {(soal.options ?? []).map((opt, oi) => {
-                  const selected = soal.type === "radio"
-                    ? answers[soal.id] === opt.id
-                    : (Array.isArray(answers[soal.id]) && answers[soal.id].includes(opt.id));
-                  return (
-                    <button
-                      key={opt.id ?? oi}
-                      onClick={() => toggleOption(soal, opt)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
-                        selected
-                          ? "border-[#1a4fa0] bg-[#f0f6fe] text-[#102f56]"
-                          : "border-[#e2e9f1] text-gray-600 hover:border-[#1a4fa0]/40 hover:bg-[#f7fafd]"
-                      }`}
-                    >
-                      <span className={`inline-grid place-items-center shrink-0 border-2 transition-all ${
-                          soal.type === "checkbox" ? "w-6 h-6 rounded-[8px]" : "w-6 h-6 rounded-full"
-                        } ${
-                          selected ? "border-[#1a4fa0] bg-[#1a4fa0]" : "border-[#5b6c7e] bg-[#eef2f6]"
+              {soal.image && (
+                <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-100 rounded-xl">
+                  <FileText size={18} className="text-[#1a4fa0] shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-semibold text-[#1a4fa0]">Lampiran Soal</p>
+                    <p className="text-[11.5px] text-blue-500 truncate">{soal.image}</p>
+                  </div>
+                  <a href={`http://localhost:3000${soal.image.startsWith('/') ? soal.image : '/uploads/soal/'+soal.image}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="shrink-0 px-3 py-1.5 rounded-lg bg-[#1a4fa0] text-white text-[12px] font-semibold hover:opacity-90 transition">
+                    Buka File
+                  </a>
+                </div>
+              )}
+
+              {(soal.type === "radio" || soal.type === "checkbox") && (
+                <div className="space-y-2.5">
+                  {(soal.options ?? []).map((opt, oi) => {
+                    const selected = soal.type === "radio"
+                      ? answers[soal.id] === opt.id
+                      : (Array.isArray(answers[soal.id]) && answers[soal.id].includes(opt.id));
+                    return (
+                      <button key={opt.id ?? oi} onClick={() => toggleOption(soal, opt)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
+                          selected ? "border-[#1a4fa0] bg-[#f0f6fe] text-[#102f56]" : "border-[#e2e9f1] text-gray-600 hover:border-[#1a4fa0]/40 hover:bg-[#f7fafd]"
                         }`}>
-                        {selected && (
-                          soal.type === "checkbox"
+                        <span className={`inline-grid place-items-center shrink-0 border-2 transition-all ${soal.type === "checkbox" ? "w-6 h-6 rounded-[8px]" : "w-6 h-6 rounded-full"} ${selected ? "border-[#1a4fa0] bg-[#1a4fa0]" : "border-[#5b6c7e] bg-[#eef2f6]"}`}>
+                          {selected && (soal.type === "checkbox"
                             ? <Check size={15} strokeWidth={3} className="text-white" />
-                            : <span className="w-3 h-3 rounded-full bg-white" />
-                        )}
-                      </span>
-                      <span className="text-[15px] font-medium">{fallbackLabel(opt, oi)}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Text */}
-            {soal.type === "text" && (
-              <textarea
-                rows={3}
-                placeholder="Tulis jawabanmu di sini..."
-                value={answers[soal.id] ?? ""}
-                onChange={(e) => setAnswer(soal.id, e.target.value)}
-                className={inputCls}
-              />
-            )}
-
-            {/* File — jawaban dalam bentuk file upload */}
-            {soal.type === "file" && (
-              <div className="space-y-3">
+                            : <span className="w-3 h-3 rounded-full bg-white" />)}
+                        </span>
+                        <span className="text-[15px] font-medium">{fallbackLabel(opt, oi)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {soal.type === "text" && (
+                <textarea key={`text-s-${soal.id}`} rows={3} placeholder="Tulis jawabanmu di sini..."
+                  defaultValue={answers[soal.id] ?? ""}
+                  onBlur={e => setAnswer(soal.id, e.target.value)}
+                  onChange={e => setAnswer(soal.id, e.target.value)}
+                  className={inputCls} />
+              )}
+              {soal.type === "file" && (
                 <label className="flex flex-col items-center justify-center gap-2 w-full rounded-xl border-2 border-dashed border-[#c3d4e4] bg-[#f7fafd] py-8 cursor-pointer hover:border-[#1a4fa0] hover:bg-[#f0f6fe] transition-all">
-                  {answers[soal.id]?.file ? (
-                    <>
-                      <FileText size={28} className="text-[#1a4fa0]" />
-                      <span className="text-[14px] font-semibold text-[#102f56]">{answers[soal.id].file.name}</span>
-                      <span className="text-[12px] text-gray-400">({(answers[soal.id].file.size / 1024).toFixed(0)} KB) · Klik untuk ganti</span>
-                    </>
-                  ) : (
-                    <>
-                      <UploadCloud size={28} className="text-[#1a4fa0]" />
-                      <span className="text-[14px] font-semibold text-[#102f56]">Unggah file jawaban</span>
-                      <span className="text-[12.5px] text-gray-400">Klik untuk memilih file</span>
-                    </>
-                  )}
-                  <input type="file" className="hidden" onChange={(e) => setAnswer(soal.id, { file: e.target.files?.[0] })} />
+                  {answers[soal.id]?.file
+                    ? <><FileText size={28} className="text-[#1a4fa0]" /><span className="text-[14px] font-semibold text-[#102f56]">{answers[soal.id].file.name}</span></>
+                    : <><UploadCloud size={28} className="text-[#1a4fa0]" /><span className="text-[14px] font-semibold text-[#102f56]">Unggah file jawaban</span></>}
+                  <input type="file" className="hidden" onChange={e => setAnswer(soal.id, { file: e.target.files?.[0] })} />
                 </label>
-              </div>
-            )}
-          </div>
-        ); })}
+              )}
+            </div>
+          );
+        })}
 
         {submitError && (
           <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-[14px] mb-4">{submitError}</div>
         )}
 
-        <button
-          onClick={submit}
-          disabled={submitting}
-          className="w-full py-3.5 rounded-xl text-white text-[15px] font-bold flex items-center justify-center gap-2 shadow-[0_8px_20px_rgba(26,79,160,0.28)] hover:opacity-90 disabled:opacity-60 transition-all"
-          style={{ backgroundColor: "#1a4fa0" }}
-        >
-          <Send size={17} /> {submitting ? "Mengirim..." : "Kirim Jawaban"}
-        </button>
+        {/* Navigation */}
+        <div className="flex items-center gap-3">
+          {!isFirstS && (
+            <button onClick={goPrevS}
+              className="flex-1 py-3 rounded-xl border border-gray-200 text-[14px] font-semibold text-gray-600 hover:bg-gray-50 transition flex items-center justify-center gap-2">
+              <ArrowLeft size={16} /> Sebelumnya
+            </button>
+          )}
+          {!isLastS ? (
+            <button onClick={goNextS}
+              className="flex-1 py-3 rounded-xl text-white text-[14px] font-bold flex items-center justify-center gap-2 hover:opacity-90 transition"
+              style={{ backgroundColor: "#1a4fa0" }}>
+              Selanjutnya <ArrowRight size={16} />
+            </button>
+          ) : (
+            <button onClick={submit} disabled={submitting}
+              className="w-full py-3.5 rounded-xl text-white text-[15px] font-bold flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-60 transition"
+              style={{ backgroundColor: "#1a4fa0" }}>
+              <Send size={17} /> {submitting ? "Mengirim..." : "Kirim Jawaban"}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

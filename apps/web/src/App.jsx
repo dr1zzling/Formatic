@@ -24,8 +24,8 @@ function AuthRoute({ children }) {
   return children;
 }
 
-/* ── Auth pages (no sidebar) ─────────────────────────────────── */
-const AUTH_PATHS = ["/login", "/register", "/forgot-password"];
+/* ── Auth pages & responden pages (no sidebar) ───────────────── */
+const AUTH_PATHS = ["/login", "/register", "/forgot-password", "/fill/"];
 
 /* ── Nav order untuk arah slide ─────────────────────────────── */
 const NAV = ["/", "/home", "/my-forms", "/history", "/trash", "/profile"];
@@ -120,7 +120,7 @@ function AnimatedContent({ children }) {
     };
   }, [location.pathname, location.key]);
 
-  const isAuth = AUTH_PATHS.includes(location.pathname);
+  const isAuth = AUTH_PATHS.some(p => location.pathname === p || location.pathname.startsWith(p));
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
