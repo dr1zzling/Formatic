@@ -217,7 +217,7 @@ export default function FormEditor() {
           existingOnes.map((q) => {
             const hasOpts = ["radio", "checkbox", "rating"].includes(q.type);
             const payload = {
-              soal: { question: q.question, type: q.type },
+              soal: { question: q.question, type: q.type, page: parseInt(q.page) || 1, score: q.score ?? null },
               options: hasOpts
                 ? (q.options || []).map((o, idx) => ({ id: o.id, value: o.value?.trim() || `Opsi ${idx + 1}`, is_correct: o.is_correct ?? false }))
                 : [],

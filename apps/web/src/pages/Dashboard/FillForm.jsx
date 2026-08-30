@@ -183,7 +183,11 @@ export default function FillForm() {
         const data = await response.json().catch(() => ({}));
         console.error("Submit error:", response.status, data);
         if (response.status === 401) {
-          throw new Error(data.message || "Kamu tidak berhak mengisi form ini.");
+          const msg = data.message || "";
+          if (msg.toLowerCase().includes("berhak") || msg.toLowerCase().includes("responden")) {
+            throw new Error("Kamu adalah Creator form ini. Creator tidak bisa mengisi form sendiri. Coba dengan akun lain.");
+          }
+          throw new Error(msg || "Tidak berhak mengisi form ini.");
         }
         throw new Error(data.message || `Gagal mengirim jawaban (${response.status}).`);
       }
