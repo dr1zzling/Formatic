@@ -3,15 +3,15 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/services/form_service.dart';
 
 class AddQuestionScreen extends StatefulWidget {
-  final String formId;
-  final String formTitle;
   final String? formSlug;
+  final String formTitle;
+  final Map<String, dynamic>? questionToEdit;
 
   const AddQuestionScreen({
     super.key,
-    required this.formId,
-    required this.formTitle,
     this.formSlug,
+    required this.formTitle,
+    this.questionToEdit,
   });
 
   @override
@@ -22,25 +22,59 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
   final _formKey = GlobalKey<FormState>();
   final _questionController = TextEditingController();
   final List<TextEditingController> _optionControllers = [];
-  
+
   String _selectedType = 'radio';
   int? _correctOptionIndex;
   bool _isLoading = false;
+  bool _isEditing = false;
 
   final List<Map<String, dynamic>> _questionTypes = [
-    {'value': 'radio', 'label': 'Single Choice', 'icon': Icons.radio_button_checked},
+    {
+      'value': 'radio',
+      'label': 'Single Choice',
+      'icon': Icons.radio_button_checked,
+    },
     {'value': 'checkbox', 'label': 'Multiple Choice', 'icon': Icons.check_box},
     {'value': 'text', 'label': 'Text Input', 'icon': Icons.text_fields},
     {'value': 'file', 'label': 'File Upload', 'icon': Icons.upload_file},
-    {'value': 'rating', 'label': 'Rating', 'icon': Icons.star},
   ];
 
   @override
   void initState() {
     super.initState();
-    // Add 2 default options for radio/checkbox
-    _addOption();
-    _addOption();
+    _isEditing = widget.questionToEdit != null;
+    if (_isEditing) {
+      _loadExistingQuestion();
+    } else {
+      _addOption();
+      _addOption();
+    }
+  }
+
+  void _loadExistingQuestion() {
+    final question = widget.questionToEdit;
+    _selectedType = question?['type']?.toString() ?? 'radio';
+    _questionController.text = question?['question']?.toString() ?? '';
+
+    final options = question?['options'] as List? ?? [];
+    for (final option in options) {
+      if (option is Map) {
+        final controller = TextEditingController(
+          text: option['value']?.toString() ?? '',
+        );
+        _optionControllers.add(controller);
+        if (option['is_correct'] == true ||
+            option['is_correct'] == 1 ||
+            option['is_correct'] == '1' ||
+            option['is_correct'] == 'true') {
+          _correctOptionIndex = _optionControllers.length - 1;
+        }
+      }
+    }
+    if (_optionControllers.isEmpty) {
+      _addOption();
+      _addOption();
+    }
   }
 
   @override
@@ -65,7 +99,8 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
         _optionControllers.removeAt(index);
         if (_correctOptionIndex == index) {
           _correctOptionIndex = null;
-        } else if (_correctOptionIndex != null && _correctOptionIndex! > index) {
+        } else if (_correctOptionIndex != null &&
+            _correctOptionIndex! > index) {
           _correctOptionIndex = _correctOptionIndex! - 1;
         }
       });
@@ -81,9 +116,21 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
       return;
     }
 
+    if (widget.formSlug == null || widget.formSlug!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Form slug tidak tersedia'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
     // Validate options if needed
     if (_needsOptions()) {
-      bool hasEmptyOption = _optionControllers.any((c) => c.text.trim().isEmpty);
+      bool hasEmptyOption = _optionControllers.any(
+        (c) => c.text.trim().isEmpty,
+      );
       if (hasEmptyOption) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -100,50 +147,52 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
     });
 
     try {
-      final formId = int.tryParse(widget.formId);
-      if (formId == null) {
-        throw Exception('Invalid form ID');
-      }
-
-      final List<Map<String, dynamic>> questions = [];
-
-      if (_needsOptions()) {
-        // For questions with options
-        final optionValues = _optionControllers
-            .asMap()
-            .entries
-            .map((entry) {
+      final List<Map<String, dynamic>> optionValues = _needsOptions()
+          ? _optionControllers.asMap().entries.map((entry) {
               final index = entry.key;
               final controller = entry.value;
               return {
                 'value': controller.text.trim(),
-                'is_correct': _correctOptionIndex == index, // Individual is_correct per option
+                'is_correct': _correctOptionIndex == index,
               };
-            })
-            .toList();
+            }).toList()
+          : <Map<String, dynamic>>[];
 
-        questions.add({
-          'soal': {
-            'question': _questionController.text.trim(),
-            'type': _selectedType,
-          },
-          'options': optionValues,
-        });
+      final soalPayload = {
+        'question': _questionController.text.trim(),
+        'type': _selectedType,
+      };
+
+      final Map<String, dynamic> result;
+      if (_isEditing) {
+        final soalId = int.tryParse(widget.questionToEdit!['id'].toString());
+        if (soalId == null) {
+          throw Exception('Invalid soal id');
+        }
+        // Attach existing option ids so the backend updates instead of
+        // duplicating them.
+        final optionsForUpdate = List<Map<String, dynamic>>.from(optionValues);
+        final existing = widget.questionToEdit!['options'] as List? ?? [];
+        for (var i = 0; i < optionsForUpdate.length; i++) {
+          if (i < existing.length && existing[i] is Map) {
+            final id = existing[i]['id'];
+            if (id != null) {
+              optionsForUpdate[i]['id'] = id;
+            }
+          }
+        }
+        result = await FormService.updateQuestion(
+          soalId: soalId,
+          payload: {'soal': soalPayload, 'options': optionsForUpdate},
+        );
       } else {
-        // For text/file questions (no options)
-        questions.add({
-          'soal': {
-            'question': _questionController.text.trim(),
-            'type': _selectedType,
-          },
-          'options': [],
-        });
+        result = await FormService.createQuestions(
+          formSlug: widget.formSlug!,
+          questions: [
+            {'soal': soalPayload, 'options': optionValues},
+          ],
+        );
       }
-
-      final result = await FormService.createQuestions(
-        formId: int.parse(widget.formId),
-        questions: questions,
-      );
 
       setState(() {
         _isLoading = false;
@@ -152,8 +201,12 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
       if (mounted) {
         if (result['success']) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Question added successfully!'),
+            SnackBar(
+              content: Text(
+                _isEditing
+                    ? 'Question updated successfully!'
+                    : 'Question added successfully!',
+              ),
               backgroundColor: AppColors.success,
             ),
           );
@@ -161,7 +214,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(result['message'] ?? 'Failed to add question'),
+              content: Text(result['message'] ?? 'Failed to save question'),
               backgroundColor: AppColors.error,
             ),
           );
@@ -194,7 +247,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
         ),
         title: Text(
-          'Add Question',
+          _isEditing ? 'Edit Question' : 'Add Question',
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -251,12 +304,17 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                     });
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: isSelected ? AppColors.primary : Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isSelected ? AppColors.primary : AppColors.inputBorder,
+                        color: isSelected
+                            ? AppColors.primary
+                            : AppColors.inputBorder,
                       ),
                     ),
                     child: Row(
@@ -265,13 +323,17 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                         Icon(
                           type['icon'],
                           size: 20,
-                          color: isSelected ? Colors.white : AppColors.textSecondary,
+                          color: isSelected
+                              ? Colors.white
+                              : AppColors.textSecondary,
                         ),
                         const SizedBox(width: 8),
                         Text(
                           type['label'],
                           style: TextStyle(
-                            color: isSelected ? Colors.white : AppColors.textSecondary,
+                            color: isSelected
+                                ? Colors.white
+                                : AppColors.textSecondary,
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
                           ),
@@ -312,7 +374,10 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                  borderSide: const BorderSide(
+                    color: AppColors.primary,
+                    width: 2,
+                  ),
                 ),
               ),
               validator: (value) {
@@ -326,7 +391,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
             // Options (for radio/checkbox/rating)
             if (_needsOptions()) ...[
               const SizedBox(height: 24),
-              
+
               // Show rating stars for rating type
               if (_selectedType == 'rating') ...[
                 const Text(
@@ -401,7 +466,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                       children: [
                         // Show correct icon based on type
                         Icon(
-                          _selectedType == 'radio' 
+                          _selectedType == 'radio'
                               ? Icons.radio_button_unchecked
                               : Icons.check_box_outline_blank,
                           color: AppColors.textSecondary,
@@ -413,7 +478,9 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                           value: _correctOptionIndex == index,
                           onChanged: (value) {
                             setState(() {
-                              _correctOptionIndex = value == true ? index : null;
+                              _correctOptionIndex = value == true
+                                  ? index
+                                  : null;
                             });
                           },
                           activeColor: AppColors.success,
@@ -426,43 +493,53 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                               hintText: 'Option ${index + 1}',
                               filled: true,
                               fillColor: Colors.white,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: AppColors.inputBorder),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: AppColors.inputBorder),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: AppColors.inputBorder,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: AppColors.inputBorder,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: AppColors.primary,
+                                  width: 2,
+                                ),
+                              ),
                             ),
                           ),
                         ),
+                        // Delete button
+                        if (_optionControllers.length > 1)
+                          IconButton(
+                            onPressed: () => _removeOption(index),
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: AppColors.error,
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                if (_correctOptionIndex != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      '✓ Option ${_correctOptionIndex! + 1} marked as correct answer',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.success,
+                        fontWeight: FontWeight.w500,
                       ),
-                      // Delete button
-                      if (_optionControllers.length > 1)
-                        IconButton(
-                          onPressed: () => _removeOption(index),
-                          icon: const Icon(Icons.delete_outline, color: AppColors.error),
-                        ),
-                    ],
-                  ),
-                );
-              }).toList(),
-              if (_correctOptionIndex != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    '✓ Option ${_correctOptionIndex! + 1} marked as correct answer',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.success,
-                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                ),
               ],
             ],
 
@@ -490,7 +567,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                       ),
                     )
                   : const Text(
-                      'Add Question',
+                      'Save Question',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,

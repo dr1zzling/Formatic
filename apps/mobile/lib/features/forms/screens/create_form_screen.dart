@@ -17,7 +17,6 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
   final _titleController = TextEditingController();
   final _tokenController = TextEditingController();
   String _selectedCategory = 'ujian';
-  XFile? _bannerFile;
   Uint8List? _bannerBytes;
   bool _isLoading = false;
   final ImagePicker _picker = ImagePicker();
@@ -39,41 +38,61 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
     if (image != null) {
       final bytes = await image.readAsBytes();
       setState(() {
-        _bannerFile = image;
         _bannerBytes = bytes;
       });
     }
   }
 
-  void _handleCreateForm() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
+  Future<void> _handleCreateForm() async {
+    if (!_formKey.currentState!.validate()) return;
 
-      final result = await FormService.createForm(
-        title: _titleController.text.trim(),
-        category: _selectedCategory,
-        tokenRespon: _tokenController.text.trim(),
-        bannerBytes: _bannerBytes,
-        bannerName: _bannerFile?.name,
-        bannerMimeType: _bannerFile?.mimeType,
+    if (_bannerBytes == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Banner image wajib diunggah'),
+          backgroundColor: AppColors.error,
+        ),
       );
+      return;
+    }
 
-      setState(() {
-        _isLoading = false;
+    setState(() {
+      _isLoading = true;
+    });
+
+    final bannerBytes = _bannerBytes!;
+    final result = await FormService.createForm(
+      title: _titleController.text.trim(),
+      category: _selectedCategory,
+      bannerBytes: bannerBytes,
+      tokenRespon: _tokenController.text.trim(),
+    );
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    if (!mounted) return;
+
+    if (result['success']) {
+      final data = result['data'] is Map ? result['data']['data'] : null;
+      final form = data is Map && data['form'] is Map ? data['form'] : data as Map?;
+      final slug = form is Map ? (form['form_slug'] ?? form['slug']) : null;
+      Navigator.of(context).pop({
+        'success': true,
+        'message': 'Form berhasil dibuat',
+        'slug': slug is String ? slug : null,
+        'form_id': form is Map ? (form['form_id'] ?? form['id']) : null,
+        'form_title': form is Map ? (form['form_title'] ?? form['title']) : null,
+        'form_status': form is Map ? (form['form_status'] ?? form['status']) : null,
       });
-
-      if (result['success'] && mounted) {
-        Navigator.of(context).pop(true);
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Failed to create form'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? 'Gagal membuat form'),
+          backgroundColor: AppColors.error,
+        ),
+      );
     }
   }
 
@@ -245,7 +264,6 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
                                     child: GestureDetector(
                                       onTap: () {
                                         setState(() {
-                                          _bannerFile = null;
                                           _bannerBytes = null;
                                         });
                                       },

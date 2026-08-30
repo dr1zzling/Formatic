@@ -6,6 +6,7 @@ import '../widgets/category_chip.dart';
 import '../../forms/screens/create_form_screen.dart';
 import '../../forms/screens/my_forms_screen.dart';
 import '../../forms/screens/form_editor_screen.dart';
+import '../../forms/screens/form_viewer_screen.dart';
 import '../../history/screens/history_screen.dart';
 import '../../profile/screens/profile_screen.dart';
 
@@ -34,13 +35,31 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
 
-    if (result == true && mounted) {
+    _handleCreateResult(result);
+  }
+
+  void _handleCreateResult(Object? result) {
+    if (result is Map && result['success'] == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Form created successfully!'),
+        SnackBar(
+          content: Text(result['message'] ?? 'Form berhasil dibuat'),
           backgroundColor: AppColors.success,
         ),
       );
+
+      final slug = result['slug'];
+      if (slug is String && slug.isNotEmpty && mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => FormEditorScreen(
+              formId: result['form_id']?.toString() ?? '',
+              formTitle: result['form_title'] ?? 'Untitled',
+              formSlug: slug,
+              formStatus: result['form_status'],
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -166,14 +185,14 @@ class _HomeContentState extends State<_HomeContent> {
         _allForms = forms.map((form) => {
           'id': form['id'].toString(),
           'form_id': form['id'],
-          'title': form['form_title'] ?? 'Untitled Form',
-          'slug': form['form_slug'] ?? '',
-          'status': form['form_status'] ?? 'private',
+          'title': form['title'] ?? form['form_title'] ?? 'Untitled Form',
+          'slug': form['slug'] ?? form['form_slug'] ?? '',
+          'status': form['status'] ?? form['form_status'] ?? 'private',
           'category': form['category'] ?? '',
           'category_id': form['category_id'],
           'questions': 0,
           'responses': '0',
-          'badge': (form['form_status'] ?? 'private').toUpperCase(),
+          'badge': (form['status'] ?? form['form_status'] ?? 'private').toUpperCase(),
           'hasImage': false,
         }).toList();
         _applyFilter();
@@ -183,6 +202,41 @@ class _HomeContentState extends State<_HomeContent> {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  void _navigateToCreateForm() async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const CreateFormScreen(),
+      ),
+    );
+
+    _handleCreateResult(result);
+  }
+
+  void _handleCreateResult(Object? result) {
+    if (result is Map && result['success'] == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? 'Form berhasil dibuat'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+
+      final slug = result['slug'];
+      if (slug is String && slug.isNotEmpty && mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => FormEditorScreen(
+              formId: result['form_id']?.toString() ?? '',
+              formTitle: result['form_title'] ?? 'Untitled',
+              formSlug: slug,
+              formStatus: result['form_status'],
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -270,13 +324,7 @@ class _HomeContentState extends State<_HomeContent> {
             ),
             const SizedBox(height: 32),
             ElevatedButton.icon(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const CreateFormScreen(),
-                  ),
-                );
-              },
+              onPressed: _navigateToCreateForm,
               icon: const Icon(Icons.add),
               label: const Text('Create Form'),
               style: ElevatedButton.styleFrom(
@@ -472,7 +520,8 @@ class _HomeContentState extends State<_HomeContent> {
         final result = await Navigator.of(context).push(
           MaterialPageRoute(builder: (context) => const CreateFormScreen()),
         );
-        if (result == true) _loadForms();
+        _handleCreateResult(result);
+        _loadForms();
       },
       child: Container(
         width: double.infinity,
@@ -665,11 +714,8 @@ class _HomeContentState extends State<_HomeContent> {
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => FormEditorScreen(
-              formId: form['form_id']?.toString() ?? form['id'].toString(),
-              formTitle: form['title'] ?? 'Untitled',
-              formSlug: form['slug'] ?? '',
-              formStatus: form['status'],
+            builder: (context) => FormViewerScreen(
+              slug: form['slug'] ?? '',
             ),
           ),
         );

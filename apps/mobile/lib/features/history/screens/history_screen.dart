@@ -105,13 +105,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         content: const Text(
-          'Form submission history feature requires backend endpoints:\n\n'
-          '• GET /form/:id/responses\n'
-          '• POST /form/:id/response\n\n'
-          'Once backend team implements these endpoints, you\'ll be able to see:\n'
-          '• Your submitted forms\n'
-          '• Submission timestamps\n'
-          '• Response details',
+          'Riwayat pengisian form per pengguna belum tersedia karena backend tidak '
+          'menyediakan endpoint pengambilan riwayat by-user.\n\n'
+          'Endpoint yang tersedia saat ini:\n'
+          '• GET /form/submit?form_slug= (kurasi hasil per form)\n'
+          '• GET /form/submit/detail?form_slug= (detail jawaban, khusus pemilik)\n\n'
+          'Anda dapat melihat respons per form dari tab My Forms (lihat detail form).\n'
+          'Status: blocker backend — bukan dapat diperbaiki dari sisi aplikasi.',
         ),
         actions: [
           TextButton(

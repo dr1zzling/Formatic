@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
@@ -19,7 +21,7 @@ class QrCodeScreen extends StatefulWidget {
 }
 
 class _QrCodeScreenState extends State<QrCodeScreen> {
-  String? _qrCodeDataUrl;
+  Uint8List? _qrCodeBytes;
   bool _isLoading = true;
   String _errorMessage = '';
 
@@ -37,10 +39,19 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
 
     try {
       final result = await FormService.generateQrCode(widget.formSlug);
-      
+
       if (result['success']) {
+        final raw = result['data']['qrCode']?.toString() ?? '';
+        final bytes = _decodeDataUrl(raw);
+        if (bytes == null) {
+          setState(() {
+            _errorMessage = 'QR code format tidak valid';
+            _isLoading = false;
+          });
+          return;
+        }
         setState(() {
-          _qrCodeDataUrl = result['data']['qrCode'];
+          _qrCodeBytes = bytes;
           _isLoading = false;
         });
       } else {
@@ -54,6 +65,16 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
         _errorMessage = 'Error: ${e.toString()}';
         _isLoading = false;
       });
+    }
+  }
+
+  Uint8List? _decodeDataUrl(String dataUrl) {
+    try {
+      final commaIndex = dataUrl.indexOf(',');
+      final base64Part = commaIndex >= 0 ? dataUrl.substring(commaIndex + 1) : dataUrl;
+      return base64Decode(base64Part.trim());
+    } catch (_) {
+      return null;
     }
   }
 
@@ -188,26 +209,32 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
             ),
             child: Column(
               children: [
-                if (_qrCodeDataUrl != null)
+                if (_qrCodeBytes != null)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      _qrCodeDataUrl!,
+                    child: Container(
                       width: 250,
                       height: 250,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          width: 250,
-                          height: 250,
-                          color: AppColors.background,
-                          child: const Icon(
-                            Icons.qr_code,
-                            size: 100,
-                            color: AppColors.textSecondary,
-                          ),
-                        );
-                      },
+                      color: Colors.white,
+                      child: Image.memory(
+                        _qrCodeBytes!,
+                        width: 250,
+                        height: 250,
+                        fit: BoxFit.contain,
+                        gaplessPlayback: true,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: 250,
+                            height: 250,
+                            color: AppColors.background,
+                            child: const Icon(
+                              Icons.qr_code,
+                              size: 100,
+                              color: AppColors.textSecondary,
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
                 const SizedBox(height: 24),

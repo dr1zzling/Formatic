@@ -96,9 +96,9 @@ app.post('/user/login', async (req, res) => {
 
         const exist = await userExist(username)
         if(!exist){
-            return res.status(404).json({
-                status: 404,
-                message: "User Tidak Ada",
+            return res.status(401).json({
+                status: 401,
+                message: "Username atau password salah",
             })
         }
 
@@ -106,7 +106,7 @@ app.post('/user/login', async (req, res) => {
         if(!isMatch){
             return res.status(401).json({
                 status: 401,
-                message: "Password Salah"
+                message: "Username atau password salah"
             })
         }
 
@@ -116,6 +116,45 @@ app.post('/user/login', async (req, res) => {
             status: 200,
             message: "Berhasil Login",
             token: token
+        })
+    }
+    catch(err){
+        return res.status(500).json({
+            status: 500,
+            message: "Internal Server Error",
+            error: err.message,
+            stack: err.stack
+        })
+    }
+})
+
+app.put('/user/forgot-password', async (req, res) => {
+    try{
+        const { username, password } = req.body
+        if(!username || !password){
+            return res.status(400).json({
+                status: 400,
+                message: "Isi Yang Benar"
+            })
+        }
+
+        const exist = await userExist(username)
+        if(!exist){
+            return res.status(404).json({
+                status: 404,
+                message: "User Tidak Ada",
+            })
+        }
+
+        const hashPassword = await bcrypt.hash(password, 10)
+
+        const update = await pool.query(`
+            UPDATE users SET password = $1 WHERE username = $2`,
+        [hashPassword, username])
+
+        return res.status(200).json({
+            status: 200,
+            message: "Berhasil Mengubah Password"
         })
     }
     catch(err){

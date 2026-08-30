@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
@@ -16,7 +17,8 @@ class _CreateFormSheetState extends State<CreateFormSheet> {
   static const _categories = ['Ujian', 'Survei', 'Pengumpulan Data'];
 
   final _titleController = TextEditingController();
-  String _category = 'Quiz';
+  final _tokenController = TextEditingController();
+  String _category = 'Ujian';
   bool _loading = false;
   String _error = '';
   XFile? _bannerFile;
@@ -24,7 +26,15 @@ class _CreateFormSheetState extends State<CreateFormSheet> {
   @override
   void dispose() {
     _titleController.dispose();
+    _tokenController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickBanner() async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (picked != null && mounted) {
+      setState(() => _bannerFile = picked);
+    }
   }
 
   Future<void> _create() async {
@@ -33,7 +43,7 @@ class _CreateFormSheetState extends State<CreateFormSheet> {
       return;
     }
     if (_bannerFile == null) {
-      setState(() => _error = 'Banner wajib dipilih.');
+      setState(() => _error = 'Banner image wajib diunggah.');
       return;
     }
     setState(() {
@@ -41,13 +51,22 @@ class _CreateFormSheetState extends State<CreateFormSheet> {
       _error = '';
     });
 
+    Uint8List bannerBytes;
+    try {
+      bannerBytes = await _bannerFile!.readAsBytes();
+    } catch (_) {
+      setState(() {
+        _loading = false;
+        _error = 'Gagal membaca banner. Silakan pilih ulang.';
+      });
+      return;
+    }
+
     final result = await FormService.createForm(
       title: _titleController.text.trim(),
       category: _category,
-      tokenRespon: '',
-      bannerBytes: _bannerFile != null ? await _bannerFile!.readAsBytes() : null,
-      bannerName: _bannerFile?.name,
-      bannerMimeType: _bannerFile?.mimeType,
+      bannerBytes: bannerBytes,
+      tokenRespon: _tokenController.text.trim(),
     );
 
     if (!mounted) return;
@@ -61,13 +80,6 @@ class _CreateFormSheetState extends State<CreateFormSheet> {
       widget.onCreated(slug is String ? slug : null);
     } else {
       setState(() => _error = result['message'] ?? 'Gagal membuat form.');
-    }
-  }
-
-  Future<void> _pickBanner() async {
-    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (picked != null && mounted) {
-      setState(() => _bannerFile = picked);
     }
   }
 
@@ -136,10 +148,18 @@ class _CreateFormSheetState extends State<CreateFormSheet> {
               items: _categories
                   .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                   .toList(),
-              onChanged: (v) => setState(() => _category = v ?? 'Quiz'),
+              onChanged: (v) => setState(() => _category = v ?? 'Ujian'),
             ),
             const SizedBox(height: 16),
-            _label('BANNER *'),
+            _label('TOKEN RESPON (OPSIONAL)'),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _tokenController,
+              onChanged: (_) => setState(() => _error = ''),
+              decoration: _inputDecoration('Masukkan token respon (opsional)'),
+            ),
+            const SizedBox(height: 16),
+            _label('BANNER IMAGE'),
             const SizedBox(height: 8),
             GestureDetector(
               onTap: _pickBanner,

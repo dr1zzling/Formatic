@@ -21,7 +21,12 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
   List<Map<String, dynamic>> _myForms = [];
   List<Map<String, dynamic>> _filteredForms = [];
 
-  final List<String> _categories = ['All', 'Ujian', 'Survei', 'Pengumpulan Data'];
+  final List<String> _categories = [
+    'All',
+    'Ujian',
+    'Survei',
+    'Pengumpulan Data',
+  ];
 
   @override
   void initState() {
@@ -44,20 +49,31 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
 
     if (result['success'] && mounted) {
       final responseData = result['data']['data'];
-      final Map<String, dynamic> userData = responseData is Map ? Map<String, dynamic>.from(responseData) : {};
-      final List<dynamic> forms = userData['form'] ?? [];
+      final Map<String, dynamic> userData = responseData is Map
+          ? Map<String, dynamic>.from(responseData)
+          : {};
+      final List<dynamic> forms =
+          (userData['form'] ?? userData['forms'] ?? []) is List
+          ? (userData['form'] ?? userData['forms'] ?? []) as List
+          : [];
 
       setState(() {
-        _myForms = forms.map((form) => {
-          'id': form['form_id'].toString(),
-          'title': form['form_title'] ?? 'Untitled Form',
-          'slug': form['form_slug'] ?? '',
-          'questions': 0,
-          'responses': 0,
-          'role': form['access_type'] ?? 'CREATOR',
-          'visibility': form['form_status'] ?? 'private',
-          'category': form['category'] ?? '',
-        }).toList();
+        _myForms = forms
+            .map(
+              (form) => {
+                'id': (form['form_id'] ?? form['id'] ?? '').toString(),
+                'title': form['form_title'] ?? 'Untitled Form',
+                'slug': form['form_slug'] ?? '',
+                'questions': 0,
+                'responses': 0,
+                'role': (form['access_type'] ?? 'CREATOR')
+                    .toString()
+                    .toUpperCase(),
+                'visibility': form['form_status'] ?? 'private',
+                'category': form['category'] ?? '',
+              },
+            )
+            .toList();
         _applyFilters();
         _isLoading = false;
       });
@@ -68,17 +84,24 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
 
   void _applyFilters() {
     _filteredForms = _myForms.where((form) {
-      final matchesSearch = _searchQuery.isEmpty ||
-          (form['title'] as String).toLowerCase().contains(_searchQuery.toLowerCase());
-      final matchesCategory = _selectedCategory == 'All' ||
-          (form['category'] as String).toLowerCase() == _selectedCategory.toLowerCase();
+      final matchesSearch =
+          _searchQuery.isEmpty ||
+          (form['title'] as String).toLowerCase().contains(
+            _searchQuery.toLowerCase(),
+          );
+      final matchesCategory =
+          _selectedCategory == 'All' ||
+          (form['category'] as String).toLowerCase() ==
+              _selectedCategory.toLowerCase();
       return matchesSearch && matchesCategory;
     }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    final forms = _selectedTab == 0 ? _filteredForms : [];
+    final forms = _selectedTab == 0
+        ? _filteredForms
+        : _filteredForms.where((f) => f['role'] == 'COLLABORATOR').toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -93,9 +116,9 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
                   Text(
                     'My Forms',
                     style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const Spacer(),
                   CircleAvatar(
@@ -103,7 +126,10 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
                     backgroundColor: AppColors.primary,
                     child: Text(
                       _username.isNotEmpty ? _username[0].toUpperCase() : 'U',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -122,7 +148,10 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
                 },
                 decoration: InputDecoration(
                   hintText: 'Search forms...',
-                  prefixIcon: const Icon(Icons.search, color: AppColors.textHint),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: AppColors.textHint,
+                  ),
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
@@ -165,14 +194,18 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
                           color: isSelected ? AppColors.primary : Colors.white,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: isSelected ? AppColors.primary : AppColors.inputBorder,
+                            color: isSelected
+                                ? AppColors.primary
+                                : AppColors.inputBorder,
                           ),
                         ),
                         child: Center(
                           child: Text(
                             cat,
                             style: TextStyle(
-                              color: isSelected ? Colors.white : AppColors.textSecondary,
+                              color: isSelected
+                                  ? Colors.white
+                                  : AppColors.textSecondary,
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
                             ),
@@ -206,25 +239,26 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : forms.isEmpty
-                      ? _buildEmptyState()
-                      : RefreshIndicator(
-                          onRefresh: _loadForms,
-                          child: ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            itemCount: forms.length,
-                            itemBuilder: (context, index) {
-                              final form = forms[index];
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 16),
-                                child: MyFormCard(
-                                  title: form['title'],
-                                  questions: form['questions'],
-                                  responses: form['responses'],
-                                  role: form['role'],
-                                  visibility: form['visibility'],
-                                  lastUpdated: form['lastUpdated'],
-                                  onTap: () {
-                                    Navigator.of(context).push(
+                  ? _buildEmptyState()
+                  : RefreshIndicator(
+                      onRefresh: _loadForms,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: forms.length,
+                        itemBuilder: (context, index) {
+                          final form = forms[index];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: MyFormCard(
+                              title: form['title'],
+                              questions: form['questions'],
+                              responses: form['responses'],
+                              role: form['role'],
+                              visibility: form['visibility'],
+                              lastUpdated: form['lastUpdated'],
+                              onTap: () {
+                                Navigator.of(context)
+                                    .push(
                                       MaterialPageRoute(
                                         builder: (context) => FormEditorScreen(
                                           formId: form['id'],
@@ -233,13 +267,14 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
                                           formStatus: form['visibility'],
                                         ),
                                       ),
-                                    ).then((_) => _loadForms());
-                                  },
-                                ),
-                              );
-                            },
-                          ),
-                        ),
+                                    )
+                                    .then((_) => _loadForms());
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
             ),
           ],
         ),
@@ -290,20 +325,26 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
                 color: AppColors.primary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.description_outlined, size: 60, color: AppColors.primary),
+              child: Icon(
+                Icons.description_outlined,
+                size: 60,
+                color: AppColors.primary,
+              ),
             ),
             const SizedBox(height: 24),
             Text(
               'No Forms Yet',
               style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 12),
             Text(
               'Create your first form to get started',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 15),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontSize: 15),
               textAlign: TextAlign.center,
             ),
           ],

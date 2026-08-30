@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/services/form_service.dart';
 import 'add_question_screen.dart';
 import 'form_viewer_screen.dart';
+import 'import_word_screen.dart';
 
 class FormEditorScreen extends StatefulWidget {
   final String formId;
@@ -23,7 +24,8 @@ class FormEditorScreen extends StatefulWidget {
   State<FormEditorScreen> createState() => _FormEditorScreenState();
 }
 
-class _FormEditorScreenState extends State<FormEditorScreen> with SingleTickerProviderStateMixin {
+class _FormEditorScreenState extends State<FormEditorScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<Map<String, dynamic>> _questions = [];
   bool _isLoading = true;
@@ -55,36 +57,33 @@ class _FormEditorScreenState extends State<FormEditorScreen> with SingleTickerPr
       final result = await FormService.getFormBySlug(widget.formSlug);
       if (result['success']) {
         final data = result['data']['data'];
-        final formId = data['form_id'] ?? data['id'];
-
-        final questionsResult = await FormService.getFormQuestions(formId);
+        // Backend returns soal grouped by page: [{page:1, soal:[...]}, ...]
+        // Flatten all page groups into a single list of soal items.
+        final rawSoal = data['soal'] is List ? data['soal'] as List : [];
+        final List<dynamic> listSoal = rawSoal.expand<dynamic>((pageGroup) {
+          if (pageGroup is Map && pageGroup['soal'] is List) {
+            return pageGroup['soal'] as List;
+          }
+          // Fallback: item is already a soal (flat list, old format)
+          return [pageGroup];
+        }).toList();
 
         setState(() {
-          _isPublic = (data['form_status'] ?? data['status'] ?? 'private') == 'public';
-
-          if (questionsResult['success']) {
-            final questionsData = questionsResult['data'];
-            final List<dynamic> listSoal;
-            if (questionsData is List) {
-              listSoal = questionsData;
-            } else if (questionsData is Map && questionsData['data'] is List) {
-              listSoal = questionsData['data'];
-            } else {
-              listSoal = [];
-            }
-            _questions = listSoal.asMap().entries.map((entry) {
-              final index = entry.key;
-              final soal = entry.value;
-              return {
-                'id': soal['id'].toString(),
-                'number': index + 1,
-                'question': soal['question'],
-                'type': soal['type'],
-                'typeDisplay': _mapQuestionType(soal['type']),
-                'options': soal['options'] ?? [],
-              };
-            }).toList();
-          }
+          _isPublic =
+              (data['form_status'] ?? data['status'] ?? 'private') == 'public';
+          _questions = listSoal.asMap().entries.map((entry) {
+            final index = entry.key;
+            final soal = entry.value;
+            final type = soal['type']?.toString() ?? 'text';
+            return {
+              'id': soal['id']?.toString() ?? '',
+              'number': index + 1,
+              'question': soal['question']?.toString() ?? '',
+              'type': type,
+              'typeDisplay': _mapQuestionType(type),
+              'options': soal['options'] ?? [],
+            };
+          }).toList();
           _isLoading = false;
         });
 
@@ -104,34 +103,35 @@ class _FormEditorScreenState extends State<FormEditorScreen> with SingleTickerPr
   }
 
   Future<void> _loadSubmitStats() async {
-    final result = await FormService.getSubmitStats(widget.formId);
+    final result = await FormService.getSubmitStats(widget.formSlug);
     if (result['success'] && mounted) {
       final data = result['data'];
-      if (data is Map && data['data'] != null) {
-        final submissions = data['data'];
-        setState(() {
-          _totalSubmissions = submissions is List ? submissions.length : 1;
-        });
+      int total = 0;
+      if (data is Map && data['data'] is Map) {
+        total = (data['data']['total_submit'] as num?)?.toInt() ?? 0;
       } else if (data is List) {
-        setState(() {
-          _totalSubmissions = data.length;
-        });
-      } else {
-        setState(() {
-          _totalSubmissions = 0;
-        });
+        total = data.length;
       }
+      setState(() {
+        _totalSubmissions = total;
+      });
     }
   }
 
   String _mapQuestionType(String type) {
     switch (type.toLowerCase()) {
-      case 'radio': return 'SINGLE CHOICE';
-      case 'checkbox': return 'MULTIPLE CHOICE';
-      case 'text': return 'TEXT';
-      case 'file': return 'FILE UPLOAD';
-      case 'rating': return 'RATING';
-      default: return type.toUpperCase();
+      case 'radio':
+        return 'SINGLE CHOICE';
+      case 'checkbox':
+        return 'MULTIPLE CHOICE';
+      case 'text':
+        return 'TEXT';
+      case 'file':
+        return 'FILE UPLOAD';
+      case 'rating':
+        return 'RATING';
+      default:
+        return type.toUpperCase();
     }
   }
 
@@ -148,7 +148,9 @@ class _FormEditorScreenState extends State<FormEditorScreen> with SingleTickerPr
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Status changed to ${_isPublic ? 'Public' : 'Private'}'),
+          content: Text(
+            'Status changed to ${_isPublic ? 'Public' : 'Private'}',
+          ),
           backgroundColor: AppColors.success,
         ),
       );
@@ -167,7 +169,9 @@ class _FormEditorScreenState extends State<FormEditorScreen> with SingleTickerPr
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Form'),
-        content: const Text('Are you sure you want to delete this form? This action cannot be undone.'),
+        content: const Text(
+          'Are you sure you want to delete this form? This action cannot be undone.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -256,7 +260,10 @@ class _FormEditorScreenState extends State<FormEditorScreen> with SingleTickerPr
           unselectedLabelColor: AppColors.textSecondary,
           indicatorColor: AppColors.primary,
           indicatorWeight: 3,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+          ),
           tabs: const [
             Tab(text: 'Questions'),
             Tab(text: 'Responses'),
@@ -265,32 +272,33 @@ class _FormEditorScreenState extends State<FormEditorScreen> with SingleTickerPr
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            )
           : _errorMessage.isNotEmpty
-              ? _buildErrorState()
-              : TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _QuestionsTab(
-                      questions: _questions,
-                      formId: widget.formId,
-                      formTitle: widget.formTitle,
-                      formSlug: widget.formSlug,
-                      onRefresh: _loadForm,
-                    ),
-                    _ResponsesTab(
-                      formId: widget.formId,
-                      formSlug: widget.formSlug,
-                      totalSubmissions: _totalSubmissions,
-                    ),
-                    _SettingsTab(
-                      isPublic: _isPublic,
-                      formSlug: widget.formSlug,
-                      onToggleStatus: _toggleStatus,
-                      onDeleteForm: _deleteForm,
-                    ),
-                  ],
+          ? _buildErrorState()
+          : TabBarView(
+              controller: _tabController,
+              children: [
+                _QuestionsTab(
+                  questions: _questions,
+                  formTitle: widget.formTitle,
+                  formSlug: widget.formSlug,
+                  onRefresh: _loadForm,
                 ),
+                _ResponsesTab(
+                  formId: widget.formId,
+                  formSlug: widget.formSlug,
+                  totalSubmissions: _totalSubmissions,
+                ),
+                _SettingsTab(
+                  isPublic: _isPublic,
+                  formSlug: widget.formSlug,
+                  onToggleStatus: _toggleStatus,
+                  onDeleteForm: _deleteForm,
+                ),
+              ],
+            ),
     );
   }
 
@@ -306,13 +314,13 @@ class _FormEditorScreenState extends State<FormEditorScreen> with SingleTickerPr
             Text(
               _errorMessage,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, color: AppColors.textSecondary),
+              style: const TextStyle(
+                fontSize: 16,
+                color: AppColors.textSecondary,
+              ),
             ),
             const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _loadForm,
-              child: const Text('Retry'),
-            ),
+            ElevatedButton(onPressed: _loadForm, child: const Text('Retry')),
           ],
         ),
       ),
@@ -324,18 +332,96 @@ class _FormEditorScreenState extends State<FormEditorScreen> with SingleTickerPr
 
 class _QuestionsTab extends StatelessWidget {
   final List<Map<String, dynamic>> questions;
-  final String formId;
   final String formTitle;
   final String formSlug;
   final VoidCallback onRefresh;
 
   const _QuestionsTab({
     required this.questions,
-    required this.formId,
     required this.formTitle,
     required this.formSlug,
     required this.onRefresh,
   });
+
+  Future<void> _openImportWord(BuildContext context) async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            ImportWordScreen(formSlug: formSlug, formTitle: formTitle),
+      ),
+    );
+    if (result == true) {
+      onRefresh();
+    }
+  }
+
+  Future<void> _openAddQuestion(
+    BuildContext context, {
+    Map<String, dynamic>? questionToEdit,
+  }) async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => AddQuestionScreen(
+          formTitle: formTitle,
+          formSlug: formSlug,
+          questionToEdit: questionToEdit,
+        ),
+      ),
+    );
+    if (result == true) {
+      onRefresh();
+    }
+  }
+
+  Future<void> _confirmDelete(
+    BuildContext context,
+    Map<String, dynamic> question,
+  ) async {
+    final id = int.tryParse(question['id'].toString());
+    if (id == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Question'),
+        content: Text(
+          'Are you sure you want to delete this question?\n\n${question['question']}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !context.mounted) return;
+
+    final result = await FormService.deleteQuestion(id);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result['message'] ??
+              (result['success']
+                  ? 'Question deleted'
+                  : 'Failed to delete question'),
+        ),
+        backgroundColor: result['success']
+            ? AppColors.success
+            : AppColors.error,
+      ),
+    );
+    if (result['success']) {
+      onRefresh();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -374,7 +460,11 @@ class _QuestionsTab extends StatelessWidget {
                     ),
                   );
                 },
-                icon: const Icon(Icons.copy, color: AppColors.primary, size: 18),
+                icon: const Icon(
+                  Icons.copy,
+                  color: AppColors.primary,
+                  size: 18,
+                ),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
@@ -397,21 +487,25 @@ class _QuestionsTab extends StatelessWidget {
               ),
               const Spacer(),
               TextButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => AddQuestionScreen(
-                        formId: formId,
-                        formTitle: formTitle,
-                        formSlug: formSlug,
-                      ),
-                    ),
-                  ).then((_) => onRefresh());
-                },
+                onPressed: () => _openImportWord(context),
+                icon: const Icon(Icons.upload_file, color: AppColors.primary),
+                label: const Text(
+                  'Import Word',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => _openAddQuestion(context),
                 icon: const Icon(Icons.add, color: AppColors.primary),
                 label: const Text(
                   'Add',
-                  style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -427,11 +521,27 @@ class _QuestionsTab extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.quiz_outlined, size: 64, color: AppColors.textSecondary.withOpacity(0.5)),
+                      Icon(
+                        Icons.quiz_outlined,
+                        size: 64,
+                        color: AppColors.textSecondary.withOpacity(0.5),
+                      ),
                       const SizedBox(height: 16),
-                      const Text('No Questions Yet', style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
+                      const Text(
+                        'No Questions Yet',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
                       const SizedBox(height: 8),
-                      const Text('Tap "Add" to create your first question', style: TextStyle(fontSize: 14, color: AppColors.textHint)),
+                      const Text(
+                        'Tap "Add" to create your first question',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textHint,
+                        ),
+                      ),
                     ],
                   ),
                 )
@@ -440,7 +550,10 @@ class _QuestionsTab extends StatelessWidget {
                   itemCount: questions.length,
                   itemBuilder: (context, index) {
                     final question = questions[index];
-                    return _buildQuestionCard(question);
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: _buildQuestionCard(context, question),
+                    );
                   },
                 ),
         ),
@@ -448,10 +561,12 @@ class _QuestionsTab extends StatelessWidget {
     );
   }
 
-  Widget _buildQuestionCard(Map<String, dynamic> question) {
+  Widget _buildQuestionCard(
+    BuildContext context,
+    Map<String, dynamic> question,
+  ) {
     final options = question['options'] as List? ?? [];
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -479,7 +594,10 @@ class _QuestionsTab extends StatelessWidget {
                 child: Center(
                   child: Text(
                     question['number'].toString(),
-                    style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
@@ -487,8 +605,31 @@ class _QuestionsTab extends StatelessWidget {
               Expanded(
                 child: Text(
                   question['question'],
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
+              ),
+              IconButton(
+                onPressed: () =>
+                    _openAddQuestion(context, questionToEdit: question),
+                icon: const Icon(
+                  Icons.edit_outlined,
+                  color: AppColors.textSecondary,
+                  size: 20,
+                ),
+                visualDensity: VisualDensity.compact,
+              ),
+              IconButton(
+                onPressed: () => _confirmDelete(context, question),
+                icon: const Icon(
+                  Icons.delete_outline,
+                  color: AppColors.error,
+                  size: 20,
+                ),
+                visualDensity: VisualDensity.compact,
               ),
             ],
           ),
@@ -501,44 +642,64 @@ class _QuestionsTab extends StatelessWidget {
             ),
             child: Text(
               question['typeDisplay'],
-              style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           if (options.isNotEmpty) ...[
             const SizedBox(height: 12),
             const Divider(height: 1),
             const SizedBox(height: 8),
-            ...options.map((option) => Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                children: [
-                  Icon(
-                    question['type'] == 'checkbox' ? Icons.check_box_outline_blank : Icons.radio_button_unchecked,
-                    size: 16,
-                    color: AppColors.textSecondary,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      option['option_value'] ?? '',
-                      style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+            ...options
+                .map(
+                  (option) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        Icon(
+                          question['type'] == 'checkbox'
+                              ? Icons.check_box_outline_blank
+                              : Icons.radio_button_unchecked,
+                          size: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            option['value'] ?? option['option_value'] ?? '',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        if (_isCorrectOption(option['is_correct']))
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.success.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'CORRECT',
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: AppColors.success,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  if (option['is_correct'] == true || option['is_correct'] == 1)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.success.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'CORRECT',
-                        style: TextStyle(fontSize: 9, color: AppColors.success, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                ],
-              ),
-            )).toList(),
+                )
+                .toList(),
           ],
         ],
       ),
@@ -564,7 +725,8 @@ class _ResponsesTab extends StatefulWidget {
 }
 
 class _ResponsesTabState extends State<_ResponsesTab> {
-  List<dynamic> _responses = [];
+  List<dynamic> _summaryQuestions = [];
+  List<dynamic> _detailQuestions = [];
   bool _isLoading = true;
   String _subTab = 'Ringkasan';
 
@@ -577,39 +739,53 @@ class _ResponsesTabState extends State<_ResponsesTab> {
   Future<void> _loadResponses() async {
     setState(() => _isLoading = true);
 
-    final result = await FormService.getSubmitDetail(widget.formId);
-    if (result['success'] && mounted) {
-      final data = result['data'];
-      List<dynamic> responsesList = [];
-      if (data is Map && data['data'] != null) {
-        final innerData = data['data'];
-        if (innerData is List) {
-          responsesList = innerData;
-        } else if (innerData is Map) {
-          responsesList = [innerData];
-        }
-      } else if (data is List) {
-        responsesList = data;
+    final summaryResult = await FormService.getSubmitStats(widget.formSlug);
+    final detailResult = await FormService.getSubmitDetail(widget.formSlug);
+
+    if (!mounted) return;
+
+    List<dynamic> summary = [];
+    if (summaryResult['success']) {
+      final data = summaryResult['data'];
+      if (data is Map &&
+          data['data'] is Map &&
+          data['data']['questions'] is List) {
+        summary = data['data']['questions'];
       }
-      setState(() {
-        _responses = responsesList;
-        _isLoading = false;
-      });
-    } else {
-      setState(() => _isLoading = false);
     }
+
+    List<dynamic> detail = [];
+    if (detailResult['success']) {
+      final data = detailResult['data'];
+      if (data is Map && data['data'] is List) {
+        detail = data['data'];
+      } else if (data is List) {
+        detail = data;
+      }
+    }
+
+    setState(() {
+      _summaryQuestions = summary;
+      _detailQuestions = detail;
+      _isLoading = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return _isLoading
-        ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+        ? const Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          )
         : Column(
             children: [
               // Sub tabs
               Container(
                 color: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: Row(
                   children: [
                     _buildSubTab('Ringkasan'),
@@ -624,16 +800,14 @@ class _ResponsesTabState extends State<_ResponsesTab> {
                 width: double.infinity,
                 color: Colors.white,
                 padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        _buildStatCard('Total', _responses.length.toString()),
-                        const SizedBox(width: 12),
-                        _buildStatCard('Soal', '${widget.totalSubmissions}'),
-                      ],
+                    _buildStatCard(
+                      'Total Submit',
+                      '${widget.totalSubmissions}',
                     ),
+                    const SizedBox(width: 12),
+                    _buildStatCard('Soal', '${_summaryQuestions.length}'),
                   ],
                 ),
               ),
@@ -642,26 +816,9 @@ class _ResponsesTabState extends State<_ResponsesTab> {
 
               // Content
               Expanded(
-                child: _responses.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.analytics_outlined, size: 64, color: AppColors.textSecondary.withOpacity(0.5)),
-                            const SizedBox(height: 16),
-                            const Text('No Responses Yet', style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Responses will appear here once users submit the form',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 14, color: AppColors.textHint),
-                            ),
-                          ],
-                        ),
-                      )
-                    : _subTab == 'Ringkasan'
-                        ? _buildSummaryView()
-                        : _buildDetailView(),
+                child: _subTab == 'Ringkasan'
+                    ? _buildSummaryView()
+                    : _buildDetailView(),
               ),
             ],
           );
@@ -700,9 +857,22 @@ class _ResponsesTabState extends State<_ResponsesTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
             const SizedBox(height: 4),
-            Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
           ],
         ),
       ),
@@ -710,20 +880,22 @@ class _ResponsesTabState extends State<_ResponsesTab> {
   }
 
   Widget _buildSummaryView() {
-    if (_responses.isEmpty) {
-      return const Center(
-        child: Text('No responses yet', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
-      );
+    if (_summaryQuestions.isEmpty) {
+      return _buildNoResponses();
     }
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: _responses.length,
+      itemCount: _summaryQuestions.length,
       itemBuilder: (context, index) {
-        final response = _responses[index];
-        if (response is! Map) return const SizedBox.shrink();
-        final submittedAt = response['submitted_at'] ?? '';
-        final questions = response['questions'] ?? response['soal'] ?? [];
+        final q = _summaryQuestions[index];
+        if (q is! Map) return const SizedBox.shrink();
+        final options = q['options'] as List? ?? [];
+        final totalAnswered = options.fold<int>(
+          0,
+          (sum, o) =>
+              sum + ((o is Map ? o['total_answer'] : 0) as num? ?? 0).toInt(),
+        );
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -732,7 +904,11 @@ class _ResponsesTabState extends State<_ResponsesTab> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 2)),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
             ],
           ),
           child: Column(
@@ -740,25 +916,95 @@ class _ResponsesTabState extends State<_ResponsesTab> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.person, size: 16, color: AppColors.primary),
-                  const SizedBox(width: 8),
-                  Text(
-                    response['username'] ?? 'Responden #${index + 1}',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                  const Spacer(),
-                  if (submittedAt is String && submittedAt.isNotEmpty)
-                    Text(
-                      submittedAt.substring(0, submittedAt.length > 19 ? 19 : submittedAt.length),
-                      style: const TextStyle(fontSize: 11, color: AppColors.textHint),
+                  Container(
+                    width: 28,
+                    height: 28,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
                     ),
+                    child: Text(
+                      '${index + 1}',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      q['question'] ?? '',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                '${questions is List ? questions.length : 0} questions answered',
-                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-              ),
+              if (options.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                ...options.map((o) {
+                  final count = (o is Map ? o['total_answer'] : 0) as num? ?? 0;
+                  final pct = totalAnswered > 0
+                      ? (count.toDouble() / totalAnswered * 100)
+                      : 0;
+                  final value = (o is Map ? o['value'] : o) ?? '';
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '$value',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '$count (${pct.toStringAsFixed(0)}%)',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: pct / 100,
+                            minHeight: 6,
+                            backgroundColor: AppColors.primary.withOpacity(0.1),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ] else if (totalAnswered > 0) ...[
+                const SizedBox(height: 8),
+                Text(
+                  '$totalAnswered jawaban teks',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ],
           ),
         );
@@ -767,19 +1013,17 @@ class _ResponsesTabState extends State<_ResponsesTab> {
   }
 
   Widget _buildDetailView() {
-    if (_responses.isEmpty) {
-      return const Center(
-        child: Text('No responses yet', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
-      );
+    if (_detailQuestions.isEmpty) {
+      return _buildNoResponses();
     }
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: _responses.length,
+      itemCount: _detailQuestions.length,
       itemBuilder: (context, index) {
-        final response = _responses[index];
-        if (response is! Map) return const SizedBox.shrink();
-        final questions = response['questions'] ?? response['soal'] ?? [];
+        final q = _detailQuestions[index];
+        if (q is! Map) return const SizedBox.shrink();
+        final responses = q['responses'] as List? ?? [];
 
         return Container(
           margin: const EdgeInsets.only(bottom: 16),
@@ -788,35 +1032,83 @@ class _ResponsesTabState extends State<_ResponsesTab> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 2)),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
             ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Responden #${index + 1}',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              const Divider(),
-              if (questions is List)
-                ...questions.map((q) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        q['question'] ?? '',
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+              Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '${index + 1}',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _getAnswerText(q),
-                        style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                      ),
-                    ],
+                    ),
                   ),
-                )),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      q['question'] ?? '',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(height: 24),
+              if (responses.isEmpty)
+                const Text(
+                  'Belum ada jawaban',
+                  style: TextStyle(fontSize: 13, color: AppColors.textHint),
+                )
+              else
+                ...responses.asMap().entries.map((entry) {
+                  final resp = entry.value;
+                  final answerText = resp is Map
+                      ? (resp['answer'] ?? 'No answer')
+                      : resp;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.person,
+                          size: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${entry.key + 1}. $answerText',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
             ],
           ),
         );
@@ -824,17 +1116,33 @@ class _ResponsesTabState extends State<_ResponsesTab> {
     );
   }
 
-  String _getAnswerText(Map<String, dynamic> question) {
-    if (question['type'] == 'text') {
-      return question['user_answer_text'] ?? 'No answer';
-    }
-    if (question['type'] == 'radio' || question['type'] == 'checkbox') {
-      final options = question['options'] as List? ?? [];
-      final selected = options.where((o) => o['is_user_selected'] == true).toList();
-      if (selected.isEmpty) return 'No answer';
-      return selected.map((o) => o['option_value'] ?? '').join(', ');
-    }
-    return 'No answer';
+  Widget _buildNoResponses() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.analytics_outlined,
+              size: 64,
+              color: AppColors.textSecondary,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'No Responses Yet',
+              style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Responses will appear here once users submit the form',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: AppColors.textHint),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -867,7 +1175,11 @@ class _SettingsTab extends StatelessWidget {
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 2)),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
               ],
             ),
             child: Row(
@@ -884,12 +1196,20 @@ class _SettingsTab extends StatelessWidget {
                     children: [
                       const Text(
                         'Public Status',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        isPublic ? 'Form can be accessed by anyone with the link' : 'Form is private',
-                        style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                        isPublic
+                            ? 'Form can be accessed by anyone with the link'
+                            : 'Form is private',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ],
                   ),
@@ -900,12 +1220,16 @@ class _SettingsTab extends StatelessWidget {
                     width: 52,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: isPublic ? AppColors.primary : AppColors.inputBorder,
+                      color: isPublic
+                          ? AppColors.primary
+                          : AppColors.inputBorder,
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: AnimatedAlign(
                       duration: const Duration(milliseconds: 200),
-                      alignment: isPublic ? Alignment.centerRight : Alignment.centerLeft,
+                      alignment: isPublic
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
                       child: Container(
                         width: 24,
                         height: 24,
@@ -930,7 +1254,11 @@ class _SettingsTab extends StatelessWidget {
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 2)),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
               ],
             ),
             child: Material(
@@ -940,7 +1268,10 @@ class _SettingsTab extends StatelessWidget {
                 onTap: () {
                   Clipboard.setData(ClipboardData(text: formSlug));
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Share link copied!'), backgroundColor: AppColors.success),
+                    const SnackBar(
+                      content: Text('Share link copied!'),
+                      backgroundColor: AppColors.success,
+                    ),
                   );
                 },
                 borderRadius: BorderRadius.circular(12),
@@ -955,20 +1286,40 @@ class _SettingsTab extends StatelessWidget {
                           color: AppColors.primary.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.share, color: AppColors.primary, size: 20),
+                        child: const Icon(
+                          Icons.share,
+                          color: AppColors.primary,
+                          size: 20,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       const Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Share Form', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                            Text(
+                              'Share Form',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                             SizedBox(height: 4),
-                            Text('Copy the form link to share', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                            Text(
+                              'Copy the form link to share',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                      const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textSecondary),
+                      const Icon(
+                        Icons.arrow_forward_ios,
+                        size: 16,
+                        color: AppColors.textSecondary,
+                      ),
                     ],
                   ),
                 ),
@@ -984,7 +1335,11 @@ class _SettingsTab extends StatelessWidget {
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 2)),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
               ],
             ),
             child: Material(
@@ -1004,20 +1359,41 @@ class _SettingsTab extends StatelessWidget {
                           color: AppColors.error.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.delete_outline, color: AppColors.error, size: 20),
+                        child: const Icon(
+                          Icons.delete_outline,
+                          color: AppColors.error,
+                          size: 20,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       const Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Delete Form', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.error)),
+                            Text(
+                              'Delete Form',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.error,
+                              ),
+                            ),
                             SizedBox(height: 4),
-                            Text('Permanently delete this form', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                            Text(
+                              'Permanently delete this form',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                      const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.error),
+                      const Icon(
+                        Icons.arrow_forward_ios,
+                        size: 16,
+                        color: AppColors.error,
+                      ),
                     ],
                   ),
                 ),
@@ -1040,8 +1416,11 @@ class _SettingsTab extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Edit/delete individual questions is not supported by the backend yet.',
-                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                    'Questions can be edited or deleted from the Questions tab. Use "Import Word" to bulk-import .docx questions.',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ),
               ],
@@ -1051,4 +1430,15 @@ class _SettingsTab extends StatelessWidget {
       ),
     );
   }
+}
+
+bool _isCorrectOption(dynamic value) {
+  if (value == null) return false;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final v = value.trim().toLowerCase();
+    return v == 'true' || v == '1';
+  }
+  return false;
 }

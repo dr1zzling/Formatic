@@ -44,9 +44,9 @@ class _MyAppState extends State<MyApp> {
         '/add-question': (context) {
           final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
           return AddQuestionScreen(
-            formId: args['formId'],
             formTitle: args['formTitle'],
             formSlug: args['formSlug'],
+            questionToEdit: args['questionToEdit'] as Map<String, dynamic>?,
           );
         },
       },

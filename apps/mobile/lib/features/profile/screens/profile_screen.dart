@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/services/storage_service.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/services/storage_service.dart';
 import '../../auth/screens/login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -69,97 +69,136 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showChangePasswordDialog() {
-    final currentPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
-    final confirmPasswordController = TextEditingController();
+    final confirmController = TextEditingController();
+    bool lifting = false;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Change Password'),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: currentPasswordController,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: 'Current Password',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppColors.cyan, width: 2),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.lock_outline, color: AppColors.primary),
+              SizedBox(width: 12),
+              Text('Change Password'),
+            ],
+          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Akun: $_username',
+                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                 ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: newPasswordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Password Baru',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirmController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Konfirmasi Password Baru',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Menggunakan endpoint aktual PUT /user/forgot-password.\n'
+                  'Password berubah tanpa memverifikasi password lama.',
+                  style: TextStyle(fontSize: 11, color: AppColors.textHint),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: lifting
+                  ? null
+                  : () {
+                      newPasswordController.dispose();
+                      confirmController.dispose();
+                      Navigator.of(dialogContext).pop();
+                    },
+              child: Text(
+                'Batal',
+                style: TextStyle(color: AppColors.textSecondary),
               ),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: newPasswordController,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: 'New Password',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppColors.cyan, width: 2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: confirmPasswordController,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: 'Confirm New Password',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppColors.cyan, width: 2),
-                ),
-              ),
+            ElevatedButton(
+              onPressed: lifting
+                  ? null
+                  : () async {
+                      final newPassword = newPasswordController.text.trim();
+                      final confirm = confirmController.text;
+                      if (newPassword.isEmpty || confirm.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Isi semua field terlebih dahulu'),
+                            backgroundColor: AppColors.error,
+                          ),
+                        );
+                        return;
+                      }
+                      if (newPassword != confirm) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Konfirmasi password tidak cocok'),
+                            backgroundColor: AppColors.error,
+                          ),
+                        );
+                        return;
+                      }
+
+                      setDialogState(() => lifting = true);
+                      final result = await AuthService.resetPassword(
+                        username: _username,
+                        newPassword: newPassword,
+                      );
+                      if (!context.mounted) return;
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            result['message'] ??
+                                (result['success'] ? 'Password berhasil diubah' : 'Gagal mengubah password'),
+                          ),
+                          backgroundColor:
+                              result['success'] ? AppColors.success : AppColors.error,
+                        ),
+                      );
+                      if (result['success']) {
+                        newPasswordController.dispose();
+                        confirmController.dispose();
+                        Navigator.of(dialogContext).pop();
+                      } else {
+                        setDialogState(() => lifting = false);
+                      }
+                    },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              child: lifting
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text('Simpan'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (newPasswordController.text != confirmPasswordController.text) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Passwords do not match'), backgroundColor: AppColors.error),
-                );
-                return;
-              }
-              if (newPasswordController.text.length < 6) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Password must be at least 6 characters'), backgroundColor: AppColors.error),
-                );
-                return;
-              }
-
-              final result = await AuthService.resetPassword(
-                username: _username,
-                newPassword: newPasswordController.text,
-              );
-
-              if (mounted) {
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(result['message'] ?? 'Password updated'),
-                    backgroundColor: result['success'] ? AppColors.success : AppColors.error,
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.cyanDeep),
-            child: const Text('Update Password'),
-          ),
-        ],
       ),
     );
   }

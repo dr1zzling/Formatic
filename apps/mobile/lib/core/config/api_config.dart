@@ -13,12 +13,16 @@ class ApiConfig {
 
   // Form API Endpoints
   static const String formsEndpoint = '/form';
+  static const String formsByCategoryEndpoint = '/form';
   static const String createFormEndpoint = '/form';
   static const String userFormsEndpoint = '/form/user';
   static const String formSlugEndpoint = '/form/slug';
   static const String formStatusEndpoint = '/form';
   static const String soalEndpoint = '/form/soal';
   static const String submitEndpoint = '/form/submit';
+  static const String submitDetailEndpoint = '/form/submit/detail';
+  static const String submitCheckTokenEndpoint = '/form/submit/check-token';
+  static const String soalImportEndpoint = '/form/soal/import';
   static const String categoryEndpoint = '/form/category';
   static const String shareEndpoint = '/form/share';
   static const String qrCodeJsonEndpoint = '/qrcode/json';

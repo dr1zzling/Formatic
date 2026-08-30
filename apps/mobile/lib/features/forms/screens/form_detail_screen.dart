@@ -53,38 +53,39 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
     });
 
     try {
-      final formId = int.tryParse(widget.formId);
-      if (formId == null) {
+      if (_formSlug.isEmpty) {
         setState(() {
-          _errorMessage = 'Invalid form ID';
+          _errorMessage = 'Missing form slug';
           _isLoading = false;
         });
         return;
       }
 
-      final result = await FormService.getFormQuestions(formId);
-      
+      final result = await FormService.getFormBySlug(_formSlug);
+
       if (result['success']) {
-        final questionsData = result['data'];
-        final List<dynamic> listSoal;
-        if (questionsData is List) {
-          listSoal = questionsData;
-        } else if (questionsData is Map && questionsData['data'] is List) {
-          listSoal = questionsData['data'];
-        } else {
-          listSoal = [];
-        }
-        
+        final data = result['data']['data'];
+        // Backend returns soal grouped by page: [{page:1, soal:[...]}, ...]
+        // Flatten all page groups into a single list of soal items.
+        final rawSoal = data['soal'] is List ? data['soal'] as List : [];
+        final List<dynamic> listSoal = rawSoal.expand<dynamic>((pageGroup) {
+          if (pageGroup is Map && pageGroup['soal'] is List) {
+            return pageGroup['soal'] as List;
+          }
+          return [pageGroup];
+        }).toList();
+
         setState(() {
           _questions = listSoal.asMap().entries.map((entry) {
             final index = entry.key;
             final soal = entry.value;
+            final type = soal['type']?.toString() ?? 'text';
             return {
-              'id': soal['id'].toString(),
+              'id': soal['id']?.toString() ?? '',
               'number': index + 1,
-              'question': soal['question'],
-              'type': _mapQuestionType(soal['type']),
-              'typeRaw': soal['type'],
+              'question': soal['question']?.toString() ?? '',
+              'type': _mapQuestionType(type),
+              'typeRaw': type,
               'options': soal['options'] ?? [],
             };
           }).toList();
@@ -104,8 +105,8 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
     }
   }
 
-  String _mapQuestionType(String type) {
-    switch (type.toLowerCase()) {
+  String _mapQuestionType(String? type) {
+    switch (type?.toLowerCase()) {
       case 'radio':
         return 'SINGLE CHOICE';
       case 'checkbox':
@@ -117,7 +118,7 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
       case 'rating':
         return 'RATING';
       default:
-        return type.toUpperCase();
+        return type?.toUpperCase() ?? 'TEXT';
     }
   }
 
@@ -168,10 +169,12 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            )
           : _errorMessage.isNotEmpty
-              ? _buildErrorState()
-              : _buildContent(),
+          ? _buildErrorState()
+          : _buildContent(),
     );
   }
 
@@ -198,7 +201,10 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 12,
+                ),
               ),
               child: const Text('Retry'),
             ),
@@ -272,7 +278,9 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
                         width: 8,
                         height: 8,
                         decoration: BoxDecoration(
-                          color: _isActive ? AppColors.success : AppColors.error,
+                          color: _isActive
+                              ? AppColors.success
+                              : AppColors.error,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -320,19 +328,24 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
               const Spacer(),
               TextButton.icon(
                 onPressed: () {
-                  Navigator.of(context).pushNamed(
-                    '/add-question',
-                    arguments: {
-                      'formId': widget.formId,
-                      'formTitle': widget.formTitle,
-                      'formSlug': widget.formSlug,
-                    },
-                  ).then((_) => _loadQuestions());
+                  Navigator.of(context)
+                      .pushNamed(
+                        '/add-question',
+                        arguments: {
+                          'formId': widget.formId,
+                          'formTitle': widget.formTitle,
+                          'formSlug': widget.formSlug,
+                        },
+                      )
+                      .then((_) => _loadQuestions());
                 },
                 icon: const Icon(Icons.add, color: AppColors.primary),
                 label: const Text(
                   'Add',
-                  style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -394,21 +407,26 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: () {
-                Navigator.of(context).pushNamed(
-                  '/add-question',
-                  arguments: {
-                    'formId': widget.formId,
-                    'formTitle': widget.formTitle,
-                    'formSlug': widget.formSlug,
-                  },
-                ).then((_) => _loadQuestions());
+                Navigator.of(context)
+                    .pushNamed(
+                      '/add-question',
+                      arguments: {
+                        'formId': widget.formId,
+                        'formTitle': widget.formTitle,
+                        'formSlug': widget.formSlug,
+                      },
+                    )
+                    .then((_) => _loadQuestions());
               },
               icon: const Icon(Icons.add),
               label: const Text('Add Question'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
               ),
             ),
           ],
@@ -419,7 +437,7 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
 
   Widget _buildQuestionCard(Map<String, dynamic> question) {
     final options = question['options'] as List? ?? [];
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -501,10 +519,7 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
           ),
           const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 6,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: AppColors.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
@@ -525,14 +540,15 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
             const Divider(),
             const SizedBox(height: 8),
             ...options.map((option) {
-              final isCorrect = option['is_correct'] == true || option['is_correct'] == 1;
+              final isCorrect =
+                  option['is_correct'] == true || option['is_correct'] == 1;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
                   children: [
                     Icon(
-                      question['typeRaw'] == 'checkbox' 
-                          ? Icons.check_box_outline_blank 
+                      question['typeRaw'] == 'checkbox'
+                          ? Icons.check_box_outline_blank
                           : Icons.radio_button_unchecked,
                       size: 18,
                       color: AppColors.textSecondary,
@@ -540,7 +556,7 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        option['option_value'] ?? '',
+                        option['value'] ?? option['option_value'] ?? '',
                         style: TextStyle(
                           fontSize: 14,
                           color: AppColors.textPrimary,
@@ -549,7 +565,10 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
                     ),
                     if (isCorrect)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.success.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(4),

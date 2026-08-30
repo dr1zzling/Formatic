@@ -1,98 +1,161 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Form API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Backend Form Maker berbasis NestJS dan PostgreSQL. Service ini menangani form, soal dan pilihan jawaban, upload gambar, impor soal dari DOCX, submit responden, serta pembuatan QR code.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Teknologi
 
-## Description
+- Node.js dan NestJS
+- TypeScript
+- PostgreSQL
+- Knex.js untuk migrasi dan seeder database
+- JWT untuk route yang membutuhkan autentikasi
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Persiapan
 
-## Project setup
+Pastikan perangkat berikut sudah tersedia:
+
+- Node.js dan npm
+- PostgreSQL
+- Database yang sudah dibuat
+- JWT secret yang sama dengan `user-api`
+
+Masuk ke direktori service:
 
 ```bash
-$ npm install
+cd services/form-api
+npm install
 ```
 
-## Compile and run the project
+## Konfigurasi environment
+
+```bash
+cp .env.example .env
+```
+
+```env
+PORT=4000
+
+DB_NAME=nama_database
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=nama_user
+DB_PASS=password_database
+
+SECRET=secret-yang-sama-dengan-user-api
+```
+
+
+## Database
+
+Jalankan migrasi dari direktori `services/form-api`:
+
+```bash
+npx knex migrate:latest
+```
+
+Jalankan seeder
+
+```bash
+npx knex seed:run
+```
+
+Perintah rollback:
+
+```bash
+npx knex migrate:rollback
+npx knex migrate:rollback --all
+```
+
+## Menjalankan service
 
 ```bash
 # development
-$ npm run start
+npm run start
 
-# watch mode
-$ npm run start:dev
+# development dengan hot reload
+npm run start:dev
 
-# production mode
-$ npm run start:prod
+# build dan production
+npm run build
+npm run start:prod
 ```
 
-## Run tests
+API tersedia di `http://localhost:4000` jika menggunakan contoh konfigurasi di atas, atau di port yang ditentukan oleh `PORT`.
+
+## Swagger
+
+Swagger dijalankan sebagai server dokumentasi terpisah. Jalankan API terlebih dahulu, lalu pada terminal lain jalankan:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+node swagger.js
 ```
 
-## Deployment
+Buka dokumentasi di:
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+```text
+http://localhost:3001/api-docs
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## Autentikasi
 
-## Resources
+Route yang dilindungi membutuhkan JWT dari `user-api` pada header berikut:
 
-Check out a few resources that may come in handy when working with NestJS:
+```http
+Authorization: Bearer <JWT>
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+Route publik dapat dipanggil tanpa header autentikasi. Pastikan nilai `SECRET` di service ini sama dengan secret yang digunakan `user-api`.
 
-## Support
+## Endpoint utama
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+### Form
 
-## Stay in touch
+| Method | Endpoint | Keterangan | Auth |
+| --- | --- | --- | --- |
+| `GET` | `/form` | Mendapatkan semua form | Tidak |
+| `GET` | `/form/category?category=<kategori>` | Mendapatkan form berdasarkan kategori | Tidak |
+| `GET` | `/form/slug/?slug=<slug>` | Mendapatkan detail form berdasarkan slug | Tidak |
+| `POST` | `/form` | Membuat form dengan upload banner | Ya |
+| `PATCH` | `/form?form_slug=<slug>` | Mengubah status form | Ya |
+| `DELETE` | `/form?form_slug=<slug>` | Menghapus form | Ya |
+| `GET` | `/form/user` | Mendapatkan form milik user | Ya |
+| `POST` | `/form/share?form_slug=<slug>` | Mengatur kolaborator form | Ya |
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+### Soal
 
-## License
+| Method | Endpoint | Keterangan | Auth |
+| --- | --- | --- | --- |
+| `GET` | `/form/soal/:id` | Mendapatkan soal berdasarkan ID form | Ya |
+| `POST` | `/form/soal?form_slug=<slug>` | Membuat soal dan pilihan jawaban | Ya |
+| `POST` | `/form/soal/import?form_slug=<slug>` | Mengimpor soal dari file `.docx` | Ya |
+| `DELETE` | `/form/soal/:soal_id` | Menghapus soal | Ya |
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+### Submit dan QR code
+
+| Method | Endpoint | Keterangan | Auth |
+| --- | --- | --- | --- |
+| `POST` | `/form/submit/check-token?form_slug=<slug>` | Memeriksa token responden | Ya |
+| `GET` | `/form/submit?form_slug=<slug>` | Mendapatkan daftar submit form | Ya |
+| `GET` | `/form/submit/detail?form_slug=<slug>` | Mendapatkan detail jawaban submit | Ya |
+| `GET` | `/qrcode/json?slug=<nilai>` | Menghasilkan QR code dalam data URL | Tidak |
+| `GET` | `/qrcode/image?slug=<nilai>` | Menghasilkan QR code PNG | Tidak |
+
+## Upload file
+
+File yang diunggah disimpan pada direktori berikut dan dapat diakses melalui static path `/uploads/`:
+
+- Banner form: `uploads/banner`
+- Gambar soal dan pilihan: `uploads/soal`
+
+Banner menerima format JPEG, PNG, atau WebP dengan ukuran maksimal 5 MB. Import soal hanya menerima file `.docx`.
+
+
+## Struktur penting
+
+```text
+src/          Source code NestJS
+migration/    Migrasi database Knex
+seeder/       Data awal database
+uploads/      File upload banner dan soal
+swagger.js    Server dokumentasi Swagger
+```
