@@ -244,7 +244,7 @@ export default function FormEditor() {
             fd.append("soal_images", q.attachment, `soal_${i}_${q.attachment.name}`);
           }
           return {
-            soal: { question: q.question, type: q.type, image: q.attachment instanceof File ? q.attachment.name : null, page: q.page ?? 1, score: q.score ?? null },
+            soal: { question: q.question, type: q.type, image: q.attachment instanceof File ? q.attachment.name : null, page: (parseInt(q.page) || 1), score: q.score ?? null },
             options: hasOpts
               ? q.options.map((o, idx) => ({ value: o.value?.trim() || `Opsi ${idx + 1}`, image: null, is_correct: o.is_correct ?? false }))
               : [],

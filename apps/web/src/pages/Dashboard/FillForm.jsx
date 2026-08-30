@@ -181,10 +181,11 @@ export default function FillForm() {
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
+        console.error("Submit error:", response.status, data);
         if (response.status === 401) {
           throw new Error(data.message || "Kamu tidak berhak mengisi form ini.");
         }
-        throw new Error(data.message || "Gagal mengirim jawaban.");
+        throw new Error(data.message || `Gagal mengirim jawaban (${response.status}).`);
       }
       // Simpan ke history lokal
       saveToHistory(slug, form?.title ?? form?.form_title, form?.category);
@@ -297,9 +298,24 @@ export default function FillForm() {
   const soalList = rawSoal.length > 0 && rawSoal[0]?.soal
     ? rawSoal.flatMap(p => p.soal ?? [])
     : rawSoal;
-  const pageGroups = rawSoal.length > 0 && rawSoal[0]?.soal
-    ? rawSoal.map(p => ({ page: p.page ?? 1, soal: p.soal ?? [] }))
-    : [{ page: 1, soal: rawSoal }];
+
+  // Grup per page — kalau semua page null/sama, jadi 1 grup (scroll semua)
+  const buildPageGroups = () => {
+    if (rawSoal.length > 0 && rawSoal[0]?.soal) {
+      // Format baru dari backend
+      return rawSoal.map(p => ({ page: p.page ?? 1, soal: p.soal ?? [] }));
+    }
+    // Format lama: flat array — grup manual berdasarkan field page di soal
+    const groups = {};
+    for (const s of rawSoal) {
+      const p = parseInt(s.page) || 1;
+      if (!groups[p]) groups[p] = [];
+      groups[p].push(s);
+    }
+    const pages = Object.keys(groups).map(Number).sort((a,b) => a - b);
+    return pages.map(p => ({ page: p, soal: groups[p] }));
+  };
+  const pageGroups = buildPageGroups();
   const allSoal = soalList;
 
   // Quiz: step-by-step navigation
