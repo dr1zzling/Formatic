@@ -605,10 +605,13 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemo
             <input
               type="text"
               inputMode="numeric"
-              pattern="[0-9]*"
               value={question.page ?? 1}
               onChange={(e) => {
-                const v = parseInt(e.target.value.replace(/\D/g, "")) || 1;
+                const raw = e.target.value.replace(/\D/g, "");
+                onUpdate("page", raw === "" ? "" : parseInt(raw));
+              }}
+              onBlur={(e) => {
+                const v = parseInt(e.target.value) || 1;
                 onUpdate("page", Math.max(1, v));
               }}
               className="w-8 text-[13px] font-bold text-[#1a4fa0] bg-transparent border-none outline-none text-center"
