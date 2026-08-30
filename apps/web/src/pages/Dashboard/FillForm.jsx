@@ -294,6 +294,13 @@ export default function FillForm() {
   );
   // Flatten soal dari format baru {page, soal:[]} atau format lama flat[]
   const rawSoal = form?.soal ?? [];
+  const soalList = rawSoal.length > 0 && rawSoal[0]?.soal
+    ? rawSoal.flatMap(p => p.soal ?? [])
+    : rawSoal;
+  const pageGroups = rawSoal.length > 0 && rawSoal[0]?.soal
+    ? rawSoal.map(p => ({ page: p.page ?? 1, soal: p.soal ?? [] }))
+    : [{ page: 1, soal: rawSoal }];
+  const allSoal = soalList;
 
   // Quiz: step-by-step navigation
 
