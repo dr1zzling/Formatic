@@ -1086,9 +1086,17 @@ function SettingsTab({ form, onUpdateStatus, slug }) {
   // Token state
   const [tokenActive, setTokenActive]   = useState(Boolean(form?.token_respon));
   const [tokenValue, setTokenValue]     = useState(form?.token_respon ?? "");
-  const [tokenMode, setTokenMode]       = useState("random"); // "random" | "manual"
+  const [tokenMode, setTokenMode]       = useState("random");
   const [tokenSaving, setTokenSaving]   = useState(false);
   const [tokenMsg, setTokenMsg]         = useState("");
+
+  // Sync token state saat form berubah (setelah loadForm)
+  useEffect(() => {
+    if (form?.token_respon) {
+      setTokenActive(true);
+      setTokenValue(form.token_respon);
+    }
+  }, [form?.token_respon]);
 
   // Timer state
   const [duration, setDuration]   = useState(form?.duration ?? "");
@@ -1154,6 +1162,7 @@ function SettingsTab({ form, onUpdateStatus, slug }) {
           duration: duration ? Number(duration) : null,
           start_at: startAt ? new Date(startAt).getTime() : null,
           is_random: isRandom,
+          token_respon: tokenActive ? (tokenValue || null) : null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1173,6 +1182,7 @@ function SettingsTab({ form, onUpdateStatus, slug }) {
           duration: duration ? Number(duration) : null,
           start_at: startAt ? new Date(startAt).getTime() : null,
           is_random: val,
+          token_respon: tokenActive ? (tokenValue || null) : null,
         }),
       });
       const data = await res.json().catch(() => ({}));
