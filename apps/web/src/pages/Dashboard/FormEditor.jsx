@@ -855,61 +855,154 @@ function ResponsesTab({ formId, form }) {
             </div>
 
             {/* PER-QUESTION CARDS */}
-            {questions.map((q, qi) => (
-              <div key={q.id ?? qi} className="mx-[22px] mb-4 p-[22px] border border-[#e7edf6] rounded-xl bg-white">
-                <div className="flex justify-between items-start gap-4 mb-5">
-                  <div>
-                    <h3 className="m-0 text-[14px] font-semibold text-[#142d63] flex items-center gap-2 flex-wrap">
-                      <span>{qi + 1}.</span>
-                      <RichTextDisplay content={q.question} />
-                      <span className="px-2 py-1 rounded-full bg-[#edf4ff] text-[#075ee0] text-[9px] font-bold">Wajib</span>
-                    </h3>
-                    <p className="mt-1 mb-0 text-[10px] text-[#7384a4]">{total} respon</p>
-                  </div>
-                  <button className="shrink-0 px-3.5 py-2.5 rounded-lg bg-[#eef5ff] text-[#075ee0] text-[11px] font-semibold border-none cursor-pointer hover:bg-[#daeaff] transition-colors">
-                    Lihat detail →
-                  </button>
-                </div>
+            {questions.map((q, qi) => {
+              const opts = q.options ?? [];
+              const answered = opts.reduce((s, o) => s + (o.total_answer ?? 0), 0);
+              const maxCount = Math.max(...opts.map(o => o.total_answer ?? 0), 1);
 
-                {/* RADIO/CHECKBOX → donut */}
-                {(q.type === "radio" || q.type === "checkbox") && (q.options ?? []).length > 0 && (
-                  <div className="flex items-center gap-[50px] pl-2 flex-wrap">
-                    <div className="shrink-0 flex justify-center">
-                      <div className="relative w-[138px] h-[138px] rounded-full flex items-center justify-center"
-                        style={{ background: buildConicGradient(q.options, total) }}>
-                        <div className="absolute w-[82px] h-[82px] rounded-full bg-white" />
-                        <div className="relative z-10 flex flex-col items-center">
-                          <strong className="text-[21px] font-bold text-[#142d63]">{total}</strong>
-                          <span className="text-[9px] text-[#7183a3]">respon</span>
-                        </div>
+              return (
+                <div key={q.id ?? qi} className="mx-[22px] mb-4 border border-[#e7edf6] rounded-xl bg-white overflow-hidden">
+                  {/* Header */}
+                  <div className="flex justify-between items-start gap-4 px-5 pt-5 pb-3 border-b border-[#f0f4fa]">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                        <span className="text-[13px] font-bold text-[#142d63]">{qi + 1}.</span>
+                        <RichTextDisplay content={q.question} />
+                        <span className="px-2 py-0.5 rounded-full bg-[#edf4ff] text-[#075ee0] text-[9px] font-bold capitalize">{q.type}</span>
                       </div>
+                      <p className="text-[11px] text-[#7384a4] mt-0.5">{answered} respon</p>
                     </div>
-                    <div className="flex-1 min-w-[200px] flex flex-col gap-3">
-                      {(q.options ?? []).map((opt, oi) => (
-                        <div key={oi} className="grid gap-2 text-[11px] text-[#50658d]" style={{ gridTemplateColumns: "12px 1fr auto" }}>
-                          <span className="w-2.5 h-2.5 rounded-full mt-0.5 shrink-0" style={{ background: CHART_COLORS[oi % CHART_COLORS.length] }} />
-                          <span>{opt.value ?? opt.option_value}</span>
-                          <strong className="text-[#142d63] text-[11px]">{opt.total_answer ?? 0} ({pct(opt.total_answer ?? 0, total)}%)</strong>
-                        </div>
-                      ))}
-                    </div>
+                    <ViewAllBtn q={q} total={total} formSlug={formSlug} />
                   </div>
-                )}
 
-                {/* TEXT answers */}
-                {q.type === "text" && (
-                  <div className="flex flex-col gap-2.5 px-2">
-                    <p className="text-[12px] text-[#8ca0ba]">
-                      {total > 0 ? `${total} jawaban teks masuk.` : "Belum ada jawaban teks."}
-                    </p>
-                  </div>
-                )}
-              </div>
-            ))}
+                  {/* BAR CHART — radio/checkbox */}
+                  {(q.type === "radio" || q.type === "checkbox") && opts.length > 0 && (
+                    <div className="px-5 py-4 space-y-3">
+                      {opts.map((opt, oi) => {
+                        const count  = opt.total_answer ?? 0;
+                        const pctVal = answered > 0 ? ((count / answered) * 100).toFixed(1) : "0.0";
+                        const barW   = answered > 0 ? `${(count / maxCount) * 100}%` : "0%";
+                        return (
+                          <div key={oi}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[13px] text-[#364a6e] font-medium truncate max-w-[60%]">
+                                {opt.value ?? opt.option_value ?? `Opsi ${oi+1}`}
+                              </span>
+                              <span className="text-[12px] font-bold text-[#142d63] shrink-0 ml-2">
+                                {count} <span className="text-[#7384a4] font-normal">({pctVal}%)</span>
+                              </span>
+                            </div>
+                            <div className="w-full h-2.5 bg-[#edf1f7] rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all duration-500"
+                                style={{ width: barW, background: CHART_COLORS[oi % CHART_COLORS.length] }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* TEXT answers */}
+                  {q.type === "text" && (
+                    <div className="px-5 py-4">
+                      <p className="text-[12px] text-[#8ca0ba]">
+                        {answered > 0 ? `${answered} jawaban teks masuk — klik "View All" untuk lihat.` : "Belum ada jawaban teks."}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </>
         )}
       </div>
     </div>
+  );
+}
+
+/* ── View All Answers Button + Modal ────────────────────────── */
+function ViewAllBtn({ q, total, formSlug }) {
+  const [open, setOpen]       = useState(false);
+  const [detail, setDetail]   = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  async function loadDetail() {
+    setOpen(true);
+    if (detail) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`http://localhost:3000/form/submit/detail?form_slug=${formSlug}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      setDetail(data?.data ?? []);
+    } catch { setDetail([]); }
+    finally { setLoading(false); }
+  }
+
+  // Extract answers for this soal from detail
+  const answers = detail
+    ? detail
+        .filter(d => d.id === q.id)
+        .flatMap(d => (d.responses ?? []).map(r => r.answer))
+        .filter(Boolean)
+    : [];
+
+  return (
+    <>
+      <button onClick={loadDetail}
+        className="shrink-0 px-3 py-1.5 rounded-lg bg-[#eef5ff] text-[#075ee0] text-[11px] font-semibold border-none cursor-pointer hover:bg-[#daeaff] transition-colors whitespace-nowrap">
+        View All →
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          onClick={() => setOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden"
+            onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-bold text-gray-400 uppercase tracking-wide mb-1">Semua Jawaban</p>
+                <RichTextDisplay content={q.question} />
+              </div>
+              <button onClick={() => setOpen(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none border-none bg-transparent cursor-pointer shrink-0">×</button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-5">
+              {loading && (
+                <div className="flex items-center justify-center py-10">
+                  <div className="w-7 h-7 border-2 border-[#075ee0] border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+
+              {!loading && answers.length === 0 && (
+                <p className="text-[13px] text-gray-400 text-center py-8">Belum ada jawaban.</p>
+              )}
+
+              {!loading && answers.length > 0 && (
+                <div className="space-y-2">
+                  {answers.map((ans, i) => (
+                    <div key={i} className="px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[13px] text-[#364a6e]">
+                      {typeof ans === "string" ? ans : JSON.stringify(ans)}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-gray-100 text-[12px] text-gray-400 text-right">
+              {answers.length} jawaban
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
