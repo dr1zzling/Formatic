@@ -1093,7 +1093,7 @@ function SettingsTab({ form, onUpdateStatus, slug }) {
   // Timer state
   const [duration, setDuration]   = useState(form?.duration ?? "");
   const [startAt, setStartAt]     = useState(
-    form?.start_at ? new Date(form.start_at).toISOString().slice(0,16) : ""
+    (form?.start_at && Number(form.start_at) > 0) ? new Date(form.start_at).toISOString().slice(0,16) : ""
   );
   const [timerSaving, setTimerSaving] = useState(false);
   const [timerMsg, setTimerMsg]       = useState("");
@@ -1131,7 +1131,14 @@ function SettingsTab({ form, onUpdateStatus, slug }) {
         }),
       });
       const data = await res.json().catch(() => ({}));
-      setTokenMsg(res.ok ? "✅ Token berhasil disimpan!" : (data?.message || "Gagal."));
+      if (res.ok) {
+        setTokenMsg("✅ Token berhasil disimpan!");
+        // Pertahankan state toggle sesuai yang disimpan
+        setTokenActive(active);
+        if (!active) setTokenValue("");
+      } else {
+        setTokenMsg(data?.message || "Gagal.");
+      }
     } catch { setTokenMsg("Gagal menyimpan."); }
     finally { setTokenSaving(false); setTimeout(() => setTokenMsg(""), 3000); }
   }
