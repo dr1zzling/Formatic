@@ -225,10 +225,13 @@ export default function FormEditor() {
             return fetch(`${FORM_API_URL}/form/soal/${q.id}`, {
               method: "PATCH",
               headers: {
-                "Content-Type": "application/json",
                 Authorization: `Bearer ${token}`,
               },
-              body: JSON.stringify({ data: JSON.stringify(payload) }),
+              body: (() => {
+                const fd = new FormData();
+                fd.append("data", JSON.stringify(payload));
+                return fd;
+              })(),
             });
           })
         );
