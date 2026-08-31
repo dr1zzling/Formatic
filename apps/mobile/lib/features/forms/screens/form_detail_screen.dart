@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/form_service.dart';
+import 'add_question_screen.dart';
 import 'qr_code_screen.dart';
 
 class FormDetailScreen extends StatefulWidget {
@@ -475,14 +476,22 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
               ),
               const Spacer(),
               IconButton(
-                onPressed: () {
-                  // Edit not available in backend yet
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Edit feature coming soon'),
-                      backgroundColor: AppColors.primary,
+                onPressed: () async {
+                  final result = await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => AddQuestionScreen(
+                        formTitle: widget.formTitle,
+                        formSlug: _formSlug,
+                        questionToEdit: {
+                          'id': question['id'],
+                          'question': question['question'],
+                          'type': question['typeRaw'],
+                          'options': question['options'],
+                        },
+                      ),
                     ),
                   );
+                  if (result == true) _loadQuestions();
                 },
                 icon: const Icon(
                   Icons.edit_outlined,
@@ -491,14 +500,48 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
                 ),
               ),
               IconButton(
-                onPressed: () {
-                  // Delete not available in backend yet
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Delete feature coming soon'),
-                      backgroundColor: AppColors.error,
+                onPressed: () async {
+                  final id = int.tryParse(question['id']?.toString() ?? '');
+                  if (id == null) return;
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Hapus Soal'),
+                      content: Text(
+                        'Yakin ingin menghapus soal ini?\n\n${question['question']}',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(false),
+                          child: const Text('Batal'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(true),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.error,
+                          ),
+                          child: const Text('Hapus'),
+                        ),
+                      ],
                     ),
                   );
+                  if (confirm != true || !context.mounted) return;
+                  final result = await FormService.deleteQuestion(id);
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        result['message'] ??
+                            (result['success']
+                                ? 'Soal dihapus'
+                                : 'Gagal menghapus'),
+                      ),
+                      backgroundColor: result['success']
+                          ? AppColors.success
+                          : AppColors.error,
+                    ),
+                  );
+                  if (result['success']) _loadQuestions();
                 },
                 icon: const Icon(
                   Icons.delete_outline,

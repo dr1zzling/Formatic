@@ -29,11 +29,9 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   void _navigateToCreateForm() async {
-    final result = await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const CreateFormScreen(),
-      ),
-    );
+    final result = await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const CreateFormScreen()));
 
     _handleCreateResult(result);
   }
@@ -70,9 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: Colors.white,
-          border: Border(
-            top: BorderSide(color: Color(0xFFE0EAF6), width: 1),
-          ),
+          border: Border(top: BorderSide(color: Color(0xFFE0EAF6), width: 1)),
           boxShadow: [
             BoxShadow(
               color: Color(0x0D000000),
@@ -182,19 +178,26 @@ class _HomeContentState extends State<_HomeContent> {
       final List<dynamic> forms = responseData ?? [];
 
       setState(() {
-        _allForms = forms.map((form) => {
-          'id': form['id'].toString(),
-          'form_id': form['id'],
-          'title': form['title'] ?? form['form_title'] ?? 'Untitled Form',
-          'slug': form['slug'] ?? form['form_slug'] ?? '',
-          'status': form['status'] ?? form['form_status'] ?? 'private',
-          'category': form['category'] ?? '',
-          'category_id': form['category_id'],
-          'questions': 0,
-          'responses': '0',
-          'badge': (form['status'] ?? form['form_status'] ?? 'private').toUpperCase(),
-          'hasImage': false,
-        }).toList();
+        _allForms = forms
+            .map(
+              (form) => {
+                'id': (form['id'] ?? '').toString(),
+                'form_id': form['id'],
+                'title': form['title'] ?? form['form_title'] ?? 'Untitled Form',
+                'slug': form['slug'] ?? form['form_slug'] ?? '',
+                'status': form['status'] ?? form['form_status'] ?? 'private',
+                'category': form['category'] ?? '',
+                'category_id': form['category_id'],
+                'questions': 0,
+                'responses': '0',
+                'badge':
+                    ((form['status'] ?? form['form_status'] ?? 'private')
+                            as String)
+                        .toUpperCase(),
+                'hasImage': false,
+              },
+            )
+            .toList();
         _applyFilter();
         _isLoading = false;
       });
@@ -206,11 +209,9 @@ class _HomeContentState extends State<_HomeContent> {
   }
 
   void _navigateToCreateForm() async {
-    final result = await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const CreateFormScreen(),
-      ),
-    );
+    final result = await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const CreateFormScreen()));
 
     _handleCreateResult(result);
   }
@@ -310,16 +311,16 @@ class _HomeContentState extends State<_HomeContent> {
             Text(
               'No Forms Yet',
               style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 12),
             Text(
               'Start creating your first form by tapping\nthe + button below',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontSize: 15,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontSize: 15),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
@@ -329,7 +330,10 @@ class _HomeContentState extends State<_HomeContent> {
               label: const Text('Create Form'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.blueAccent,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 16,
+                ),
               ),
             ),
           ],
@@ -425,7 +429,11 @@ class _HomeContentState extends State<_HomeContent> {
                       color: AppColors.textHint,
                       fontSize: 13,
                     ),
-                    prefixIcon: Icon(Icons.search, color: AppColors.blueButton, size: 20),
+                    prefixIcon: Icon(
+                      Icons.search,
+                      color: AppColors.blueButton,
+                      size: 20,
+                    ),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(vertical: 14),
                   ),
@@ -462,51 +470,58 @@ class _HomeContentState extends State<_HomeContent> {
             // Content
             Expanded(
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: AppColors.blueAccent))
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.blueAccent,
+                      ),
+                    )
                   : _allForms.isEmpty
-                      ? _buildEmptyState(context)
-                      : RefreshIndicator(
-                          onRefresh: _loadForms,
-                          child: ListView(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            children: [
-                              // Create Form Card
-                              _buildCreateFormCard(),
-                              const SizedBox(height: 16),
-                              // Forms List
-                              if (_filteredForms.isEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.all(40),
-                                  child: Column(
-                                    children: [
-                                      Icon(
-                                        Icons.search_off,
-                                        size: 64,
-                                        color: AppColors.textSecondary.withOpacity(0.5),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      Text(
-                                        'No $_selectedCategory forms found',
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                    ],
+                  ? _buildEmptyState(context)
+                  : RefreshIndicator(
+                      onRefresh: _loadForms,
+                      child: ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        children: [
+                          // Create Form Card
+                          _buildCreateFormCard(),
+                          const SizedBox(height: 16),
+                          // Forms List
+                          if (_filteredForms.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.all(40),
+                              child: Column(
+                                children: [
+                                  Icon(
+                                    Icons.search_off,
+                                    size: 64,
+                                    color: AppColors.textSecondary.withOpacity(
+                                      0.5,
+                                    ),
                                   ),
-                                )
-                              else
-                                ..._filteredForms.map((form) {
-                                  final cat = (form['category'] as String?) ?? 'default';
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 12),
-                                    child: _buildFormListItem(form, cat),
-                                  );
-                                }),
-                              const SizedBox(height: 20),
-                            ],
-                          ),
-                        ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No $_selectedCategory forms found',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            ..._filteredForms.map((form) {
+                              final cat =
+                                  (form['category'] as String?) ?? 'default';
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _buildFormListItem(form, cat),
+                              );
+                            }),
+                          const SizedBox(height: 20),
+                        ],
+                      ),
+                    ),
             ),
           ],
         ),
@@ -578,7 +593,10 @@ class _HomeContentState extends State<_HomeContent> {
                   ),
                   const SizedBox(height: 16),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.blueAccent,
                       borderRadius: BorderRadius.circular(8),
@@ -623,7 +641,9 @@ class _HomeContentState extends State<_HomeContent> {
                     height: 26,
                     decoration: const BoxDecoration(
                       color: Color(0xFF1760CE),
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(12),
+                      ),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.start,
@@ -656,14 +676,29 @@ class _HomeContentState extends State<_HomeContent> {
                                 width: 18,
                                 height: 18,
                                 decoration: BoxDecoration(
-                                  border: Border.all(color: const Color(0xFF5596D8), width: 2),
-                                  shape: i == 1 ? BoxShape.rectangle : BoxShape.circle,
-                                  borderRadius: i == 1 ? BorderRadius.circular(3) : null,
-                                  color: i == 1 ? const Color(0xFFE3F2FF) : null,
+                                  border: Border.all(
+                                    color: const Color(0xFF5596D8),
+                                    width: 2,
+                                  ),
+                                  shape: i == 1
+                                      ? BoxShape.rectangle
+                                      : BoxShape.circle,
+                                  borderRadius: i == 1
+                                      ? BorderRadius.circular(3)
+                                      : null,
+                                  color: i == 1
+                                      ? const Color(0xFFE3F2FF)
+                                      : null,
                                 ),
                                 child: i == 1
                                     ? const Center(
-                                        child: Text('✓', style: TextStyle(fontSize: 8, color: Color(0xFF1767CE))),
+                                        child: Text(
+                                          '✓',
+                                          style: TextStyle(
+                                            fontSize: 8,
+                                            color: Color(0xFF1767CE),
+                                          ),
+                                        ),
                                       )
                                     : null,
                               ),
@@ -714,9 +749,7 @@ class _HomeContentState extends State<_HomeContent> {
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => FormViewerScreen(
-              slug: form['slug'] ?? '',
-            ),
+            builder: (context) => FormViewerScreen(slug: form['slug'] ?? ''),
           ),
         );
       },
@@ -743,7 +776,11 @@ class _HomeContentState extends State<_HomeContent> {
                 color: catBg,
                 borderRadius: BorderRadius.circular(9),
               ),
-              child: Icon(Icons.description_outlined, color: catColor, size: 20),
+              child: Icon(
+                Icons.description_outlined,
+                color: catColor,
+                size: 20,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(

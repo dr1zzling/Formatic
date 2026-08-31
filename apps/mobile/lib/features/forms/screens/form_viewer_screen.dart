@@ -249,7 +249,10 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
             }
           }
         } else if (type == 'checkbox') {
-          final List<String> selectedValues = (answer as List<String>?) ?? [];
+          final rawAnswer = question['answer'];
+          final List<String> selectedValues = rawAnswer is List
+              ? rawAnswer.map((e) => e.toString()).toList()
+              : <String>[];
           final options = question['options'] as List;
           final selectedIds = <int>[];
           for (final selected in selectedValues) {
@@ -771,7 +774,11 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
     List options,
     int index,
   ) {
-    List<String> selectedValues = (question['answer'] as List<String>?) ?? [];
+    // Use List<dynamic> cast first to avoid ClassCastException, then convert.
+    final rawAnswer = question['answer'];
+    List<String> selectedValues = rawAnswer is List
+        ? rawAnswer.map((e) => e.toString()).toList()
+        : <String>[];
 
     return Column(
       children: options.map((option) {

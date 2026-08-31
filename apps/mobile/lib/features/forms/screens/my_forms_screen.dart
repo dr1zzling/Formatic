@@ -77,9 +77,81 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
         _applyFilters();
         _isLoading = false;
       });
+      // Load question and response counts in background
+      _loadFormCounts();
     } else {
       setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _loadFormCounts() async {
+    if (_myForms.isEmpty) return;
+
+    // Load all counts in parallel
+    final futures = _myForms.map((form) async {
+      final slug = form['slug'] as String? ?? '';
+      if (slug.isEmpty) return {'slug': slug, 'questions': 0, 'responses': 0};
+
+      int questionCount = 0;
+      int responseCount = 0;
+
+      // Load questions count from getFormBySlug
+      try {
+        final formResult = await FormService.getFormBySlug(slug);
+        if (formResult['success'] == true) {
+          final data = formResult['data']?['data'];
+          final rawSoal = data is Map && data['soal'] is List
+              ? data['soal'] as List
+              : [];
+          // Flatten page-grouped structure
+          questionCount = rawSoal.fold<int>(0, (count, pageGroup) {
+            if (pageGroup is Map && pageGroup['soal'] is List) {
+              return count + (pageGroup['soal'] as List).length;
+            }
+            return count + 1;
+          });
+        }
+      } catch (_) {}
+
+      // Load responses count from getSubmitStats
+      try {
+        final statsResult = await FormService.getSubmitStats(slug);
+        if (statsResult['success'] == true) {
+          final statsData = statsResult['data'];
+          if (statsData is Map) {
+            final inner = statsData['data'];
+            if (inner is Map) {
+              responseCount = (inner['total_submit'] as num?)?.toInt() ?? 0;
+            }
+          }
+        }
+      } catch (_) {}
+
+      return {
+        'slug': slug,
+        'questions': questionCount,
+        'responses': responseCount,
+      };
+    }).toList();
+
+    final results = await Future.wait(futures);
+
+    if (!mounted) return;
+
+    setState(() {
+      final countMap = {for (final r in results) (r['slug'] as String): r};
+      _myForms = _myForms.map((form) {
+        final slug = form['slug'] as String? ?? '';
+        final counts = countMap[slug];
+        if (counts == null) return form;
+        return {
+          ...form,
+          'questions': counts['questions'] as int,
+          'responses': counts['responses'] as int,
+        };
+      }).toList();
+      _applyFilters();
+    });
   }
 
   void _applyFilters() {

@@ -750,18 +750,35 @@ class _ResponsesTabState extends State<_ResponsesTab> {
       if (data is Map &&
           data['data'] is Map &&
           data['data']['questions'] is List) {
-        summary = data['data']['questions'];
+        // Backend returns questions as page groups: [{page, soal:[...]}, ...]
+        // Flatten all soal from every page into a single list.
+        final pageGroups = data['data']['questions'] as List;
+        summary = pageGroups.expand<dynamic>((pageGroup) {
+          if (pageGroup is Map && pageGroup['soal'] is List) {
+            return pageGroup['soal'] as List;
+          }
+          return [pageGroup];
+        }).toList();
       }
     }
 
     List<dynamic> detail = [];
     if (detailResult['success']) {
       final data = detailResult['data'];
+      // Backend returns data as page groups: [{page, soal:[...]}, ...]
+      // Flatten all soal from every page into a single list.
+      List<dynamic> rawList = [];
       if (data is Map && data['data'] is List) {
-        detail = data['data'];
+        rawList = data['data'] as List;
       } else if (data is List) {
-        detail = data;
+        rawList = data;
       }
+      detail = rawList.expand<dynamic>((pageGroup) {
+        if (pageGroup is Map && pageGroup['soal'] is List) {
+          return pageGroup['soal'] as List;
+        }
+        return [pageGroup];
+      }).toList();
     }
 
     setState(() {
