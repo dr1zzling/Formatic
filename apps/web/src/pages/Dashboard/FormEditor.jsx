@@ -775,7 +775,11 @@ function ResponsesTab({ formId, form }) {
   }, [formSlug]);
 
   const total     = summary?.total_submit ?? 0;
-  const questions = summary?.questions    ?? [];
+  // Backend return questions sebagai array of pages [{page, soal:[]}] — flatten
+  const rawQ      = summary?.questions ?? [];
+  const questions = rawQ.length > 0 && rawQ[0]?.soal
+    ? rawQ.flatMap(pg => pg.soal ?? [])
+    : rawQ;
   const isPublic  = form?.status === "public" || form?.form_status === "public";
   const title     = form?.title ?? form?.form_title ?? "Form";
 

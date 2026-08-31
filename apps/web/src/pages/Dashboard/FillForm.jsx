@@ -197,11 +197,12 @@ export default function FillForm() {
       localStorage.removeItem(STORAGE_KEY);
       setDone(true);
     } catch (e) {
-      const status = e.response?.status;
-      if (status === 409) {
-        setSubmitError("Kamu sudah mengisi form ini. Tidak bisa mengisi dua kali.");
+      const msg = e.message || "";
+      if (msg.toLowerCase().includes("sudah") || msg.includes("409")) {
+        setSubmitError("Kamu sudah pernah mengisi form ini sebelumnya.");
+        localStorage.removeItem(STORAGE_KEY); // hapus draft
       } else {
-        setSubmitError(e.response?.data?.message || e.message || "Gagal mengirim jawaban.");
+        setSubmitError(e.message || "Gagal mengirim jawaban.");
       }
     } finally { setSubmitting(false); }
   }
