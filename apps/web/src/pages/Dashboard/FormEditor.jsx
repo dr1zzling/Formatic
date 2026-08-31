@@ -57,6 +57,8 @@ export default function FormEditor() {
       setQuestions(prev => {
         const fromDB = soalFlat.map((s) => ({
           id: s.id, question: s.question, type: s.type, required: true,
+          page: s.page ?? 1,
+          score: s.score ?? null,
           options: (s.options ?? []).map((o) => ({
             id: o.id, value: o.value ?? o.option_value, is_correct: o.is_correct,
           })),
@@ -100,6 +102,8 @@ export default function FormEditor() {
           }
           const fromDB = soalFlat.map((s) => ({
             id: s.id, question: s.question, type: s.type, required: true,
+            page: s.page ?? 1,
+            score: s.score ?? null,
             options: (s.options ?? []).map((o) => ({
               id: o.id, value: o.value ?? o.option_value, is_correct: o.is_correct,
             })),
@@ -1133,7 +1137,7 @@ function SettingsTab({ form, onUpdateStatus, slug }) {
   async function saveToken(active, value) {
     setTokenSaving(true); setTokenMsg("");
     try {
-      const res = await fetch(`http://localhost:3000/form/setting?form_slug=${form?.slug ?? slug}`, {
+      const res = await fetch(`${FORM_API_URL}/form/setting?form_slug=${form?.slug ?? slug}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: JSON.stringify({
@@ -1164,7 +1168,7 @@ function SettingsTab({ form, onUpdateStatus, slug }) {
     if (!duration && !startAt) { setTimerMsg("Isi durasi atau waktu mulai."); return; }
     setTimerSaving(true); setTimerMsg("");
     try {
-      const res = await fetch(`http://localhost:3000/form/setting?form_slug=${form?.slug ?? slug}`, {
+      const res = await fetch(`${FORM_API_URL}/form/setting?form_slug=${form?.slug ?? slug}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: JSON.stringify({
@@ -1184,7 +1188,7 @@ function SettingsTab({ form, onUpdateStatus, slug }) {
     setIsRandom(val);
     setShuffleSaving(true); setShuffleMsg("");
     try {
-      const res = await fetch(`http://localhost:3000/form/setting?form_slug=${form?.slug ?? slug}`, {
+      const res = await fetch(`${FORM_API_URL}/form/setting?form_slug=${form?.slug ?? slug}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: JSON.stringify({
@@ -1209,7 +1213,7 @@ function SettingsTab({ form, onUpdateStatus, slug }) {
         if (!q.id) continue;
         const fd = new FormData();
         fd.append("data", JSON.stringify({ soal: { question: q.question, type: q.type, score: perSoal } }));
-        await fetch(`http://localhost:3000/form/soal/${q.id}`, {
+        await fetch(`${FORM_API_URL}/form/soal/${q.id}`, {
           method: "PATCH",
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           body: fd,
