@@ -30,6 +30,7 @@
     "@nestjs/websockets": "^11.2.1",
     "crypto": "^1.0.1",
     "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
     "fast-xml-parser": "^5.11.1",
     "jszip": "^3.10.1",
     "knex": "^3.3.0",
