@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
 import { socket } from "../../utils/socket";
-import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical } from "lucide-react";
+import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical, ImagePlus, X } from "lucide-react";
 import QuillEditor from "../../components/QuillEditor";
 import RichTextDisplay from "../../components/RichTextDisplay";
 
@@ -61,6 +61,7 @@ export default function FormEditor() {
           score: s.score ?? null,
           options: (s.options ?? []).map((o) => ({
             id: o.id, value: o.value ?? o.option_value, is_correct: o.is_correct,
+            image: o.image ?? null,
           })),
         }));
         const unsaved = prev.filter(q => q._new);
@@ -106,6 +107,7 @@ export default function FormEditor() {
             score: s.score ?? null,
             options: (s.options ?? []).map((o) => ({
               id: o.id, value: o.value ?? o.option_value, is_correct: o.is_correct,
+              image: o.image ?? null,
             })),
           }));
           const unsaved = prev.filter(q => q._new);
@@ -141,6 +143,12 @@ export default function FormEditor() {
     setQuestions((prev) => prev.map((q, i) => {
       if (i !== qIdx) return q;
       return { ...q, options: q.options.map((o, j) => j === oIdx ? { ...o, value: val } : o) };
+    }));
+  }
+  function updateOptField(qIdx, oIdx, field, val) {
+    setQuestions((prev) => prev.map((q, i) => {
+      if (i !== qIdx) return q;
+      return { ...q, options: q.options.map((o, j) => j === oIdx ? { ...o, [field]: val } : o) };
     }));
   }
   function addOpt(qIdx) {
@@ -198,6 +206,11 @@ export default function FormEditor() {
     if (questions.find((q) => isTextEmpty(q.question))) { setError("Semua pertanyaan wajib diisi."); return; }
     setSaving(true); setError("");
     isSavingRef.current = true;
+
+    // Survey: semua soal di page 1. Ujian: page = urutan soal (1-indexed)
+    const isQuiz = form?.category === "ujian";
+    const getPage = (globalIdx) => isQuiz ? globalIdx + 1 : 1;
+
     try {
       const token = localStorage.getItem("token");
 
@@ -220,25 +233,36 @@ export default function FormEditor() {
         await Promise.all(
           existingOnes.map((q) => {
             const idx = questions.findIndex(x => x.id === q.id);
-            // page = posisi soal dalam array (1-indexed), drag untuk ubah urutan
-            const pageVal = idx + 1;
+            const pageVal = getPage(idx);
             const hasOpts = ["radio", "checkbox", "rating"].includes(q.type);
             const payload = {
               soal: { question: q.question, type: q.type, page: pageVal, score: q.score ?? null },
               options: hasOpts
-                ? (q.options || []).map((o, idx) => ({ id: o.id, value: o.value?.trim() || `Opsi ${idx + 1}`, is_correct: o.is_correct ?? false }))
+                ? (q.options || []).map((o, idx) => ({
+                    id: o.id,
+                    value: o.value?.trim() || `Opsi ${idx + 1}`,
+                    is_correct: o.is_correct ?? false,
+                    // kalau ada file baru, tandai dengan image_filename
+                    ...(o.imageFile ? { image_filename: o.imageFile.name } : {}),
+                    // kalau sudah ada image dari DB, tetap kirim
+                    ...(o.image && !o.imageFile ? { image: o.image } : {}),
+                  }))
                 : [],
             };
+            const fd = new FormData();
+            fd.append("data", JSON.stringify(payload));
+            // Lampirkan file gambar opsi baru
+            if (hasOpts) {
+              (q.options || []).forEach((o) => {
+                if (o.imageFile instanceof File) {
+                  fd.append("option_images", o.imageFile, o.imageFile.name);
+                }
+              });
+            }
             return fetch(`${FORM_API_URL}/form/soal/${q.id}`, {
               method: "PATCH",
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-              body: (() => {
-                const fd = new FormData();
-                fd.append("data", JSON.stringify(payload));
-                return fd;
-              })(),
+              headers: { Authorization: `Bearer ${token}` },
+              body: fd,
             });
           })
         );
@@ -250,15 +274,30 @@ export default function FormEditor() {
         const fd = new FormData();
         const payload = newOnes.map((q, i) => {
           const hasOpts = ["radio", "checkbox", "rating"].includes(q.type);
-          // page = posisi global soal dalam array (1-indexed)
-          const pageVal = questions.findIndex(x => x === q) + 1;
+          const globalIdx = questions.findIndex(x => x === q);
+          const pageVal = getPage(globalIdx);
           if (q.attachment instanceof File) {
             fd.append("soal_images", q.attachment, `soal_${i}_${q.attachment.name}`);
           }
           return {
-            soal: { question: q.question, type: q.type, image: q.attachment instanceof File ? q.attachment.name : null, page: pageVal, score: q.score ?? null },
+            soal: {
+              question: q.question, type: q.type,
+              image: q.attachment instanceof File ? q.attachment.name : null,
+              page: pageVal, score: q.score ?? null,
+            },
             options: hasOpts
-              ? q.options.map((o, idx) => ({ value: o.value?.trim() || `Opsi ${idx + 1}`, image: null, is_correct: o.is_correct ?? false }))
+              ? q.options.map((o, oIdx) => {
+                  const opt = {
+                    value: o.value?.trim() || `Opsi ${oIdx + 1}`,
+                    image: null,
+                    is_correct: o.is_correct ?? false,
+                  };
+                  if (o.imageFile instanceof File) {
+                    fd.append("option_images", o.imageFile, o.imageFile.name);
+                    opt.image_filename = o.imageFile.name;
+                  }
+                  return opt;
+                })
               : [],
           };
         });
@@ -434,7 +473,7 @@ export default function FormEditor() {
             <PertanyaanTab
               form={form} slug={slug} questions={questions} error={error}
               onAddQuestion={addQuestion}
-              onUpdateQ={updateQ} onUpdateOpt={updateOpt}
+              onUpdateQ={updateQ} onUpdateOpt={updateOpt} onUpdateOptField={updateOptField}
               onAddOpt={addOpt} onRemoveOpt={removeOpt}
               onRemoveQ={removeQ} onDuplicateQ={duplicateQ}
               onToggleCorrect={toggleCorrect}
@@ -489,7 +528,7 @@ export default function FormEditor() {
 }
 
 /* ── Pertanyaan Tab ─────────────────────────────────────────── */
-function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ, onUpdateOpt, onAddOpt, onRemoveOpt, onRemoveQ, onDuplicateQ, onToggleCorrect, onReorder, onCopyLink, onShowToast, onImported, onImportedSilent }) {
+function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ, onUpdateOpt, onUpdateOptField, onAddOpt, onRemoveOpt, onRemoveQ, onDuplicateQ, onToggleCorrect, onReorder, onCopyLink, onShowToast, onImported, onImportedSilent }) {
   const [dragFrom, setDragFrom] = useState(null);
   const [dragOver, setDragOver] = useState(null);
   // Baca scoreType dari localStorage supaya badge score realtime ikut berubah
@@ -558,6 +597,7 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ,
             index={qIdx}
             onUpdate={(f, v) => onUpdateQ(qIdx, f, v)}
             onUpdateOpt={(oIdx, v) => onUpdateOpt(qIdx, oIdx, v)}
+            onUpdateOptField={(oIdx, field, v) => onUpdateOptField(qIdx, oIdx, field, v)}
             onAddOpt={() => onAddOpt(qIdx)}
             onRemoveOpt={(oIdx) => onRemoveOpt(qIdx, oIdx)}
             onToggleCorrect={(oIdx) => onToggleCorrect(qIdx, oIdx)}
@@ -586,7 +626,7 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ,
 }
 
 /* ── Question Card ──────────────────────────────────────────── */
-function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemoveOpt, onToggleCorrect, onRemove, onDuplicate, onDragHandleStart, onDragHandleEnd, onShowToast, scoreType, totalSoal }) {
+function QuestionCard({ question, index, onUpdate, onUpdateOpt, onUpdateOptField, onAddOpt, onRemoveOpt, onToggleCorrect, onRemove, onDuplicate, onDragHandleStart, onDragHandleEnd, onShowToast, scoreType, totalSoal }) {
   const hasOptions = ["radio", "checkbox"].includes(question.type);
   // Semua soal bisa diedit (tidak hanya yang baru)
   const editable = true;
@@ -642,35 +682,81 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemo
           <p className="text-[12.5px] text-gray-500 ml-1">
             {question.type === "checkbox" ? "Klik kotak untuk menandai jawaban benar" : "Klik lingkaran untuk menandai jawaban benar"}
           </p>
-          {question.options.map((opt, oIdx) => (
-            <div key={oIdx} className="group flex items-center gap-3">
-              <button
-                title="Tandai jawaban benar"
-                onClick={() => onToggleCorrect(oIdx)}
-                className={`inline-grid place-items-center shrink-0 border-2 transition-all duration-150 active:scale-90 will-change-transform ${
-                  question.type === "checkbox" ? "w-7 h-7 rounded-[8px]" : "w-7 h-7 rounded-full"
-                } ${
-                  opt.is_correct
-                    ? "bg-green-500 border-green-500 text-white"
-                    : "bg-[#eef2f6] border-[#5b6c7e] hover:border-green-500 hover:bg-green-50"
-                }`}
-              >
-                {opt.is_correct && (
-                  question.type === "checkbox"
-                    ? <Check size={16} strokeWidth={3} />
-                    : <span className="block w-3 h-3 rounded-full bg-white" />
+          {question.options.map((opt, oIdx) => {
+            const previewUrl = opt.imageFile
+              ? URL.createObjectURL(opt.imageFile)
+              : opt.image
+                ? `${FORM_API_URL}${opt.image}`
+                : null;
+            return (
+              <div key={oIdx} className="group flex flex-col gap-1.5">
+                <div className="flex items-center gap-3">
+                  <button
+                    title="Tandai jawaban benar"
+                    onClick={() => onToggleCorrect(oIdx)}
+                    className={`inline-grid place-items-center shrink-0 border-2 transition-all duration-150 active:scale-90 will-change-transform ${
+                      question.type === "checkbox" ? "w-7 h-7 rounded-[8px]" : "w-7 h-7 rounded-full"
+                    } ${
+                      opt.is_correct
+                        ? "bg-green-500 border-green-500 text-white"
+                        : "bg-[#eef2f6] border-[#5b6c7e] hover:border-green-500 hover:bg-green-50"
+                    }`}
+                  >
+                    {opt.is_correct && (
+                      question.type === "checkbox"
+                        ? <Check size={16} strokeWidth={3} />
+                        : <span className="block w-3 h-3 rounded-full bg-white" />
+                    )}
+                  </button>
+                  <input
+                    type="text"
+                    value={opt.value}
+                    onChange={(e) => onUpdateOpt(oIdx, e.target.value)}
+                    placeholder={`Opsi ${oIdx + 1}`}
+                    className="flex-1 text-[15px] text-gray-700 outline-none border-b border-dashed border-gray-100 focus:border-[#1a4fa0] transition-colors bg-transparent py-1"
+                  />
+                  {/* Tombol upload gambar opsi */}
+                  <label
+                    title="Tambah gambar opsi"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer text-gray-300 hover:text-[#1a4fa0] hover:bg-[#eef5fb] transition-all shrink-0"
+                  >
+                    <ImagePlus size={16} />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) onUpdateOptField(oIdx, "imageFile", file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <button onClick={() => onRemoveOpt(oIdx)} className="w-8 h-8 rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-all flex items-center justify-center shrink-0">✕</button>
+                </div>
+                {/* Preview gambar opsi */}
+                {previewUrl && (
+                  <div className="ml-10 relative inline-block">
+                    <img
+                      src={previewUrl}
+                      alt={`Gambar opsi ${oIdx + 1}`}
+                      className="h-20 max-w-[180px] object-cover rounded-lg border border-[#d4e5fa]"
+                    />
+                    <button
+                      onClick={() => {
+                        onUpdateOptField(oIdx, "imageFile", null);
+                        onUpdateOptField(oIdx, "image", null);
+                      }}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+                      title="Hapus gambar"
+                    >
+                      <X size={11} strokeWidth={3} />
+                    </button>
+                  </div>
                 )}
-              </button>
-              <input
-                type="text"
-                value={opt.value}
-                onChange={(e) => onUpdateOpt(oIdx, e.target.value)}
-                placeholder={`Opsi ${oIdx + 1}`}
-                className="flex-1 text-[15px] text-gray-700 outline-none border-b border-dashed border-gray-100 focus:border-[#1a4fa0] transition-colors bg-transparent py-1"
-              />
-              <button onClick={() => onRemoveOpt(oIdx)} className="w-8 h-8 rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-all flex items-center justify-center shrink-0">✕</button>
-            </div>
-          ))}
+              </div>
+            );
+          })}
           <button onClick={onAddOpt} className="text-[14px] font-medium text-gray-400 hover:text-[#1a4fa0] flex items-center gap-2 ml-1 mt-2 transition-colors">
             <Plus size={16} /> Tambah opsi
           </button>
