@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Isi Form - Loading...</title>
+    <title>Isi Form - Verifikasi Token</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
@@ -13,9 +13,9 @@
     <!-- Sticky Header Navbar -->
     <header class="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm">
         <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
-            <button onclick="window.history.back()"
+            <button onclick="window.location.href='dashboard.html'"
                 class="px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition flex items-center gap-1">
-                ← Kembali
+                ← Kembali ke Dashboard
             </button>
 
             <!-- Timer di Header Navbar -->
@@ -25,7 +25,7 @@
             </div>
 
             <span id="header-category" class="text-xs font-bold px-2.5 py-1 rounded bg-indigo-50 text-indigo-700 uppercase tracking-wider">
-                Loading...
+                Verifikasi...
             </span>
         </div>
     </header>
@@ -38,7 +38,7 @@
 
         <!-- Card Loading State -->
         <div id="loading-state" class="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm text-center">
-            <p class="text-slate-500 animate-pulse font-medium">Memuat formulir...</p>
+            <p class="text-slate-500 animate-pulse font-medium">Menunggu verifikasi token...</p>
         </div>
 
         <!-- Form Wrapper -->
@@ -88,6 +88,40 @@
 
     </main>
 
+    <!-- MODAL TOKEN RESPONDEN (DIPINDAHKAN KE FILL-FORM) -->
+    <div id="modal-token" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 space-y-4 relative">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                    <span>🔑</span> Verifikasi Token Responden
+                </h3>
+                <button onclick="window.location.href='dashboard.html'" class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
+            </div>
+
+            <p class="text-xs text-slate-500 leading-relaxed">
+                Masukkan token responden yang valid untuk mulai mengisi formulir ini. Jika token salah, Anda akan dikembalikan ke dashboard.
+            </p>
+
+            <!-- Alert khusus modal -->
+            <div id="modal-alert" class="hidden p-3 rounded-lg text-xs font-medium bg-red-100 text-red-700 border border-red-200"></div>
+
+            <form id="form-check-token" onsubmit="handleVerifyToken(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Token Responden (Opsional / Jika Ada)</label>
+                    <input type="text" id="input-token-respon" placeholder="Masukkan token..."
+                        class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2 border-t">
+                    <button type="button" onclick="window.location.href='dashboard.html'" class="px-4 py-2 bg-slate-100 text-slate-600 text-xs font-semibold rounded-lg hover:bg-slate-200 transition">Batal</button>
+                    <button type="submit" id="btn-submit-token" class="px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 shadow-sm transition flex items-center gap-1">
+                        <span>Masuk Form</span> &rarr;
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         const API_BASE_URL = 'http://localhost:4000';
         const token = localStorage.getItem('token');
@@ -98,7 +132,6 @@
 
         const urlParams = new URLSearchParams(window.location.search);
         const formSlug = urlParams.get('slug');
-        const tokenRespon = urlParams.get('token');
 
         if (!formSlug) {
             alert('Form slug tidak ditemukan!');
@@ -107,12 +140,59 @@
 
         let timerInterval = null;
         let isTimeExpired = false;
-
-        // --- GLOBAL PAGINATION & ANSWER STATE ---
         let sortedPageNumbers = [];
-        let pagesData = {}; // Format: { 1: [soalObj, ...], 2: [soalObj, ...] }
+        let pagesData = {};
         let currentPageIndex = 0;
-        let userAnswersState = {}; // Menyimpan jawaban pengguna sementara per soal_id
+        let userAnswersState = {};
+
+        // --- HANDLE VERIFIKASI TOKEN DI HALAMAN FILL-FORM ---
+        async function handleVerifyToken(e) {
+            e.preventDefault();
+            const modalAlert = document.getElementById('modal-alert');
+            modalAlert.classList.add('hidden');
+
+            const tokenRespon = document.getElementById('input-token-respon').value.trim();
+            const btnSubmit = document.getElementById('btn-submit-token');
+
+            btnSubmit.disabled = true;
+            btnSubmit.textContent = 'Memeriksa...';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/form/submit/check-token?form_slug=${encodeURIComponent(formSlug)}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ token: tokenRespon || null })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Token Valid -> Tutup Modal dan Muat Detail Form
+                    document.getElementById('modal-token').classList.add('hidden');
+                    fetchFormDetail();
+                } else {
+                    // Jika Token Salah -> Tampilkan pesan error sebentar lalu redirect ke dashboard.html
+                    modalAlert.textContent = result.message || 'Token salah! Mengalihkan ke dashboard...';
+                    modalAlert.classList.remove('hidden');
+                    setTimeout(() => {
+                        window.location.href = 'dashboard.html';
+                    }, 1500);
+                }
+            } catch (err) {
+                console.error(err);
+                modalAlert.textContent = 'Terjadi kesalahan koneksi ke server. Mengalihkan...';
+                modalAlert.classList.remove('hidden');
+                setTimeout(() => {
+                    window.location.href = 'dashboard.html';
+                }, 1500);
+            } finally {
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = '<span>Masuk Form</span> &rarr;';
+            }
+        }
 
         // --- FETCH FORM DETAIL ---
         async function fetchFormDetail() {
@@ -189,7 +269,7 @@
             document.getElementById('timer-text-nav').textContent = "00:00:00";
             showGlobalAlert('⏰ Waktu pengerjaan telah habis! Mengirimkan jawaban Anda secara otomatis...', false);
 
-            saveCurrentPageAnswers(); // Simpan jawaban halaman saat ini sebelum submit
+            saveCurrentPageAnswers();
 
             const formInputs = document.querySelectorAll('#form-fill input, #form-fill button');
             formInputs.forEach(input => input.disabled = true);
@@ -213,21 +293,17 @@
                 ? 'text-[10px] font-bold px-2.5 py-0.5 rounded bg-emerald-100 text-emerald-800 uppercase tracking-wider'
                 : 'text-[10px] font-bold px-2.5 py-0.5 rounded bg-amber-100 text-amber-800 uppercase tracking-wider';
 
-            // Reset Structure Data
             pagesData = {};
             const rawSoal = formData.soal || [];
 
-            // Grouping Soal Per Halaman (Handling nested group & flat array)
             if (Array.isArray(rawSoal) && rawSoal.length > 0) {
                 if (rawSoal[0] && Array.isArray(rawSoal[0].soal)) {
-                    // Berbentuk Nested Page Grouping: [{ page: 1, soal: [...] }]
                     rawSoal.forEach(group => {
                         const pageNum = (group.page === null || group.page === undefined) ? 1 : Number(group.page);
                         if (!pagesData[pageNum]) pagesData[pageNum] = [];
                         pagesData[pageNum].push(...group.soal);
                     });
                 } else {
-                    // Berbentuk Flat Array Soal: [{ id: 1, page: 1, ... }]
                     rawSoal.forEach(soalObj => {
                         const pageNum = (soalObj.page === null || soalObj.page === undefined) ? 1 : Number(soalObj.page);
                         if (!pagesData[pageNum]) pagesData[pageNum] = [];
@@ -245,7 +321,6 @@
             renderCurrentPageSoal();
         }
 
-        // --- RENDER SOAL PER HALAMAN AKTIF ---
         function renderCurrentPageSoal() {
             const soalContainer = document.getElementById('soal-container');
             soalContainer.innerHTML = '';
@@ -264,7 +339,6 @@
             const currentRealPage = sortedPageNumbers[currentPageIndex];
             const currentSoalList = pagesData[currentRealPage] || [];
 
-            // Hitung nomor urut global untuk soal
             let globalSoalIndexOffset = 0;
             for (let i = 0; i < currentPageIndex; i++) {
                 const prevPageNum = sortedPageNumbers[i];
@@ -277,10 +351,8 @@
                 soalContainer.appendChild(card);
             });
 
-            // Restore Jawaban yang Pernah Diisi di Halaman Ini
             restoreCurrentPageAnswers();
 
-            // Update Header & Navigasi Buttons
             document.getElementById('page-indicator-badge').textContent = `Halaman ${currentPageIndex + 1} dari ${sortedPageNumbers.length}`;
             
             const btnPrev = document.getElementById('btn-prev');
@@ -300,7 +372,6 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // --- CARD SOAL COMPONENT ---
         function createSoalCard(soal, number) {
             const card = document.createElement('div');
             card.className = 'bg-white p-6 md:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-4';
@@ -369,11 +440,9 @@
             return card;
         }
 
-        // --- PINDAH HALAMAN (NEXT / PREV) ---
         function changePage(direction) {
             hideGlobalAlert();
 
-            // Jika mau lanjut ke depan, simpan & validasi halaman saat ini
             if (direction > 0) {
                 const isValid = validateAndSaveCurrentPage();
                 if (!isValid) {
@@ -381,7 +450,7 @@
                     return;
                 }
             } else {
-                saveCurrentPageAnswers(); // Simpan tanpa wajib validasi jika mundur
+                saveCurrentPageAnswers();
             }
 
             const targetIndex = currentPageIndex + direction;
@@ -391,7 +460,6 @@
             }
         }
 
-        // --- SIMPAN & VALIDASI STATE JAWABAN HALAMAN SAAT INI ---
         function validateAndSaveCurrentPage() {
             let isCurrentPageValid = true;
             saveCurrentPageAnswers((soalId, hasValue) => {
@@ -442,7 +510,6 @@
                         userAnswersState[soalId] = fileInput.files[0];
                         hasValue = true;
                     }
-                    // Jika file sudah pernah diunggah sebelumnya di state, anggap valid
                     if (userAnswersState[soalId] instanceof File) {
                         hasValue = true;
                     }
@@ -479,7 +546,6 @@
             });
         }
 
-        // --- SUBMIT HANDLERS ---
         async function handleSubmitAnswers(e) {
             if (e) e.preventDefault();
 
@@ -488,7 +554,6 @@
                 return;
             }
 
-            // Simpan dan Validasi Halaman Terakhir
             const isValid = validateAndSaveCurrentPage();
             if (!isValid) {
                 showGlobalAlert('Harap jawab seluruh pertanyaan pada halaman ini sebelum mengirimkan.', false);
@@ -508,7 +573,6 @@
             const formData = new FormData();
             const payload = [];
 
-            // Evaluasi Semua Soal Dari Seluruh Halaman
             let totalQuestionsCount = 0;
             let answeredQuestionsCount = 0;
 
@@ -621,7 +685,6 @@
             }
         }
 
-        // --- HELPER ALERT ---
         function showGlobalAlert(msg, isSuccess = true) {
             const box = document.getElementById('alert-box');
             box.textContent = msg;
@@ -638,8 +701,7 @@
             document.getElementById('alert-box').classList.add('hidden');
         }
 
-        // --- INIT ---
-        document.addEventListener('DOMContentLoaded', fetchFormDetail);
+        // Catatan: Proses inisialisasi awal form sengaja menunggu user mengisi modal verifikasi token.
     </script>
 </body>
 
