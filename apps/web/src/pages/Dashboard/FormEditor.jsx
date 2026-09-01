@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
 import { socket } from "../../utils/socket";
-import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical, ImagePlus, X } from "lucide-react";
+import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical, ImagePlus, X, QrCode, Download } from "lucide-react";
 import QuillEditor from "../../components/QuillEditor";
 import RichTextDisplay from "../../components/RichTextDisplay";
+import Toast, { useToast } from "../../components/Toast";
 
 const QUESTION_TYPES = [
   { value: "radio",    label: "Pilihan Ganda" },
@@ -25,10 +26,11 @@ export default function FormEditor() {
   const [loading, setLoading]               = useState(true);
   const [saving, setSaving]                 = useState(false);
   const [error, setError]                   = useState("");
-  const [toast, setToast]                   = useState("");
+  const { toast, showToast }                = useToast();
   const [showDelete, setShowDelete]         = useState(false);
   const [collabNotice, setCollabNotice]     = useState("");
   const [userRole, setUserRole]             = useState(null); // "Creator" | "Collaborator"
+  const [showQr, setShowQr]                 = useState(false);
   const isSavingRef = useRef(false);
 
   useEffect(() => { loadForm(); }, [slug]);
@@ -105,6 +107,7 @@ export default function FormEditor() {
             id: s.id, question: s.question, type: s.type, required: true,
             page: s.page ?? 1,
             score: s.score ?? null,
+            audio: s.audio ?? null,
             options: (s.options ?? []).map((o) => ({
               id: o.id, value: o.value ?? o.option_value, is_correct: o.is_correct,
               image: o.image ?? null,
@@ -204,6 +207,17 @@ export default function FormEditor() {
   async function saveQuestions() {
     const isTextEmpty = (str) => !str || str.replace(/<[^>]*>/g, '').trim() === '';
     if (questions.find((q) => isTextEmpty(q.question))) { setError("Semua pertanyaan wajib diisi."); return; }
+
+    // Cek soal yang punya audio + gambar embedded sekaligus
+    const conflictQ = questions.find((q) =>
+      (q.audioFile instanceof File || q.audio) &&
+      /<img/i.test(q.question || "")
+    );
+    if (conflictQ) {
+      const idx = questions.indexOf(conflictQ) + 1;
+      setError(`Soal ${idx}: tidak bisa menyimpan audio bersamaan dengan gambar di teks soal. Hapus gambar dari teks atau gunakan fitur Lampiran Soal.`);
+      return;
+    }
     setSaving(true); setError("");
     isSavingRef.current = true;
 
@@ -236,7 +250,14 @@ export default function FormEditor() {
             const pageVal = getPage(idx);
             const hasOpts = ["radio", "checkbox", "rating"].includes(q.type);
             const payload = {
-              soal: { question: q.question, type: q.type, page: pageVal, score: q.score ?? null },
+              soal: { question: q.question, type: q.type, page: pageVal, score: q.score ?? null,
+                // audio baru
+                ...(q.audioFile instanceof File ? { audio_filename: q.audioFile.name } : {}),
+                // pertahankan audio lama dari DB
+                ...(q.audio && !(q.audioFile instanceof File) ? { audio: q.audio } : {}),
+                // hapus audio jika di-null-kan
+                ...(!q.audio && !(q.audioFile instanceof File) ? { audio: null } : {}),
+              },
               options: hasOpts
                 ? (q.options || []).map((o, idx) => ({
                     id: o.id,
@@ -251,6 +272,10 @@ export default function FormEditor() {
             };
             const fd = new FormData();
             fd.append("data", JSON.stringify(payload));
+            // Lampirkan file audio baru
+            if (q.audioFile instanceof File) {
+              fd.append("soal_audios", q.audioFile, q.audioFile.name);
+            }
             // Lampirkan file gambar opsi baru
             if (hasOpts) {
               (q.options || []).forEach((o) => {
@@ -279,10 +304,14 @@ export default function FormEditor() {
           if (q.attachment instanceof File) {
             fd.append("soal_images", q.attachment, `soal_${i}_${q.attachment.name}`);
           }
+          if (q.audioFile instanceof File) {
+            fd.append("soal_audios", q.audioFile, `audio_${i}_${q.audioFile.name}`);
+          }
           return {
             soal: {
               question: q.question, type: q.type,
               image: q.attachment instanceof File ? q.attachment.name : null,
+              audio_filename: q.audioFile instanceof File ? q.audioFile.name : null,
               page: pageVal, score: q.score ?? null,
             },
             options: hasOpts
@@ -360,8 +389,6 @@ export default function FormEditor() {
     showToast("Link berhasil disalin!");
   }
 
-  function showToast(msg) { setToast(msg); setTimeout(() => setToast(""), 3000); }
-
   if (loading) return (
     <div className="flex h-screen overflow-hidden" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
       <div className="flex-1 flex items-center justify-center">
@@ -406,6 +433,9 @@ export default function FormEditor() {
           <div className="flex items-center gap-2">
             <button onClick={copyLink} title="Salin link" className="hidden sm:flex w-10 h-10 rounded-xl items-center justify-center text-gray-400 hover:bg-[#eef5fb] hover:text-[#1a4fa0] transition-all">
               <Link2 size={17} />
+            </button>
+            <button onClick={() => setShowQr(true)} title="QR Code" className="hidden sm:flex w-10 h-10 rounded-xl items-center justify-center text-gray-400 hover:bg-[#eef5fb] hover:text-[#1a4fa0] transition-all">
+              <QrCode size={17} />
             </button>
             {userRole !== "Collaborator" && (
               <button
@@ -494,11 +524,7 @@ export default function FormEditor() {
       </div>
 
       {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-sm px-5 py-3 rounded-xl shadow-lg z-50">
-          ✅ {toast}
-        </div>
-      )}
+      <Toast message={toast} />
 
       {/* Collab notice */}
       {collabNotice && (
@@ -522,6 +548,15 @@ export default function FormEditor() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* QR Code modal */}
+      {showQr && (
+        <QrModal
+          slug={slug}
+          formTitle={form?.title ?? form?.form_title ?? "Form"}
+          onClose={() => setShowQr(false)}
+        />
       )}
     </div>
   );
@@ -807,6 +842,69 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onUpdateOptField
         </div>
       )}
 
+      {/* Warning: audio + gambar di teks tidak bisa bersamaan */}
+      {(question.audioFile || question.audio) && /<img/i.test(question.question || "") && (
+        <div className="mb-4 flex items-start gap-2.5 px-4 py-3 rounded-xl bg-amber-50 border border-amber-300">
+          <span className="text-amber-500 shrink-0 mt-0.5">⚠️</span>
+          <p className="text-[12.5px] text-amber-700 leading-relaxed">
+            <strong>Konflik audio + gambar:</strong> Soal ini memiliki audio dan gambar di teks sekaligus. Saat disimpan akan error. Hapus gambar dari teks dan gunakan fitur <strong>Lampiran Soal</strong> sebagai gantinya.
+          </p>
+        </div>
+      )}
+
+      {/* ── Audio Lampiran (semua tipe soal) ───────────────────── */}
+      <div className="mt-4 mb-1">
+        <p className="text-[12px] font-extrabold text-[#1a4fa0] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          🎵 Audio Soal <span className="normal-case font-normal text-gray-400">(opsional)</span>
+        </p>
+        {question.audioFile || question.audio ? (
+          <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-purple-50 border border-purple-200">
+            <span className="text-purple-600 shrink-0">🎵</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-semibold text-purple-700 truncate">
+                {question.audioFile?.name ?? question.audio?.split("/").pop()}
+              </p>
+              {question.audioFile && (
+                <audio controls src={URL.createObjectURL(question.audioFile)} className="mt-1.5 w-full h-8" />
+              )}
+              {!question.audioFile && question.audio && (
+                <audio controls src={`${FORM_API_URL}${question.audio}`} className="mt-1.5 w-full h-8" />
+              )}
+            </div>
+            <button
+              onClick={() => { onUpdate("audioFile", null); onUpdate("audio", null); }}
+              className="w-7 h-7 rounded-lg bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 flex items-center justify-center transition-all shrink-0"
+              title="Hapus audio"
+            >
+              <X size={13} strokeWidth={3} />
+            </button>
+          </div>
+        ) : (
+          <label className="flex items-center gap-3 w-full rounded-xl border-2 border-dashed border-[#c3d4e4] bg-[#f7fafd] py-3 px-4 cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-all">
+            <span className="text-[20px] shrink-0">🎵</span>
+            <span className="text-[13px] text-gray-500">Klik untuk upload audio (mp3, wav, ogg, m4a)</span>
+            <input
+              type="file"
+              accept=".mp3,.wav,.ogg,.m4a,.aac,audio/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  const hasEmbeddedImage = /<img/i.test(question.question || "");
+                  if (hasEmbeddedImage) {
+                    onShowToast("Hapus gambar dari teks soal sebelum menambahkan audio. Gunakan fitur Lampiran Soal untuk gambar.");
+                    e.target.value = "";
+                    return;
+                  }
+                  onUpdate("audioFile", file);
+                }
+                e.target.value = "";
+              }}
+            />
+          </label>
+        )}
+      </div>
+
       <div className="flex items-center justify-between gap-2 mt-5 pt-4 border-t border-[#eef3f8]">
         <div className="flex items-center gap-1">
           <button title="Duplikat" onClick={onDuplicate} className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-400 hover:bg-[#eef5fb] hover:text-[#1a4fa0] transition-all"><Copy size={16} /></button>
@@ -1021,7 +1119,7 @@ function ViewAllBtn({ q, total, formSlug }) {
     if (detail) return;
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:3000/form/submit/detail?form_slug=${formSlug}`, {
+      const res = await fetch(`${FORM_API_URL}/form/submit/detail?form_slug=${formSlug}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       const data = await res.json().catch(() => ({}));
@@ -1514,7 +1612,7 @@ function ImportDocxButton({ slug, onImported, onImportedSilent }) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.message || "Gagal import.");
-      const count = data?.data?.length ?? 0;
+      const count = data?.data?.list_soal?.length ?? 0;
       showMsg(`✅ ${count} soal berhasil diimport dari Word!`);
       setTimeout(() => { onImportedSilent?.(); }, 500);
     } catch (e) {
@@ -1558,6 +1656,96 @@ function ImportDocxButton({ slug, onImported, onImportedSilent }) {
           {error}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── QR Code Modal ──────────────────────────────────────────── */
+function QrModal({ slug, formTitle, onClose }) {
+  const [qrSrc, setQrSrc]     = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState("");
+
+  useEffect(() => {
+    setLoading(true);
+    const fillUrl = `${window.location.origin}/fill/${slug}`;
+    fetch(`${FORM_API_URL}/qrcode/image?slug=${encodeURIComponent(fillUrl)}`)
+      .then(res => {
+        if (!res.ok) throw new Error("Gagal generate QR Code");
+        return res.blob();
+      })
+      .then(blob => setQrSrc(URL.createObjectURL(blob)))
+      .catch(() => setError("Gagal memuat QR Code."))
+      .finally(() => setLoading(false));
+  }, [slug]);
+
+  function downloadQr() {
+    if (!qrSrc) return;
+    const a = document.createElement("a");
+    a.href = qrSrc;
+    a.download = `qrcode-${slug}.png`;
+    a.click();
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-gray-800 text-[16px] flex items-center gap-2">
+            <QrCode size={18} className="text-[#1a4fa0]" /> QR Code Form
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-[22px] leading-none">×</button>
+        </div>
+
+        <p className="text-[13px] text-gray-400 mb-4 truncate">"{formTitle}"</p>
+
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-10 gap-3">
+            <div className="w-8 h-8 border-2 border-[#1a4fa0] border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm text-gray-400">Membuat QR Code...</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="py-6 text-red-500 text-sm">{error}</div>
+        )}
+
+        {!loading && !error && qrSrc && (
+          <>
+            <div className="flex justify-center mb-4">
+              <img
+                src={qrSrc}
+                alt="QR Code Form"
+                className="w-52 h-52 rounded-xl border border-[#e5eef7] shadow-sm"
+              />
+            </div>
+            <p className="text-[12px] text-gray-400 mb-5">
+              Scan QR ini untuk mengisi form langsung.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={downloadQr}
+                className="w-full py-3 rounded-xl text-white text-[14px] font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition"
+                style={{ backgroundColor: "#1a4fa0" }}
+              >
+                <Download size={16} /> Download PNG
+              </button>
+              <button
+                onClick={onClose}
+                className="w-full py-2.5 rounded-xl text-[13px] font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition"
+              >
+                Tutup
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

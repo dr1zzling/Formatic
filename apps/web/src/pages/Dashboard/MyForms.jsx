@@ -181,7 +181,7 @@ export default function MyForms() {
     const isConfirmed = window.confirm(`Yakin ingin menghapus form "${form.form_title}"?`);
     if (!isConfirmed) return;
     try {
-      const response = await fetch(`http://localhost:3000/form?form_slug=${form.form_slug}`, {
+      const response = await fetch(`${FORM_API_URL}/form?form_slug=${form.form_slug}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",

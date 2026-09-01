@@ -66,3 +66,98 @@ body {
 }
 
 
+
+/* ── Code Block (hljs) ────────────────────────────────────────────────────── */
+.hljs-pre {
+  margin: 10px 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.hljs-pre code.hljs {
+  display: block;
+  padding: 14px 16px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13.5px;
+  line-height: 1.6;
+  overflow-x: auto;
+  background: #f6f8fa;
+  color: #24292e;
+  border-radius: 0;
+}
+
+code.inline-code {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  background: #f0f4f8;
+  border: 1px solid #d4dde8;
+  border-radius: 4px;
+  padding: 1px 6px;
+  color: #c7254e;
+}
+
+/* Quill built-in code-block styling override */
+.ql-editor pre.ql-syntax {
+  background: #f6f8fa;
+  color: #24292e;
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13.5px;
+  border: 1px solid #e2e8f0;
+  overflow-x: auto;
+}
+
+/* ── KaTeX Display Math ────────────────────────────────────────────────────── */
+.katex-display-wrap {
+  display: block;
+  text-align: center;
+  margin: 8px 0;
+  overflow-x: auto;
+}
+
+.katex-display-wrap .katex {
+  font-size: 1.1em;
+}
+
+/* ── RichTextDisplay container ────────────────────────────────────────────── */
+.rich-display {
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.rich-display .katex {
+  font-size: 1em;
+}
+
+/* ── Quill code-block toolbar icon hint ──────────────────────────────────── */
+.ql-code-block::before {
+  font-family: monospace;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* ── Math display (Unicode rumus dari import docx) ────────────────────────── */
+.math-display {
+  display: block;
+  text-align: center;
+  margin: 8px auto;
+  font-family: 'Cambria Math', 'Times New Roman', Georgia, serif;
+  font-size: 1.1em;
+  color: #102f56;
+  background: #f8faff;
+  border: 1px solid #d4e5fa;
+  border-radius: 8px;
+  padding: 8px 16px;
+  letter-spacing: 0.02em;
+}
+
+.math-inline {
+  font-family: 'Cambria Math', 'Times New Roman', Georgia, serif;
+  font-size: 1.05em;
+  color: #102f56;
+  background: #f0f6fe;
+  border-radius: 4px;
+  padding: 1px 5px;
+}

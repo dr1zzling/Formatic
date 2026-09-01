@@ -265,7 +265,7 @@ export default function FillForm() {
     if (!tokenInput.trim()) { setTokenError("Masukkan token terlebih dahulu."); return; }
     setTokenLoading(true); setTokenError("");
     try {
-      const res = await fetch(`http://localhost:3000/form/submit/check-token?form_slug=${slug}`, {
+      const res = await fetch(`${FORM_API_URL}/form/submit/check-token?form_slug=${slug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: JSON.stringify({ token: tokenInput.trim() }),
@@ -391,11 +391,19 @@ export default function FillForm() {
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-semibold text-[#1a4fa0]">Lampiran Soal</p>
               </div>
-              <a href={`http://localhost:3000${soal.image.startsWith('/') ? soal.image : '/uploads/soal/' + soal.image}`}
+              <a href={`${FORM_API_URL}${soal.image.startsWith('/') ? soal.image : '/uploads/soal/' + soal.image}`}
                 target="_blank" rel="noopener noreferrer"
                 className="shrink-0 px-3 py-1.5 rounded-lg bg-[#1a4fa0] text-white text-[12px] font-semibold hover:opacity-90 transition">
                 Buka File
               </a>
+            </div>
+          )}
+
+          {/* Audio soal — survey mode */}
+          {soal.audio && (
+            <div className="mb-4 px-4 py-3 bg-purple-50 border border-purple-200 rounded-xl">
+              <p className="text-[12px] font-bold text-purple-700 mb-2">🎵 Audio Soal</p>
+              <audio controls src={`${FORM_API_URL}${soal.audio}`} className="w-full h-10" />
             </div>
           )}
 
@@ -633,11 +641,19 @@ export default function FillForm() {
                     <p className="text-[13px] font-semibold text-[#1a4fa0]">Lampiran Soal</p>
                     <p className="text-[11.5px] text-blue-500 truncate">{soal.image}</p>
                   </div>
-                  <a href={`http://localhost:3000${soal.image.startsWith('/') ? soal.image : '/uploads/soal/'+soal.image}`}
+                  <a href={`${FORM_API_URL}${soal.image.startsWith('/') ? soal.image : '/uploads/soal/'+soal.image}`}
                     target="_blank" rel="noopener noreferrer"
                     className="shrink-0 px-3 py-1.5 rounded-lg bg-[#1a4fa0] text-white text-[12px] font-semibold hover:opacity-90 transition">
                     Buka File
                   </a>
+                </div>
+              )}
+
+              {/* Audio soal — quiz mode */}
+              {soal.audio && (
+                <div className="mb-4 px-4 py-3 bg-purple-50 border border-purple-200 rounded-xl">
+                  <p className="text-[12px] font-bold text-purple-700 mb-2">🎵 Audio Soal</p>
+                  <audio controls src={`${FORM_API_URL}${soal.audio}`} className="w-full h-10" />
                 </div>
               )}
 

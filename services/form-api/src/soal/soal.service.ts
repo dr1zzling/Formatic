@@ -1,10 +1,7 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import { KnexService } from '../database/knex.service'
 import { FormEventsGateway } from '../form/form-events.gateway'
-import * as JSZip from 'jszip'
-import { XMLParser } from 'fast-xml-parser'
-import * as omml2mathml from 'omml2mathml'
-import * as mammoth from 'mammoth'
+import JSZip from 'jszip'
 import * as fs from 'fs'
 import * as path from 'path'
 import { v4 as uuidv4 } from 'uuid'
@@ -47,28 +44,47 @@ export class SoalService {
 
         const paragraphs = documentXml.match(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g) ?? []
 
-        const getText = (xml: string) => {
-            return [...xml.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)]
-                .map(match => match[1])
-                .join('')
-                .replace(/&amp;/g, '&')
-                .replace(/&lt;/g, '<')
-                .replace(/&gt;/g, '>')
-                .replace(/&quot;/g, '"')
-                .replace(/&apos;/g, "'")
-                .trim()
+        // Decode XML entities termasuk &lt; &gt; untuk kode
+        const decodeEntities = (s: string) =>
+            s.replace(/&amp;/g, '&')
+             .replace(/&lt;/g, '<')
+             .replace(/&gt;/g, '>')
+             .replace(/&quot;/g, '"')
+             .replace(/&apos;/g, "'")
+
+        // Gabungkan semua <w:t> dalam paragraf, decode entities
+        const getText = (xml: string): string => {
+            return decodeEntities(
+                [...xml.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)]
+                    .map(m => m[1])
+                    .join('')
+                    .trim()
+            )
+        }
+
+        // Deteksi apakah paragraf menggunakan font monospace (kode)
+        const isCodeParagraph = (xml: string): boolean => {
+            return /w:ascii="(?:Courier New|Courier|Consolas|Lucida Console|Monaco|Monospace)"/i.test(xml)
+        }
+
+        // Deteksi apakah paragraf menggunakan font matematika (Cambria Math)
+        const isMathParagraph = (xml: string): boolean => {
+            return /w:ascii="(?:Cambria Math|Latin Modern Math|XITS Math|Asana Math|Neo Euler|TeX Gyre)"/i.test(xml)
         }
 
         const getNumbering = (xml: string) => {
             const numId = xml.match(/<w:numId[^>]*w:val="(\d+)"/)?.[1] ?? null
-            const ilvl = xml.match(/<w:ilvl[^>]*w:val="(\d+)"/)?.[1] ?? null
+            const ilvl  = xml.match(/<w:ilvl[^>]*w:val="(\d+)"/)?.[1] ?? null
             return { numId, ilvl }
         }
 
-        const saveImageToLocal = async (xml: string): Promise<string | null> => {
-            const embed = xml.match(/r:embed="([^"]+)"/)?.[1]
-            if (!embed) return null
+        const uploadDir = path.join(process.cwd(), 'uploads', 'soal')
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true })
+        }
 
+        // Simpan satu gambar berdasarkan embed rId, kembalikan path atau null
+        const saveOneImage = async (embed: string): Promise<string | null> => {
             const target = relationships[embed]
             if (!target) return null
 
@@ -83,18 +99,20 @@ export class SoalService {
 
             const imageBuffer = await file.async('nodebuffer')
             const extension = filePath.split('.').pop()?.toLowerCase() || 'png'
-
-            const uploadDir = path.join(process.cwd(), 'uploads', 'soal')
-            if (!fs.existsSync(uploadDir)) {
-                fs.mkdirSync(uploadDir, { recursive: true })
-            }
-
             const fileName = `${Date.now()}-${uuidv4()}.${extension}`
-            const fullPath = path.join(uploadDir, fileName)
-
-            fs.writeFileSync(fullPath, imageBuffer)
-
+            fs.writeFileSync(path.join(uploadDir, fileName), imageBuffer)
             return `/uploads/soal/${fileName}`
+        }
+
+        // Ambil semua gambar dari satu paragraf (bisa lebih dari satu drawing)
+        const saveAllImagesFromParagraph = async (xml: string): Promise<string[]> => {
+            const embeds = [...xml.matchAll(/r:embed="([^"]+)"/g)].map(m => m[1])
+            const results: string[] = []
+            for (const embed of embeds) {
+                const url = await saveOneImage(embed)
+                if (url) results.push(url)
+            }
+            return results
         }
 
         const finalParsedSoal: any[] = []
@@ -143,31 +161,116 @@ export class SoalService {
             currentQuestion = null
         }
 
+        // ── State untuk mengumpulkan baris kode berurutan ──────────────────
+        let codeBuffer: string[] = []
+
+        const flushCodeBuffer = () => {
+            if (codeBuffer.length === 0) return null
+            // Trim trailing blank lines
+            while (codeBuffer.length > 0 && codeBuffer[codeBuffer.length - 1] === '') {
+                codeBuffer.pop()
+            }
+            if (codeBuffer.length === 0) return null
+            const block = '```\n' + codeBuffer.join('\n') + '\n```'
+            codeBuffer = []
+            return block
+        }
+
+        // ── State untuk mengumpulkan baris rumus matematika berurutan ──────
+        let mathBuffer: string[] = []
+
+        const flushMathBuffer = () => {
+            if (mathBuffer.length === 0) return null
+            while (mathBuffer.length > 0 && mathBuffer[mathBuffer.length - 1] === '') {
+                mathBuffer.pop()
+            }
+            if (mathBuffer.length === 0) return null
+            // Baris tunggal → inline $$, multi-baris → tiap baris display $$
+            const block = mathBuffer.map(line => `$$${line}$$`).join('\n')
+            mathBuffer = []
+            return block
+        }
+
         for (const paragraph of paragraphs) {
-            let text = getText(paragraph)
-            const image = await saveImageToLocal(paragraph)
+            let text       = getText(paragraph)
+            const isCode   = isCodeParagraph(paragraph)
+            const isMath   = isMathParagraph(paragraph)
+            const images   = await saveAllImagesFromParagraph(paragraph)
+            const image    = images[0] ?? null
+            const extraImages = images.slice(1)
             const { numId, ilvl } = getNumbering(paragraph)
 
-            if (!text && !image) continue
+            // ── Kumpulkan baris kode ke buffer ──────────────────────────────
+            if (isCode) {
+                codeBuffer.push(text || '')
+                continue
+            }
+
+            // ── Kumpulkan baris rumus ke math buffer ────────────────────────
+            if (isMath) {
+                mathBuffer.push(text || '')
+                continue
+            }
+
+            // Blank line di tengah area kode → tetap masuk buffer, jangan flush
+            if (!text && images.length === 0 && codeBuffer.length > 0) {
+                codeBuffer.push('')
+                continue
+            }
+
+            // Blank line di tengah area rumus → tetap masuk math buffer
+            if (!text && images.length === 0 && mathBuffer.length > 0) {
+                mathBuffer.push('')
+                continue
+            }
+
+            // ── Flush code buffer ketika ada konten non-kode yang nyata ────
+            if (codeBuffer.length > 0) {
+                while (codeBuffer.length > 0 && codeBuffer[codeBuffer.length - 1] === '') codeBuffer.pop()
+                const codeBlock = flushCodeBuffer()
+                if (codeBlock && currentQuestion) {
+                    currentQuestion.question += '\n' + codeBlock
+                }
+            }
+
+            // ── Flush math buffer ketika ada konten non-rumus yang nyata ───
+            if (mathBuffer.length > 0) {
+                while (mathBuffer.length > 0 && mathBuffer[mathBuffer.length - 1] === '') mathBuffer.pop()
+                const mathBlock = flushMathBuffer()
+                if (mathBlock && currentQuestion) {
+                    currentQuestion.question += '\n' + mathBlock
+                }
+            }
+
+            if (!text && images.length === 0) continue
 
             const answerMatch = text.match(/Kunci\s*:\s*([A-Z0-9]+(?:\s*,\s*[A-Z0-9]+)*)/i)
-            const typeMatch = text.match(/Tipe\s*:\s*(radio|checkbox|rating|text|file)/i)
+            const typeMatch   = text.match(/Tipe\s*:\s*(radio|checkbox|rating|text|file)/i)
 
             if (answerMatch) text = text.replace(answerMatch[0], '').trim()
-            if (typeMatch) text = text.replace(typeMatch[0], '').trim()
+            if (typeMatch)   text = text.replace(typeMatch[0], '').trim()
 
             const isExplicitQuestion = numId === '1' && ilvl === '0'
-            const isExplicitOption = (numId === '1' && ilvl === '1') || numId === '2'
-            const isManualQuestion = /^\d+[\.\)]/.test(text)
-            const isManualOption = /^[a-hA-H][\.\)]/.test(text)
+            const isExplicitOption   = (numId === '1' && ilvl === '1') || numId === '2'
+            const isManualQuestion   = /^\d+[\.\)]/.test(text)
+            const isManualOption     = /^[a-hA-H][\.\)]/.test(text)
 
-            if (isExplicitQuestion || (isManualQuestion && (!currentQuestion || currentQuestion.options.length > 0))) {
+            // Metadata-only baris (Kunci/Tipe kosong setelah strip)
+            if (!text && images.length === 0) {
+                if (currentQuestion) {
+                    if (answerMatch) currentQuestion.answer = answerMatch[1]
+                    if (typeMatch)   currentQuestion.type   = typeMatch[1].toLowerCase()
+                }
+                continue
+            }
+
+            if (isExplicitQuestion || (isManualQuestion && (!currentQuestion || currentQuestion.options.length > 0 || currentQuestion.type !== null))) {
                 finishQuestion()
-
                 currentQuestion = {
                     question: text.replace(/^\d+[\.\)]\s*/, ''),
-                    image: image,
-                    type: typeMatch ? typeMatch[1].toLowerCase() : null,
+                    image,
+                    images: extraImages,
+                    type:   typeMatch  ? typeMatch[1].toLowerCase()  : null,
                     answer: answerMatch ? answerMatch[1] : null,
                     options: [],
                 }
@@ -177,8 +280,9 @@ export class SoalService {
             if (!currentQuestion) {
                 currentQuestion = {
                     question: text,
-                    image: image,
-                    type: typeMatch ? typeMatch[1].toLowerCase() : null,
+                    image,
+                    images: extraImages,
+                    type:   typeMatch  ? typeMatch[1].toLowerCase()  : null,
                     answer: answerMatch ? answerMatch[1] : null,
                     options: [],
                 }
@@ -186,34 +290,59 @@ export class SoalService {
             }
 
             if (answerMatch) currentQuestion.answer = answerMatch[1]
-            if (typeMatch) currentQuestion.type = typeMatch[1].toLowerCase()
+            if (typeMatch)   currentQuestion.type   = typeMatch[1].toLowerCase()
 
             if (isExplicitOption || isManualOption) {
                 const optVal = isManualOption ? text.replace(/^[a-hA-H][\.\)]\s*/, '') : text
-                currentQuestion.options.push({
-                    value: optVal,
-                    image: image,
-                })
+                if (optVal || image) {
+                    currentQuestion.options.push({ value: optVal, image })
+                }
+                for (const extraImg of extraImages) {
+                    currentQuestion.options.push({ value: '', image: extraImg })
+                }
                 continue
             }
 
+            // Paragraf lanjutan (bukan soal baru, bukan opsi)
             if (currentQuestion.options.length > 0) {
-                const lastOption = currentQuestion.options[currentQuestion.options.length - 1]
-
-                if (image && !lastOption.image) {
-                    lastOption.image = image
-                    if (text) lastOption.value += (lastOption.value ? '\n' : '') + text
-                } else if (image && lastOption.image) {
-                    currentQuestion.options.push({
-                        value: text,
-                        image: image,
-                    })
+                const lastOpt = currentQuestion.options[currentQuestion.options.length - 1]
+                if (image && !lastOpt.image) {
+                    lastOpt.image = image
+                    if (text) lastOpt.value += (lastOpt.value ? '\n' : '') + text
+                } else if (image && lastOpt.image) {
+                    currentQuestion.options.push({ value: text, image })
                 } else if (text) {
-                    lastOption.value += (lastOption.value ? '\n' : '') + text
+                    lastOpt.value += (lastOpt.value ? '\n' : '') + text
+                }
+                for (const extraImg of extraImages) {
+                    currentQuestion.options.push({ value: '', image: extraImg })
                 }
             } else {
-                if (text) currentQuestion.question += (currentQuestion.question ? '\n' : '') + text
-                if (image && !currentQuestion.image) currentQuestion.image = image
+                if (text) currentQuestion.question += '\n' + text
+                if (image && !currentQuestion.image) {
+                    currentQuestion.image = image
+                } else if (image) {
+                    currentQuestion.images = [...(currentQuestion.images ?? []), image]
+                }
+                for (const extraImg of extraImages) {
+                    currentQuestion.images = [...(currentQuestion.images ?? []), extraImg]
+                }
+            }
+        }
+
+        // Flush sisa code buffer setelah loop selesai
+        if (codeBuffer.length > 0) {
+            const codeBlock = flushCodeBuffer()
+            if (codeBlock && currentQuestion) {
+                currentQuestion.question += '\n' + codeBlock
+            }
+        }
+
+        // Flush sisa math buffer setelah loop selesai
+        if (mathBuffer.length > 0) {
+            const mathBlock = flushMathBuffer()
+            if (mathBlock && currentQuestion) {
+                currentQuestion.question += '\n' + mathBlock
             }
         }
 
@@ -263,6 +392,7 @@ export class SoalService {
                 question: row.question,
                 type: row.type,
                 image: row.image,
+                audio: row.audio,
                 score: row.score,
                 options: options
             })
@@ -303,9 +433,10 @@ export class SoalService {
                             type: soal.type,
                             score: soal.score,
                             image: soal.image ?? null,
+                            audio: soal.audio ?? null,
                             page: soal.page
                         })
-                        .returning(['id', 'question', 'type', 'image', 'page'])
+                        .returning(['id', 'question', 'type', 'image', 'audio', 'page'])
 
                     if (!optionTypes.includes(soal.type)) return insertSoal
 
@@ -379,8 +510,12 @@ export class SoalService {
         const soal = { ...body.soal }
 
         delete soal.image_filename
+        delete soal.audio_filename
         if (!soal.image) {
             delete soal.image
+        }
+        if (!soal.audio) {
+            delete soal.audio
         }
 
         const updateSoal = await this.knexService.connection("soal")
