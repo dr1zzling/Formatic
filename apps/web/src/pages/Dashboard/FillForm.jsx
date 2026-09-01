@@ -318,8 +318,10 @@ export default function FillForm() {
   // Grup per page — kalau semua page null/sama, jadi 1 grup (scroll semua)
   const buildPageGroups = () => {
     if (rawSoal.length > 0 && rawSoal[0]?.soal) {
-      // Format baru dari backend
-      return rawSoal.map(p => ({ page: p.page ?? 1, soal: p.soal ?? [] }));
+      // Format baru dari backend: sudah di-group, tinggal sort
+      return [...rawSoal]
+        .sort((a, b) => (a.page ?? 1) - (b.page ?? 1))
+        .map(p => ({ page: p.page ?? 1, soal: p.soal ?? [] }));
     }
     // Format lama: flat array — grup manual berdasarkan field page di soal
     const groups = {};
@@ -358,6 +360,10 @@ export default function FillForm() {
       setSubmitError("");
       setCurrentIdx(i => Math.max(i - 1, 0));
     }
+
+    // Hitung status ringkasan untuk badge tombol Soal
+    const answeredCount = allSoal.filter(s => hasAnswer(s)).length;
+    const doubtCount    = doubtfulIds.size;
 
     const SoalItem = ({ soal, idx }) => {
       const isError = errorSoalId === soal.id;
@@ -436,37 +442,25 @@ export default function FillForm() {
         {/* Top bar */}
         <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-[#e5eef7] px-4 py-3">
           <div className="max-w-2xl mx-auto">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between">
               <button onClick={() => navigate("/")} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#1a4fa0] hover:underline">
                 <ArrowLeft size={15} /> Kembali
               </button>
               <span className="text-[13px] font-semibold text-gray-500">
                 Halaman {currentIdx + 1} / {totalPages}
               </span>
-            </div>
-        {/* Indikator soal */}
-            <div className="flex items-center gap-1.5 flex-wrap mt-2">
-              {allSoal.map((s, i) => {
-                const answered = hasAnswer(s);
-                const doubt    = doubtfulIds.has(s.id);
-                const isActive = (currPage.soal ?? []).some(cs => cs.id === s.id);
-                return (
-                  <button key={s.id ?? i}
-                    onClick={() => {
-                      // Navigasi ke halaman yang mengandung soal ini
-                      const pgIdx = pageGroups.findIndex(pg => (pg.soal ?? []).some(cs => cs.id === s.id));
-                      if (pgIdx >= 0) setCurrentIdx(pgIdx);
-                    }}
-                    title={`Soal ${i+1}${doubt ? " (ragu-ragu)" : answered ? " (dijawab)" : " (belum)"}`}
-                    className={`w-7 h-7 rounded-lg text-[11px] font-bold transition border ${
-                      doubt    ? "bg-amber-100 border-amber-400 text-amber-700" :
-                      answered ? "bg-[#1a4fa0] border-[#1a4fa0] text-white" :
-                                 "bg-white border-gray-300 text-gray-500 hover:border-[#1a4fa0]"
-                    } ${isActive ? "ring-2 ring-[#1a4fa0] ring-offset-1" : ""}`}>
-                    {i+1}
-                  </button>
-                );
-              })}
+              {/* Tombol Soal */}
+              <SoalIndicatorBtn
+                allSoal={allSoal}
+                answers={answers}
+                hasAnswer={hasAnswer}
+                doubtfulIds={doubtfulIds}
+                pageGroups={pageGroups}
+                currentIdx={currentIdx}
+                setCurrentIdx={setCurrentIdx}
+                answeredCount={answeredCount}
+                doubtCount={doubtCount}
+              />
             </div>
           </div>
         </div>
@@ -711,5 +705,157 @@ export default function FillForm() {
         </div>
       </div>
     </div>
+  );
+}
+
+/* ── Soal Indicator Button + Modal ─────────────────────────── */
+function SoalIndicatorBtn({ allSoal, answers, hasAnswer, doubtfulIds, pageGroups, currentIdx, setCurrentIdx, answeredCount, doubtCount }) {
+  const [open, setOpen] = useState(false);
+  const total      = allSoal.length;
+  const unanswered = total - answeredCount;
+
+  return (
+    <>
+      {/* Trigger button */}
+      <button
+        onClick={() => setOpen(true)}
+        className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#d0e3f5] bg-white text-[13px] font-semibold text-[#1a4fa0] hover:bg-[#eef5fb] transition shadow-sm"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        Soal
+        {unanswered > 0 && (
+          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold grid place-items-center">
+            {unanswered}
+          </span>
+        )}
+        {unanswered === 0 && doubtCount > 0 && (
+          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-amber-400 text-white text-[9px] font-bold grid place-items-center">
+            {doubtCount}
+          </span>
+        )}
+      </button>
+
+      {/* Modal — slide up dari bawah di mobile, center di desktop */}
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="bg-white w-full sm:w-auto sm:min-w-[360px] sm:max-w-[420px] rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Drag handle (mobile) */}
+            <div className="flex justify-center pt-3 pb-1 sm:hidden">
+              <div className="w-10 h-1 rounded-full bg-gray-200" />
+            </div>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 pt-4 pb-3">
+              <div>
+                <h3 className="font-extrabold text-[#102f56] text-[16px] leading-tight">Navigasi Soal</h3>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="text-[12px] text-gray-400">
+                    <span className="font-bold text-[#1a4fa0]">{answeredCount}</span>/{total} dijawab
+                  </span>
+                  {doubtCount > 0 && (
+                    <span className="flex items-center gap-1 text-[12px] font-semibold text-amber-600">
+                      <span>🚩</span> {doubtCount} ragu-ragu
+                    </span>
+                  )}
+                  {unanswered > 0 && (
+                    <span className="flex items-center gap-1 text-[12px] font-semibold text-red-500">
+                      <span>○</span> {unanswered} belum
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setOpen(false)}
+                className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 text-[18px] font-bold transition"
+              >×</button>
+            </div>
+
+            {/* Progress bar */}
+            <div className="mx-5 mb-3 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{ width: `${total > 0 ? (answeredCount / total) * 100 : 0}%`, background: "linear-gradient(90deg,#1a4fa0,#3b82f6)" }}
+              />
+            </div>
+
+            {/* Legend */}
+            <div className="flex items-center gap-4 px-5 pb-3 text-[11px] text-gray-500 font-medium">
+              <span className="flex items-center gap-1.5">
+                <span className="w-3.5 h-3.5 rounded bg-[#1a4fa0] inline-block shrink-0" /> Dijawab
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3.5 h-3.5 rounded bg-amber-100 border border-amber-400 inline-block shrink-0" /> Ragu-ragu
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3.5 h-3.5 rounded bg-white border border-gray-300 inline-block shrink-0" /> Belum
+              </span>
+            </div>
+
+            <div className="border-t border-gray-100" />
+
+            {/* Soal grid — per halaman, 5 kolom */}
+            <div className="px-5 py-4 max-h-[50vh] overflow-y-auto space-y-4">
+              {pageGroups.map((pg, pgIdx) => (
+                <div key={pgIdx}>
+                  <div className="flex items-center gap-2 mb-2.5">
+                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+                      Hal. {pg.page ?? pgIdx + 1}
+                    </span>
+                    {pgIdx === currentIdx && (
+                      <span className="px-2 py-0.5 rounded-full bg-[#eef5fb] text-[#1a4fa0] text-[10px] font-bold">
+                        Sekarang
+                      </span>
+                    )}
+                  </div>
+                  {/* Grid 5 kolom */}
+                  <div className="grid grid-cols-5 gap-2">
+                    {(pg.soal ?? []).map((s) => {
+                      const globalIdx = allSoal.findIndex(x => x.id === s.id);
+                      const answered  = hasAnswer(s);
+                      const doubt     = doubtfulIds.has(s.id);
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => { setCurrentIdx(pgIdx); setOpen(false); }}
+                          className={`aspect-square w-full rounded-xl text-[13px] font-bold border-2 transition-all active:scale-90 ${
+                            doubt
+                              ? "bg-amber-50 border-amber-400 text-amber-700 shadow-sm"
+                              : answered
+                                ? "bg-[#1a4fa0] border-[#1a4fa0] text-white shadow-sm"
+                                : "bg-white border-gray-200 text-gray-500 hover:border-[#1a4fa0] hover:text-[#1a4fa0] hover:bg-[#f0f6fe]"
+                          }`}
+                        >
+                          {globalIdx + 1}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-4 border-t border-gray-100">
+              <button
+                onClick={() => setOpen(false)}
+                className="w-full py-2.5 rounded-xl text-white text-[14px] font-semibold hover:opacity-90 active:scale-[0.98] transition"
+                style={{ backgroundColor: "#1a4fa0" }}
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

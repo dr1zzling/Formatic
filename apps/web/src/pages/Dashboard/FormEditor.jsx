@@ -219,9 +219,12 @@ export default function FormEditor() {
       if (existingOnes.length > 0) {
         await Promise.all(
           existingOnes.map((q) => {
+            const idx = questions.findIndex(x => x.id === q.id);
+            // page = posisi soal dalam array (1-indexed), drag untuk ubah urutan
+            const pageVal = idx + 1;
             const hasOpts = ["radio", "checkbox", "rating"].includes(q.type);
             const payload = {
-              soal: { question: q.question, type: q.type, page: parseInt(q.page) || 1, score: q.score ?? null },
+              soal: { question: q.question, type: q.type, page: pageVal, score: q.score ?? null },
               options: hasOpts
                 ? (q.options || []).map((o, idx) => ({ id: o.id, value: o.value?.trim() || `Opsi ${idx + 1}`, is_correct: o.is_correct ?? false }))
                 : [],
@@ -247,11 +250,13 @@ export default function FormEditor() {
         const fd = new FormData();
         const payload = newOnes.map((q, i) => {
           const hasOpts = ["radio", "checkbox", "rating"].includes(q.type);
+          // page = posisi global soal dalam array (1-indexed)
+          const pageVal = questions.findIndex(x => x === q) + 1;
           if (q.attachment instanceof File) {
             fd.append("soal_images", q.attachment, `soal_${i}_${q.attachment.name}`);
           }
           return {
-            soal: { question: q.question, type: q.type, image: q.attachment instanceof File ? q.attachment.name : null, page: (parseInt(q.page) || 1), score: q.score ?? null },
+            soal: { question: q.question, type: q.type, image: q.attachment instanceof File ? q.attachment.name : null, page: pageVal, score: q.score ?? null },
             options: hasOpts
               ? q.options.map((o, idx) => ({ value: o.value?.trim() || `Opsi ${idx + 1}`, image: null, is_correct: o.is_correct ?? false }))
               : [],
@@ -604,26 +609,12 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemo
           <span className="w-9 h-9 rounded-xl bg-[#eef5fb] text-[#1a4fa0] text-[14px] font-extrabold flex items-center justify-center shrink-0">
             {index + 1}
           </span>
+          {/* Badge halaman otomatis = posisi soal */}
+          <span className="px-2 py-0.5 rounded-lg bg-[#f0f6fe] border border-[#d4e5fa] text-[11px] font-bold text-[#1a4fa0]" title="Halaman otomatis sesuai urutan soal">
+            Hal. {index + 1}
+          </span>
         </div>
         <div className="flex items-center gap-2">
-          {/* Page selector */}
-          <div className="flex items-center gap-1.5 bg-[#f0f6fe] border border-[#d4e5fa] rounded-lg px-2 py-1">
-            <span className="text-[11px] font-semibold text-[#1a4fa0]">Hal.</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={question.page ?? 1}
-              onChange={(e) => {
-                const raw = e.target.value.replace(/\D/g, "");
-                onUpdate("page", raw === "" ? "" : parseInt(raw));
-              }}
-              onBlur={(e) => {
-                const v = parseInt(e.target.value) || 1;
-                onUpdate("page", Math.max(1, v));
-              }}
-              className="w-8 text-[13px] font-bold text-[#1a4fa0] bg-transparent border-none outline-none text-center"
-            />
-          </div>
           {/* Type selector */}
           <select
             value={question.type}

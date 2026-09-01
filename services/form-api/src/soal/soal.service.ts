@@ -272,10 +272,12 @@ export class SoalService {
 
         const result = Object.values(grouped) as Array<{ page: number, soal: any[] }>
 
-        return result.map((pageGroup) => ({
-            ...pageGroup,
-            soal: is_random ? shuffleArray(pageGroup.soal) : pageGroup.soal
-        }))
+        return result
+            .sort((a, b) => (a.page ?? 1) - (b.page ?? 1))
+            .map((pageGroup) => ({
+                ...pageGroup,
+                soal: is_random ? shuffleArray(pageGroup.soal) : pageGroup.soal
+            }))
     }
 
     // Create Soal And Option
