@@ -1,6 +1,10 @@
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:quill_html_editor/quill_html_editor.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/form_service.dart';
+import '../../../core/config/api_config.dart';
 
 class AddQuestionScreen extends StatefulWidget {
   final String? formSlug;
@@ -20,13 +24,20 @@ class AddQuestionScreen extends StatefulWidget {
 
 class _AddQuestionScreenState extends State<AddQuestionScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _questionController = TextEditingController();
+  final QuillEditorController _quillController = QuillEditorController();
   final List<TextEditingController> _optionControllers = [];
 
   String _selectedType = 'radio';
   int? _correctOptionIndex;
   bool _isLoading = false;
   bool _isEditing = false;
+  // Initial HTML content for the Quill editor (edit mode only, empty for create)
+  String _initialQuestionHtml = '';
+
+  // Image upload state
+  Uint8List? _selectedImageBytes;
+  String? _selectedImageName;
+  String? _existingImageUrl;
 
   final List<Map<String, dynamic>> _questionTypes = [
     {
@@ -54,7 +65,15 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
   void _loadExistingQuestion() {
     final question = widget.questionToEdit;
     _selectedType = question?['type']?.toString() ?? 'radio';
-    _questionController.text = question?['question']?.toString() ?? '';
+    // Pass initial HTML directly to QuillHtmlEditor via text: parameter.
+    // This is set before the widget is built, so no timing issue.
+    _initialQuestionHtml = question?['question']?.toString() ?? '';
+
+    // Parse existing image URL
+    final imageUrl = question?['image']?.toString();
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      _existingImageUrl = imageUrl;
+    }
 
     final options = question?['options'] as List? ?? [];
     for (final option in options) {
@@ -77,9 +96,23 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
     }
   }
 
+  /// Called by QuillHtmlEditor once the WebView and Quill JS are fully ready.
+  /// This is the reliable point to inject existing HTML into the editor.
+  void _onEditorCreated() {
+    if (_isEditing && _initialQuestionHtml.isNotEmpty) {
+      // 300ms delay ensures Quill's internal stabilization is complete
+      // and the editor is accepting content programmatically.
+      Future.delayed(const Duration(milliseconds: 300), () async {
+        if (mounted) {
+          await _quillController.setText(_initialQuestionHtml);
+        }
+      });
+    }
+  }
+
   @override
   void dispose() {
-    _questionController.dispose();
+    _quillController.dispose();
     for (var controller in _optionControllers) {
       controller.dispose();
     }
@@ -109,6 +142,171 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
 
   bool _needsOptions() {
     return ['radio', 'checkbox', 'rating'].contains(_selectedType);
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final result = await FilePickerPlatform.instance.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+      );
+
+      if (result.isEmpty) return; // cancelled
+
+      final file = result.first;
+
+      // Validate file type
+      final ext = (file.extension ?? '').toLowerCase();
+      if (!['jpg', 'jpeg', 'png', 'webp'].contains(ext)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Invalid image format. Please select JPG, PNG, or WEBP.',
+              ),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Read bytes via xFile (works on web and native, no withData needed)
+      final bytes = await file.xFile.readAsBytes();
+      if (bytes.isEmpty) return;
+      if (bytes.lengthInBytes > 5 * 1024 * 1024) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Image too large. Maximum size is 5MB.'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
+
+      setState(() {
+        _selectedImageBytes = bytes;
+        _selectedImageName = file.name;
+        _existingImageUrl = null; // Clear existing when selecting new
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to pick image. Please try again.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  void _removeImage() {
+    setState(() {
+      _selectedImageBytes = null;
+      _selectedImageName = null;
+      _existingImageUrl = null;
+    });
+  }
+
+  Widget _buildImagePreview() {
+    return Stack(
+      children: [
+        Container(
+          height: 200,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.inputBorder),
+            borderRadius: BorderRadius.circular(12),
+            color: AppColors.background,
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: _selectedImageBytes != null
+                ? Image.memory(
+                    _selectedImageBytes!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(
+                            Icons.broken_image,
+                            size: 48,
+                            color: AppColors.textHint,
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Failed to load image',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textHint,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : _existingImageUrl != null
+                ? Image.network(
+                    '${ApiConfig.formApiBaseUrl}$_existingImageUrl',
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
+                              : null,
+                          color: AppColors.primary,
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) => Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(
+                            Icons.broken_image,
+                            size: 48,
+                            color: AppColors.textHint,
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Failed to load image',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textHint,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ),
+        // Remove button
+        Positioned(
+          top: 8,
+          right: 8,
+          child: GestureDetector(
+            onTap: _removeImage,
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.black87,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.close, color: Colors.white, size: 18),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Future<void> _saveQuestion() async {
@@ -142,6 +340,27 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
       }
     }
 
+    // Get HTML content from the Quill editor
+    final questionHtml = await _quillController.getText();
+    final questionText = questionHtml.trim();
+    // Strip Quill's empty paragraph marker
+    final isQuestionEmpty =
+        questionText.isEmpty ||
+        questionText == '<p><br></p>' ||
+        questionText == '<p></p>' ||
+        questionText.replaceAll(RegExp(r'<[^>]*>'), '').trim().isEmpty;
+    if (isQuestionEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter a question'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -158,10 +377,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
             }).toList()
           : <Map<String, dynamic>>[];
 
-      final soalPayload = {
-        'question': _questionController.text.trim(),
-        'type': _selectedType,
-      };
+      final soalPayload = {'question': questionText, 'type': _selectedType};
 
       final Map<String, dynamic> result;
       if (_isEditing) {
@@ -181,16 +397,27 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
             }
           }
         }
-        result = await FormService.updateQuestion(
+
+        // Determine image action
+        bool removeImage =
+            _existingImageUrl != null &&
+            _selectedImageBytes == null &&
+            _existingImageUrl!.isNotEmpty;
+
+        result = await FormService.updateQuestionWithImage(
           soalId: soalId,
           payload: {'soal': soalPayload, 'options': optionsForUpdate},
+          imageBytes: _selectedImageBytes,
+          imageName: _selectedImageName,
+          removeImage: removeImage,
         );
       } else {
-        result = await FormService.createQuestions(
+        // Create new question
+        result = await FormService.createQuestionWithImage(
           formSlug: widget.formSlug!,
-          questions: [
-            {'soal': soalPayload, 'options': optionValues},
-          ],
+          questionData: {'soal': soalPayload, 'options': optionValues},
+          imageBytes: _selectedImageBytes,
+          imageName: _selectedImageName,
         );
       }
 
@@ -227,7 +454,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: const Text('Failed to save question. Please try again.'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -347,7 +574,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
 
             const SizedBox(height: 24),
 
-            // Question Input
+            // Question Input (WYSIWYG)
             const Text(
               'Question',
               style: TextStyle(
@@ -356,37 +583,84 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                 color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _questionController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'Enter your question here...',
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.inputBorder),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.inputBorder),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppColors.primary,
-                    width: 2,
-                  ),
-                ),
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Please enter a question';
-                }
-                return null;
-              },
+            const SizedBox(height: 8),
+            // Toolbar above editor
+            ToolBar(
+              toolBarColor: Colors.white,
+              activeIconColor: AppColors.primary,
+              iconSize: 20,
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              controller: _quillController,
+              toolBarConfig: const [
+                ToolBarStyle.bold,
+                ToolBarStyle.italic,
+                ToolBarStyle.underline,
+                ToolBarStyle.strike,
+                ToolBarStyle.listOrdered,
+                ToolBarStyle.listBullet,
+                ToolBarStyle.codeBlock,
+                ToolBarStyle.clean,
+              ],
             ),
+            // Editor
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: AppColors.inputBorder),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: QuillHtmlEditor(
+                hintText: 'Enter your question here...',
+                controller: _quillController,
+                onEditorCreated: _onEditorCreated,
+                isEnabled: true,
+                minHeight: 120,
+                textStyle: const TextStyle(
+                  fontSize: 16,
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.normal,
+                ),
+                hintTextStyle: const TextStyle(
+                  fontSize: 16,
+                  color: AppColors.textHint,
+                ),
+                padding: const EdgeInsets.all(8),
+                backgroundColor: Colors.white,
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Image Upload Section
+            const Text(
+              'Image (Optional)',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            if (_selectedImageBytes == null && _existingImageUrl == null)
+              OutlinedButton.icon(
+                onPressed: _pickImage,
+                icon: const Icon(Icons.add_photo_alternate, size: 20),
+                label: const Text('Add Image'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 14,
+                    horizontal: 20,
+                  ),
+                  side: const BorderSide(color: AppColors.inputBorder),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  foregroundColor: AppColors.textSecondary,
+                ),
+              )
+            else
+              _buildImagePreview(),
 
             // Options (for radio/checkbox/rating)
             if (_needsOptions()) ...[

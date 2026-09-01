@@ -1,10 +1,13 @@
+import 'dart:typed_data' show Uint8List;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/download_utils.dart';
 import '../../../core/services/form_service.dart';
 import 'add_question_screen.dart';
 import 'form_viewer_screen.dart';
 import 'import_word_screen.dart';
+import '../../../core/utils/html_utils.dart';
 
 class FormEditorScreen extends StatefulWidget {
   final String formId;
@@ -604,7 +607,7 @@ class _QuestionsTab extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  question['question'],
+                  stripHtmlTags(question['question']?.toString() ?? ''),
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
@@ -728,6 +731,7 @@ class _ResponsesTabState extends State<_ResponsesTab> {
   List<dynamic> _summaryQuestions = [];
   List<dynamic> _detailQuestions = [];
   bool _isLoading = true;
+  bool _isExporting = false;
   String _subTab = 'Ringkasan';
 
   @override
@@ -788,6 +792,44 @@ class _ResponsesTabState extends State<_ResponsesTab> {
     });
   }
 
+  Future<void> _exportExcel() async {
+    if (_isExporting) return;
+    setState(() => _isExporting = true);
+    try {
+      final result = await FormService.exportSubmitToExcel(widget.formSlug);
+      if (!mounted) return;
+      if (result['success']) {
+        final bytes = result['bytes'] as Uint8List;
+        final filename = result['filename'] as String;
+        triggerFileDownload(bytes, filename);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('File Excel berhasil diunduh.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Gagal mengunduh file Excel.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Gagal mengunduh file Excel.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return _isLoading
@@ -808,6 +850,45 @@ class _ResponsesTabState extends State<_ResponsesTab> {
                     _buildSubTab('Ringkasan'),
                     const SizedBox(width: 8),
                     _buildSubTab('Jawaban'),
+                    const Spacer(),
+                    // Export Excel button
+                    SizedBox(
+                      height: 36,
+                      child: ElevatedButton.icon(
+                        onPressed: _isExporting ? null : _exportExcel,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.success,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 0,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          elevation: 0,
+                        ),
+                        icon: _isExporting
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : const Icon(Icons.table_chart_rounded, size: 16),
+                        label: const Text(
+                          'Export Excel',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),

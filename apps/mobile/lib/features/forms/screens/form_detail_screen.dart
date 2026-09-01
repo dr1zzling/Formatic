@@ -3,6 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/services/form_service.dart';
 import 'add_question_screen.dart';
 import 'qr_code_screen.dart';
+import '../../../core/utils/html_utils.dart';
 
 class FormDetailScreen extends StatefulWidget {
   final String formId;
@@ -553,7 +554,7 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            question['question'],
+            stripHtmlTags(question['question']?.toString() ?? ''),
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,

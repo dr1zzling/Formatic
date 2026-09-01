@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:path/path.dart' as path;
 import '../config/api_config.dart';
 import 'storage_service.dart';
 
@@ -30,12 +32,12 @@ class FormService {
 
   static Future<Map<String, String>> _getAuthHeaders() async {
     final token = await StorageService.getToken();
-    return {
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
+    return {if (token != null) 'Authorization': 'Bearer $token'};
   }
 
-  static Future<Map<String, dynamic>> _decodeResponse(http.Response response) async {
+  static Future<Map<String, dynamic>> _decodeResponse(
+    http.Response response,
+  ) async {
     Map<String, dynamic> data = {};
     try {
       data = jsonDecode(response.body);
@@ -72,7 +74,8 @@ class FormService {
           final catLower = category.toLowerCase();
           final filtered = all.where((form) {
             if (form is! Map) return false;
-            return (form['category'] as String? ?? '').toLowerCase() == catLower;
+            return (form['category'] as String? ?? '').toLowerCase() ==
+                catLower;
           }).toList();
           return {
             'success': true,
@@ -85,13 +88,11 @@ class FormService {
 
       return {
         'success': false,
-        'message': data['message'] ?? 'Failed to fetch forms (${response.statusCode})',
+        'message':
+            data['message'] ?? 'Failed to fetch forms (${response.statusCode})',
       };
     } catch (e) {
-      return {
-        'success': false,
-        'message': 'Connection error: ${e.toString()}',
-      };
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
     }
   }
 
@@ -108,6 +109,7 @@ class FormService {
     required String category,
     required Uint8List bannerBytes,
     String? tokenRespon,
+    int? duration,
   }) async {
     try {
       final imageExt = _detectImageExt(bannerBytes);
@@ -131,12 +133,17 @@ class FormService {
       if (tokenRespon != null && tokenRespon.trim().isNotEmpty) {
         request.fields['token_respon'] = tokenRespon.trim();
       }
-      request.files.add(http.MultipartFile.fromBytes(
-        'banner',
-        bannerBytes,
-        filename: 'banner.$imageExt',
-        contentType: MediaType('image', imageExt),
-      ));
+      if (duration != null && duration > 0) {
+        request.fields['duration'] = duration.toString();
+      }
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'banner',
+          bannerBytes,
+          filename: 'banner.$imageExt',
+          contentType: MediaType('image', imageExt),
+        ),
+      );
 
       final streamedResponse = await request.send().timeout(ApiConfig.timeout);
       final response = await http.Response.fromStream(streamedResponse);
@@ -153,13 +160,11 @@ class FormService {
 
       return {
         'success': false,
-        'message': data['message'] ?? 'Failed to create form (${response.statusCode})',
+        'message':
+            data['message'] ?? 'Failed to create form (${response.statusCode})',
       };
     } catch (e) {
-      return {
-        'success': false,
-        'message': 'Connection error: ${e.toString()}',
-      };
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
     }
   }
 
@@ -218,10 +223,7 @@ class FormService {
         'message': data['message'] ?? 'Failed to fetch forms',
       };
     } catch (e) {
-      return {
-        'success': false,
-        'message': 'Connection error: ${e.toString()}',
-      };
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
     }
   }
 
@@ -249,10 +251,7 @@ class FormService {
         'message': data['message'] ?? 'Failed to fetch form',
       };
     } catch (e) {
-      return {
-        'success': false,
-        'message': 'Connection error: ${e.toString()}',
-      };
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
     }
   }
 
@@ -266,11 +265,7 @@ class FormService {
       );
       final headers = await _getHeaders();
       final response = await http
-          .patch(
-            url,
-            headers: headers,
-            body: jsonEncode({'status': status}),
-          )
+          .patch(url, headers: headers, body: jsonEncode({'status': status}))
           .timeout(ApiConfig.timeout);
 
       _handle401(response.statusCode);
@@ -288,10 +283,7 @@ class FormService {
         'message': data['message'] ?? 'Failed to update status',
       };
     } catch (e) {
-      return {
-        'success': false,
-        'message': 'Connection error: ${e.toString()}',
-      };
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
     }
   }
 
@@ -309,10 +301,7 @@ class FormService {
       final data = await _decodeResponse(response);
 
       if (response.statusCode == 200 || response.statusCode == 204) {
-        return {
-          'success': true,
-          'message': data['message'] ?? 'Form deleted',
-        };
+        return {'success': true, 'message': data['message'] ?? 'Form deleted'};
       }
 
       return {
@@ -320,10 +309,7 @@ class FormService {
         'message': data['message'] ?? 'Failed to delete form',
       };
     } catch (e) {
-      return {
-        'success': false,
-        'message': 'Connection error: ${e.toString()}',
-      };
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
     }
   }
 
@@ -362,10 +348,7 @@ class FormService {
         'message': data['message'] ?? 'Failed to create questions',
       };
     } catch (e) {
-      return {
-        'success': false,
-        'message': 'Connection error: ${e.toString()}',
-      };
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
     }
   }
 
@@ -404,10 +387,7 @@ class FormService {
         'message': data['message'] ?? 'Failed to update question',
       };
     } catch (e) {
-      return {
-        'success': false,
-        'message': 'Connection error: ${e.toString()}',
-      };
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
     }
   }
 
@@ -436,10 +416,7 @@ class FormService {
         'message': data['message'] ?? 'Failed to delete question',
       };
     } catch (e) {
-      return {
-        'success': false,
-        'message': 'Connection error: ${e.toString()}',
-      };
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
     }
   }
 
@@ -458,11 +435,9 @@ class FormService {
       final request = http.MultipartRequest('POST', url);
       final headers = await _getAuthHeaders();
       request.headers.addAll(headers);
-      request.files.add(http.MultipartFile.fromBytes(
-        'file',
-        fileBytes,
-        filename: filename,
-      ));
+      request.files.add(
+        http.MultipartFile.fromBytes('file', fileBytes, filename: filename),
+      );
 
       final streamedResponse = await request.send().timeout(ApiConfig.timeout);
       final response = await http.Response.fromStream(streamedResponse);
@@ -482,10 +457,7 @@ class FormService {
         'message': data['message'] ?? 'Failed to import questions',
       };
     } catch (e) {
-      return {
-        'success': false,
-        'message': 'Connection error: ${e.toString()}',
-      };
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
     }
   }
 
@@ -500,11 +472,7 @@ class FormService {
       );
       final headers = await _getHeaders();
       final response = await http
-          .post(
-            url,
-            headers: headers,
-            body: jsonEncode({'token': token}),
-          )
+          .post(url, headers: headers, body: jsonEncode({'token': token}))
           .timeout(ApiConfig.timeout);
 
       _handle401(response.statusCode);
@@ -522,10 +490,7 @@ class FormService {
         'message': data['message'] ?? 'Token validation failed',
       };
     } catch (e) {
-      return {
-        'success': false,
-        'message': 'Connection error: ${e.toString()}',
-      };
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
     }
   }
 
@@ -548,11 +513,13 @@ class FormService {
       request.fields['data'] = jsonEncode(answers);
 
       for (final file in files) {
-        request.files.add(http.MultipartFile.fromBytes(
-          'files',
-          file.bytes,
-          filename: file.filename,
-        ));
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'files',
+            file.bytes,
+            filename: file.filename,
+          ),
+        );
       }
 
       final streamedResponse = await request.send().timeout(ApiConfig.timeout);
@@ -570,14 +537,12 @@ class FormService {
 
       return {
         'success': false,
-        'message': data['message'] ?? 'Failed to submit form (${response.statusCode})',
+        'message':
+            data['message'] ?? 'Failed to submit form (${response.statusCode})',
         'statusCode': response.statusCode,
       };
     } catch (e) {
-      return {
-        'success': false,
-        'message': 'Connection error: ${e.toString()}',
-      };
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
     }
   }
 
@@ -602,10 +567,7 @@ class FormService {
         'message': data['message'] ?? 'Failed to fetch stats',
       };
     } catch (e) {
-      return {
-        'success': false,
-        'message': 'Connection error: ${e.toString()}',
-      };
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
     }
   }
 
@@ -630,10 +592,7 @@ class FormService {
         'message': data['message'] ?? 'Failed to fetch response details',
       };
     } catch (e) {
-      return {
-        'success': false,
-        'message': 'Connection error: ${e.toString()}',
-      };
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
     }
   }
 
@@ -669,10 +628,7 @@ class FormService {
         'message': data['message'] ?? 'Failed to share form',
       };
     } catch (e) {
-      return {
-        'success': false,
-        'message': 'Connection error: ${e.toString()}',
-      };
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
     }
   }
 
@@ -697,15 +653,205 @@ class FormService {
         'message': data['message'] ?? 'Failed to generate QR code',
       };
     } catch (e) {
-      return {
-        'success': false,
-        'message': 'Connection error: ${e.toString()}',
-      };
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
     }
   }
 
   static String getQrCodeImageUrl(String slug) {
     return '${ApiConfig.formApiBaseUrl}${ApiConfig.qrCodeImageEndpoint}?slug=$slug';
+  }
+
+  /// Download Excel export of form submissions.
+  /// Returns the raw bytes of the .xlsx file on success, or an error map on failure.
+  static Future<Map<String, dynamic>> exportSubmitToExcel(
+    String formSlug,
+  ) async {
+    try {
+      final url = Uri.parse(
+        '${ApiConfig.formApiBaseUrl}${ApiConfig.submitExportExcelEndpoint}?form_slug=$formSlug',
+      );
+      // Use auth-only headers — no Content-Type on a GET binary download.
+      // Adding Content-Type on cross-origin GET triggers CORS preflight in browsers.
+      final token = await StorageService.getToken();
+      final headers = <String, String>{
+        if (token != null) 'Authorization': 'Bearer $token',
+        'Accept':
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      };
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 60)); // Excel export may take longer
+
+      _handle401(response.statusCode);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'bytes': response.bodyBytes,
+          'filename':
+              'Hasil_Submit_${formSlug}_${DateTime.now().millisecondsSinceEpoch}.xlsx',
+        };
+      }
+
+      // Try to decode error message
+      String message = 'Gagal mengunduh file Excel';
+      try {
+        final data = jsonDecode(response.body);
+        message = data['message'] ?? message;
+      } catch (_) {}
+
+      return {'success': false, 'message': message};
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
+    }
+  }
+
+  /// Create a question with optional image upload. The image is sent as multipart
+  /// with field name 'soal_images' and the question data is sent as JSON in the 'data' field.
+  static Future<Map<String, dynamic>> createQuestionWithImage({
+    required String formSlug,
+    required Map<String, dynamic> questionData,
+    File? imageFile,
+    Uint8List? imageBytes,
+    String? imageName,
+  }) async {
+    try {
+      final url = Uri.parse(
+        '${ApiConfig.formApiBaseUrl}${ApiConfig.soalEndpoint}?form_slug=$formSlug',
+      );
+
+      final request = http.MultipartRequest('POST', url);
+      final headers = await _getAuthHeaders();
+      request.headers.addAll(headers);
+
+      // Add image if provided (bytes for web, file path for native)
+      if (imageBytes != null && imageName != null) {
+        if (questionData['soal'] is Map<String, dynamic>) {
+          questionData['soal']['image_filename'] = imageName;
+        }
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'soal_images',
+            imageBytes,
+            filename: imageName,
+          ),
+        );
+      } else if (imageFile != null) {
+        final filename = path.basename(imageFile.path);
+        if (questionData['soal'] is Map<String, dynamic>) {
+          questionData['soal']['image_filename'] = filename;
+        }
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'soal_images',
+            imageFile.path,
+            filename: filename,
+          ),
+        );
+      }
+
+      // Add JSON data as array with single question
+      request.fields['data'] = jsonEncode([questionData]);
+
+      final streamedResponse = await request.send().timeout(ApiConfig.timeout);
+      final response = await http.Response.fromStream(streamedResponse);
+      _handle401(response.statusCode);
+      final data = await _decodeResponse(response);
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Question created successfully',
+          'data': data,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Failed to create question',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
+    }
+  }
+
+  /// Update a question with optional image upload or removal.
+  /// - If imageFile is provided: uploads new image
+  /// - If removeImage is true: removes existing image
+  /// - If neither: keeps existing image
+  static Future<Map<String, dynamic>> updateQuestionWithImage({
+    required int soalId,
+    required Map<String, dynamic> payload,
+    File? imageFile,
+    Uint8List? imageBytes,
+    String? imageName,
+    bool removeImage = false,
+  }) async {
+    try {
+      final url = Uri.parse(
+        '${ApiConfig.formApiBaseUrl}${ApiConfig.soalEndpoint}/$soalId',
+      );
+
+      final request = http.MultipartRequest('PATCH', url);
+      final headers = await _getAuthHeaders();
+      request.headers.addAll(headers);
+
+      // Handle image updates
+      if (removeImage) {
+        // Signal backend to remove image
+        if (payload['soal'] is Map<String, dynamic>) {
+          payload['soal']['image_filename'] = null;
+        }
+      } else if (imageBytes != null && imageName != null) {
+        // Upload new image (web/bytes path)
+        if (payload['soal'] is Map<String, dynamic>) {
+          payload['soal']['image_filename'] = imageName;
+        }
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'soal_images',
+            imageBytes,
+            filename: imageName,
+          ),
+        );
+      } else if (imageFile != null) {
+        // Upload new image (native/file path)
+        final filename = path.basename(imageFile.path);
+        if (payload['soal'] is Map<String, dynamic>) {
+          payload['soal']['image_filename'] = filename;
+        }
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'soal_images',
+            imageFile.path,
+            filename: filename,
+          ),
+        );
+      }
+      // If neither removeImage nor imageFile, keep existing image (don't modify)
+
+      request.fields['data'] = jsonEncode(payload);
+
+      final streamedResponse = await request.send().timeout(ApiConfig.timeout);
+      final response = await http.Response.fromStream(streamedResponse);
+      _handle401(response.statusCode);
+      final data = await _decodeResponse(response);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Question updated successfully',
+          'data': data,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Failed to update question',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
+    }
   }
 }
 

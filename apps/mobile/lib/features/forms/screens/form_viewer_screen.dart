@@ -1,8 +1,10 @@
+﻿import 'dart:async';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/form_service.dart';
+import '../../../core/config/api_config.dart';
 
 class FormViewerScreen extends StatefulWidget {
   final String slug;
@@ -23,9 +25,22 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
   String _category = '';
   String _tokenRespon = '';
 
+  // Timer state
+  int? _durationSeconds;
+  int? _remainingSeconds;
+  Timer? _countdownTimer;
+  bool _hasShownWarning = false;
+
   // When the form requires a token, submission is gated until it is validated.
   bool _tokenValidated = false;
   bool _tokenNeeded = false;
+
+  // Pre-Start screen state
+  bool _preStartCompleted = false;
+  String _formBanner = '';
+  final TextEditingController _tokenController = TextEditingController();
+  bool _isCheckingToken = false;
+  String _tokenError = '';
 
   List<Map<String, dynamic>> _questions = [];
 
@@ -33,6 +48,13 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
   void initState() {
     super.initState();
     _loadForm();
+  }
+
+  @override
+  void dispose() {
+    _countdownTimer?.cancel();
+    _tokenController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadForm() async {
@@ -63,6 +85,29 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
           _tokenRespon = data['token_respon']?.toString() ?? '';
           _tokenNeeded = _tokenRespon.trim().isNotEmpty;
           _tokenValidated = false;
+
+          // Parse banner
+          _formBanner = data['banner']?.toString() ?? '';
+
+          // Parse duration — check root level first, then nested setting object.
+          // tryParse safely handles int, double, String, or num from JSON.
+          final rawDur =
+              data['duration'] ??
+              (data['setting'] is Map
+                  ? (data['setting'] as Map)['duration']
+                  : null);
+          // Handle num/double (e.g. 60.0) by truncating, then String/int via tryParse.
+          final int? duration = rawDur == null
+              ? null
+              : (rawDur is num
+                    ? rawDur.toInt()
+                    : int.tryParse(rawDur.toString()));
+          if (duration != null && duration > 0) {
+            _durationSeconds = duration * 60; // convert minutes to seconds
+            _remainingSeconds = _durationSeconds;
+            // Timer starts in _onStartForm(), not here
+          }
+
           _questions = listSoal.asMap().entries.map((entry) {
             final index = entry.key;
             final soal = entry.value;
@@ -74,15 +119,12 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
               'type': type,
               'typeDisplay': _mapQuestionType(type),
               'options': soal['options'] ?? [],
+              'image': soal['image']?.toString(),
               'answer': null,
             };
           }).toList();
           _isLoading = false;
         });
-
-        if (_tokenNeeded && mounted) {
-          WidgetsBinding.instance.addPostFrameCallback((_) => _promptToken());
-        }
       } else {
         setState(() {
           _errorMessage = result['message'] ?? 'Failed to load form';
@@ -94,6 +136,44 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
         _errorMessage = 'Error: ${e.toString()}';
         _isLoading = false;
       });
+    }
+  }
+
+  /// Called when user taps "Mulai Form" on the Pre-Start screen.
+  /// Validates token if required, then transitions to the active form.
+  Future<void> _onStartForm() async {
+    if (_tokenNeeded) {
+      final token = _tokenController.text.trim();
+      if (token.isEmpty) {
+        setState(() => _tokenError = 'Token wajib diisi.');
+        return;
+      }
+      setState(() {
+        _isCheckingToken = true;
+        _tokenError = '';
+      });
+      final check = await FormService.checkTokenResponden(
+        formSlug: widget.slug,
+        token: token,
+      );
+      if (!mounted) return;
+      setState(() => _isCheckingToken = false);
+      if (!check['success']) {
+        setState(
+          () => _tokenError =
+              check['message'] ??
+              'Token yang Anda masukkan salah. Silakan periksa kembali.',
+        );
+        return;
+      }
+      // Token validated — mark as validated so submit works
+      setState(() => _tokenValidated = true);
+    }
+
+    // Transition to active form and start timer
+    setState(() => _preStartCompleted = true);
+    if (_durationSeconds != null && _durationSeconds! > 0) {
+      _startTimer();
     }
   }
 
@@ -111,6 +191,128 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
         return 'Rating';
       default:
         return type;
+    }
+  }
+
+  void _startTimer() {
+    _countdownTimer?.cancel(); // Cancel any existing timer
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      setState(() {
+        if (_remainingSeconds != null && _remainingSeconds! > 0) {
+          _remainingSeconds = _remainingSeconds! - 1;
+
+          // Show warning at 60 seconds
+          if (_remainingSeconds == 60) {
+            _showTimeWarning();
+          }
+
+          // Auto-submit at 0 (optional behavior)
+          if (_remainingSeconds == 0) {
+            timer.cancel();
+            _handleAutoSubmit();
+          }
+        } else {
+          timer.cancel();
+        }
+      });
+    });
+  }
+
+  Widget _buildTimerDisplay() {
+    final minutes = _remainingSeconds! ~/ 60;
+    final seconds = _remainingSeconds! % 60;
+    final timeString =
+        '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+
+    // Color based on remaining time
+    Color timerColor;
+    if (_remainingSeconds! > 300) {
+      // > 5 minutes
+      timerColor = AppColors.success;
+    } else if (_remainingSeconds! > 120) {
+      // 2-5 minutes
+      timerColor = AppColors.warning;
+    } else {
+      // < 2 minutes
+      timerColor = AppColors.error;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(right: 12, top: 8, bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: timerColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: timerColor, width: 1.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.timer, color: timerColor, size: 18),
+          const SizedBox(width: 6),
+          Text(
+            timeString,
+            style: TextStyle(
+              color: timerColor,
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              fontFamily: 'monospace',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTimeWarning() {
+    if (!_hasShownWarning) {
+      _hasShownWarning = true;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: Row(
+            children: const [
+              Icon(Icons.warning_amber, color: AppColors.error, size: 28),
+              SizedBox(width: 8),
+              Text('Time Warning'),
+            ],
+          ),
+          content: const Text(
+            'You have less than 1 minute remaining! Please submit your answers soon.',
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+              ),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleAutoSubmit() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Time is up! Submitting your answers...'),
+        backgroundColor: AppColors.error,
+      ),
+    );
+
+    // Give user 2 seconds to see the message
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (mounted) {
+      await _handleSubmit(); // Call existing submit logic
     }
   }
 
@@ -320,7 +522,9 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: const Text(
+              'Failed to submit form. Please check your connection and try again.',
+            ),
             backgroundColor: AppColors.error,
           ),
         );
@@ -332,22 +536,33 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-        ),
-        title: const Text(
-          'Fill Form',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
-        ),
-      ),
+      appBar:
+          (_preStartCompleted &&
+              !_isLoading &&
+              _errorMessage.isEmpty &&
+              !_isSubmitted)
+          ? null // SliverAppBar inside _buildActiveForm() handles this
+          : AppBar(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              leading: IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(
+                  Icons.arrow_back,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              title: Text(
+                _isLoading
+                    ? 'Memuat...'
+                    : (_isSubmitted ? 'Selesai' : 'Fill Form'),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(color: AppColors.primary),
@@ -356,7 +571,9 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
           ? _buildSuccessState()
           : _errorMessage.isNotEmpty
           ? _buildErrorState()
-          : _buildContent(),
+          : !_preStartCompleted
+          ? _buildPreStart()
+          : _buildActiveForm(),
     );
   }
 
@@ -431,6 +648,334 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPreStart() {
+    final hasBanner = _formBanner.isNotEmpty;
+    final bannerUrl = hasBanner
+        ? '${ApiConfig.formApiBaseUrl}$_formBanner'
+        : '';
+
+    String durationText;
+    if (_durationSeconds != null && _durationSeconds! > 0) {
+      final mins = _durationSeconds! ~/ 60;
+      durationText = '$mins Menit';
+    } else {
+      durationText = 'Tanpa Batasan Waktu';
+    }
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+        ),
+        title: const Text(
+          'Informasi Form',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Banner
+            if (hasBanner)
+              Image.network(
+                bannerUrl,
+                height: 200,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  height: 200,
+                  decoration: const BoxDecoration(
+                    gradient: AppColors.primaryGradient,
+                  ),
+                  child: const Icon(
+                    Icons.description_outlined,
+                    size: 64,
+                    color: Colors.white54,
+                  ),
+                ),
+              )
+            else
+              Container(
+                height: 200,
+                decoration: const BoxDecoration(
+                  gradient: AppColors.primaryGradient,
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.description_outlined,
+                    size: 64,
+                    color: Colors.white54,
+                  ),
+                ),
+              ),
+
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title
+                  Text(
+                    _formTitle,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Category badge
+                  if (_category.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        _category.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+
+                  const SizedBox(height: 24),
+                  const Divider(color: AppColors.inputBorder),
+                  const SizedBox(height: 20),
+
+                  // Info rows
+                  _buildInfoRow(
+                    icon: Icons.quiz_outlined,
+                    label: 'Jumlah Soal',
+                    value: '${_questions.length} Pertanyaan',
+                  ),
+                  const SizedBox(height: 12),
+                  _buildInfoRow(
+                    icon: Icons.timer_outlined,
+                    label: 'Durasi',
+                    value: durationText,
+                  ),
+
+                  // Token input (conditional)
+                  if (_tokenNeeded) ...[
+                    const SizedBox(height: 24),
+                    const Divider(color: AppColors.inputBorder),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Form ini memerlukan token responden.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _tokenController,
+                      decoration: InputDecoration(
+                        labelText: 'Token Responden',
+                        hintText: 'Masukkan token yang diberikan',
+                        prefixIcon: const Icon(
+                          Icons.key_outlined,
+                          color: AppColors.primary,
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: AppColors.inputBorder,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: AppColors.inputBorder,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: AppColors.primary,
+                            width: 2,
+                          ),
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.error),
+                        ),
+                        errorText: _tokenError.isNotEmpty ? _tokenError : null,
+                      ),
+                      onChanged: (_) {
+                        if (_tokenError.isNotEmpty) {
+                          setState(() => _tokenError = '');
+                        }
+                      },
+                    ),
+                  ],
+
+                  const SizedBox(height: 32),
+
+                  // Start button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isCheckingToken ? null : _onStartForm,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: _isCheckingToken
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          : const Text(
+                              'Mulai Form',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: AppColors.primary, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Active form view: sticky banner header + question list.
+  /// All question/submit/option logic lives in _buildContent().
+  Widget _buildActiveForm() {
+    final hasBanner = _formBanner.isNotEmpty;
+    final bannerUrl = hasBanner
+        ? '${ApiConfig.formApiBaseUrl}$_formBanner'
+        : '';
+
+    return NestedScrollView(
+      headerSliverBuilder: (context, innerBoxIsScrolled) => [
+        SliverAppBar(
+          pinned: true,
+          expandedHeight: hasBanner ? 160.0 : 80.0,
+          backgroundColor: AppColors.primary,
+          automaticallyImplyLeading: false,
+          leading: IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+          ),
+          actions: [if (_remainingSeconds != null) _buildTimerDisplay()],
+          flexibleSpace: FlexibleSpaceBar(
+            titlePadding: const EdgeInsets.only(
+              left: 56,
+              bottom: 12,
+              right: 16,
+            ),
+            title: Text(
+              _formTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            background: hasBanner
+                ? Image.network(
+                    bannerUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      decoration: const BoxDecoration(
+                        gradient: AppColors.primaryGradient,
+                      ),
+                    ),
+                  )
+                : Container(
+                    decoration: const BoxDecoration(
+                      gradient: AppColors.primaryGradient,
+                    ),
+                  ),
+            collapseMode: CollapseMode.parallax,
+          ),
+        ),
+      ],
+      body: _buildContent(),
     );
   }
 
@@ -681,15 +1226,21 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          Text(
-            question['question'],
-            style: const TextStyle(
+          QuillRichText(
+            content: question['question'] as String? ?? '',
+            baseStyle: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,
               color: AppColors.textPrimary,
               height: 1.5,
             ),
           ),
+
+          // Display question image if exists
+          if (question['image'] != null &&
+              (question['image'] as String).isNotEmpty)
+            _buildQuestionImage(question['image']),
+
           const SizedBox(height: 20),
           if (type == 'radio' && options.isNotEmpty)
             _buildRadioOptions(question, options, index)
@@ -939,4 +1490,315 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
       }),
     );
   }
+
+  Widget _buildQuestionImage(String imagePath) {
+    final imageUrl = '${ApiConfig.formApiBaseUrl}$imagePath';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 12),
+      child: GestureDetector(
+        onTap: () => _showImageDialog(imageUrl),
+        child: Container(
+          height: 200,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.inputBorder),
+            borderRadius: BorderRadius.circular(12),
+            color: AppColors.background,
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.network(
+              imageUrl,
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Center(
+                  child: CircularProgressIndicator(
+                    value: loadingProgress.expectedTotalBytes != null
+                        ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                        : null,
+                    color: AppColors.primary,
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) => Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(
+                      Icons.broken_image,
+                      size: 48,
+                      color: AppColors.textHint,
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Image not available',
+                      style: TextStyle(fontSize: 12, color: AppColors.textHint),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showImageDialog(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(20),
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => const Center(
+                  child: Icon(
+                    Icons.broken_image,
+                    size: 64,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close, color: Colors.white, size: 32),
+                style: IconButton.styleFrom(backgroundColor: Colors.black54),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Renders a Quill HTML string as Flutter widgets.
+/// Handles: plain text, <p>, <strong>, <em>, <u>, <s>, <pre class="ql-syntax">, <br>.
+/// Falls back to plain text if parsing fails.
+class QuillRichText extends StatelessWidget {
+  final String content;
+  final TextStyle? baseStyle;
+
+  const QuillRichText({super.key, required this.content, this.baseStyle});
+
+  @override
+  Widget build(BuildContext context) {
+    if (content.isEmpty) return const SizedBox.shrink();
+
+    // If no HTML tags, render as plain text
+    final hasHtml = RegExp(r'<[a-zA-Z][^>]*>').hasMatch(content);
+    if (!hasHtml) {
+      return Text(
+        content,
+        style:
+            baseStyle ??
+            const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textPrimary,
+              height: 1.5,
+            ),
+      );
+    }
+
+    // Parse HTML into blocks
+    return _buildHtmlContent(content, baseStyle);
+  }
+
+  Widget _buildHtmlContent(String html, TextStyle? base) {
+    // Split into block-level segments: paragraphs and code blocks
+    final blocks = _splitBlocks(html);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: blocks.map((block) => _renderBlock(block, base)).toList(),
+    );
+  }
+
+  List<_HtmlBlock> _splitBlocks(String html) {
+    final blocks = <_HtmlBlock>[];
+    // Match <pre class="ql-syntax"...>...</pre> as code blocks
+    final codeRe = RegExp(
+      r'<pre[^>]*class="[^"]*ql-syntax[^"]*"[^>]*>([\s\S]*?)<\/pre>',
+      caseSensitive: false,
+    );
+    int pos = 0;
+    for (final m in codeRe.allMatches(html)) {
+      if (m.start > pos) {
+        blocks.add(_HtmlBlock(html.substring(pos, m.start), isCode: false));
+      }
+      // Decode inner text of code block
+      final inner = m.group(1) ?? '';
+      blocks.add(_HtmlBlock(_decodeHtmlEntities(inner), isCode: true));
+      pos = m.end;
+    }
+    if (pos < html.length) {
+      blocks.add(_HtmlBlock(html.substring(pos), isCode: false));
+    }
+    return blocks.isEmpty ? [_HtmlBlock(html, isCode: false)] : blocks;
+  }
+
+  Widget _renderBlock(_HtmlBlock block, TextStyle? base) {
+    if (block.isCode) {
+      return Container(
+        width: double.infinity,
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0F0F0),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFD0D0D0)),
+        ),
+        child: Text(
+          block.content,
+          style: const TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 14,
+            color: Color(0xFF1A1A1A),
+            height: 1.5,
+          ),
+        ),
+      );
+    }
+    // Parse inline rich text from HTML paragraphs
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: _parseInlineHtml(block.content, base),
+    );
+  }
+
+  Widget _parseInlineHtml(String html, TextStyle? base) {
+    // Remove wrapping <p>...</p> tags, replace <br> with newlines
+    var text = html
+        .replaceAll(RegExp(r'<p[^>]*>', caseSensitive: false), '')
+        .replaceAll(RegExp(r'</p>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+        .trim();
+
+    if (text.isEmpty) return const SizedBox.shrink();
+
+    // Check for inline formatting tags
+    final hasInline = RegExp(
+      r'<(strong|em|u|s|b|i)\b',
+      caseSensitive: false,
+    ).hasMatch(text);
+    if (!hasInline) {
+      // No inline formatting â€” strip any remaining tags and render plain
+      final plain = _decodeHtmlEntities(
+        text.replaceAll(RegExp(r'<[^>]+>'), ''),
+      );
+      if (plain.trim().isEmpty) return const SizedBox.shrink();
+      return Text(
+        plain,
+        style:
+            base ??
+            const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textPrimary,
+              height: 1.5,
+            ),
+      );
+    }
+
+    // Build a RichText with inline spans
+    final spans = _buildInlineSpans(text, base);
+    return RichText(text: TextSpan(children: spans));
+  }
+
+  List<TextSpan> _buildInlineSpans(String html, TextStyle? base) {
+    final defaultStyle =
+        base ??
+        const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          color: AppColors.textPrimary,
+          height: 1.5,
+        );
+
+    final spans = <TextSpan>[];
+    // Process strong/em/u/s tags iteratively
+    final tagRe = RegExp(
+      r'(<(strong|em|u|s|b|i)[^>]*>|<\/(strong|em|u|s|b|i)>)',
+      caseSensitive: false,
+    );
+
+    bool isBold = false;
+    bool isItalic = false;
+    bool isUnderline = false;
+    bool isStrike = false;
+    int pos = 0;
+
+    void flushText(String text) {
+      if (text.isEmpty) return;
+      final decoded = _decodeHtmlEntities(
+        text.replaceAll(RegExp(r'<[^>]+>'), ''),
+      );
+      if (decoded.isEmpty) return;
+      spans.add(
+        TextSpan(
+          text: decoded,
+          style: defaultStyle.copyWith(
+            fontWeight: isBold ? FontWeight.bold : defaultStyle.fontWeight,
+            fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
+            decoration: TextDecoration.combine([
+              if (isUnderline) TextDecoration.underline,
+              if (isStrike) TextDecoration.lineThrough,
+            ]),
+          ),
+        ),
+      );
+    }
+
+    for (final m in tagRe.allMatches(html)) {
+      if (m.start > pos) {
+        flushText(html.substring(pos, m.start));
+      }
+      final tag = m.group(0)!.toLowerCase();
+      if (tag.startsWith('</')) {
+        final name = tag.replaceAll(RegExp(r'[<>/]'), '').trim();
+        if (name == 'strong' || name == 'b') isBold = false;
+        if (name == 'em' || name == 'i') isItalic = false;
+        if (name == 'u') isUnderline = false;
+        if (name == 's') isStrike = false;
+      } else {
+        if (tag.contains('strong') || tag.contains('<b')) isBold = true;
+        if (tag.contains('em') || tag.contains('<i')) isItalic = true;
+        if (tag.contains('<u')) isUnderline = true;
+        if (tag.contains('<s')) isStrike = true;
+      }
+      pos = m.end;
+    }
+    if (pos < html.length) {
+      flushText(html.substring(pos));
+    }
+    return spans;
+  }
+
+  String _decodeHtmlEntities(String text) {
+    return text
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'")
+        .replaceAll('&nbsp;', ' ');
+  }
+}
+
+class _HtmlBlock {
+  final String content;
+  final bool isCode;
+  const _HtmlBlock(this.content, {required this.isCode});
 }

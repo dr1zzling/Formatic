@@ -47,10 +47,16 @@ dependencies:
 
   # Google Fonts
   google_fonts: ^6.2.1
+
+  # file_picker: direct dependency used in add_question_screen, form_viewer_screen.
   file_picker: ^12.1.1
 
   # DOCX template preview parsing
   xml: ^7.0.1
+
+  # WYSIWYG rich text editor — local fork patched for file_picker 12.x
+  quill_html_editor:
+    path: packages/quill_html_editor
 
 dev_dependencies:
   flutter_test:

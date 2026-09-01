@@ -16,6 +16,7 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _tokenController = TextEditingController();
+  final _durationController = TextEditingController();
   String _selectedCategory = 'ujian';
   Uint8List? _bannerBytes;
   bool _isLoading = false;
@@ -25,6 +26,7 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
   void dispose() {
     _titleController.dispose();
     _tokenController.dispose();
+    _durationController.dispose();
     super.dispose();
   }
 
@@ -66,6 +68,9 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
       category: _selectedCategory,
       bannerBytes: bannerBytes,
       tokenRespon: _tokenController.text.trim(),
+      duration: _durationController.text.trim().isEmpty
+          ? null
+          : int.tryParse(_durationController.text.trim()),
     );
 
     setState(() {
@@ -76,15 +81,21 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
 
     if (result['success']) {
       final data = result['data'] is Map ? result['data']['data'] : null;
-      final form = data is Map && data['form'] is Map ? data['form'] : data as Map?;
+      final form = data is Map && data['form'] is Map
+          ? data['form']
+          : data as Map?;
       final slug = form is Map ? (form['form_slug'] ?? form['slug']) : null;
       Navigator.of(context).pop({
         'success': true,
         'message': 'Form berhasil dibuat',
         'slug': slug is String ? slug : null,
         'form_id': form is Map ? (form['form_id'] ?? form['id']) : null,
-        'form_title': form is Map ? (form['form_title'] ?? form['title']) : null,
-        'form_status': form is Map ? (form['form_status'] ?? form['status']) : null,
+        'form_title': form is Map
+            ? (form['form_title'] ?? form['title'])
+            : null,
+        'form_status': form is Map
+            ? (form['form_status'] ?? form['status'])
+            : null,
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -129,7 +140,8 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
                       children: [
                         Text(
                           'Create New Form',
-                          style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                          style: Theme.of(context).textTheme.displayMedium
+                              ?.copyWith(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -151,7 +163,9 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
                             hintText: 'e.g. Customer Satisfaction Survey',
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: AppColors.inputBorder),
+                              borderSide: const BorderSide(
+                                color: AppColors.inputBorder,
+                              ),
                             ),
                           ),
                           validator: (value) {
@@ -196,6 +210,59 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
                         ),
                         const SizedBox(height: 24),
                         Text(
+                          'DURATION (OPTIONAL)',
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _durationController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            hintText: 'e.g. 60',
+                            suffixText: 'minutes',
+                            helperText: 'Leave empty for no time limit',
+                            helperStyle: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textHint,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                color: AppColors.inputBorder,
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                color: AppColors.inputBorder,
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                color: AppColors.primary,
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value != null && value.trim().isNotEmpty) {
+                              final duration = int.tryParse(value.trim());
+                              if (duration == null) {
+                                return 'Please enter a valid number';
+                              }
+                              if (duration < 1) {
+                                return 'Duration must be at least 1 minute';
+                              }
+                              if (duration > 1440) {
+                                return 'Duration cannot exceed 1440 minutes (24 hours)';
+                              }
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
                           'TOKEN RESPON',
                           style: Theme.of(context).textTheme.labelLarge,
                         ),
@@ -206,7 +273,9 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
                             hintText: 'Masukkan token respon (opsional)',
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: AppColors.inputBorder),
+                              borderSide: const BorderSide(
+                                color: AppColors.inputBorder,
+                              ),
                             ),
                           ),
                         ),
@@ -295,7 +364,9 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
                                     width: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
                                     ),
                                   )
                                 : const Text('Create Form'),

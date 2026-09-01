@@ -27,6 +27,7 @@ class ApiConfig {
   static const String shareEndpoint = '/form/share';
   static const String qrCodeJsonEndpoint = '/qrcode/json';
   static const String qrCodeImageEndpoint = '/qrcode/image';
+  static const String submitExportExcelEndpoint = '/form/submit/export-excel';
 
   // Request timeout
   static const Duration timeout = Duration(seconds: 30);
