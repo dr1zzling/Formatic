@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Public Forms</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col font-sans">
+
+  <!-- Navbar -->
+  <nav class="bg-white shadow-sm border-b border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16 items-center">
+        <div class="flex items-center gap-8">
+          <span class="text-xl font-bold text-blue-600">FormApp</span>
+          <div class="flex gap-4">
+            <a href="dashboard.html" class="text-blue-600 font-semibold border-b-2 border-blue-600 pb-1">Dashboard</a>
+            <a href="my-forms.html" class="text-gray-600 hover:text-blue-600 font-medium pb-1">My Forms</a>
+          </div>
+        </div>
+        <button onclick="handleLogout()" class="bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2 rounded-lg text-sm font-medium transition">
+          Logout
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
+    
+    <!-- Header & Filter Section -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">Eksplorasi Form Public</h1>
+        <p class="text-gray-500 text-sm">Temukan dan isi formulir yang tersedia.</p>
+      </div>
+
+      <!-- Filter Category -->
+      <div class="flex items-center gap-2">
+        <label for="category-select" class="text-sm font-medium text-gray-700">Kategori:</label>
+        <select id="category-select" onchange="fetchForms(this.value)" class="border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">Semua Kategori</option>
+          <option value="survei">Survei</option>
+          <option value="kuisioner">Kuisioner</option>
+          <option value="pendaftaran">Pendaftaran</option>
+          <option value="edukasi">Edukasi</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Alert Box Global -->
+    <div id="alert-box" class="hidden mb-6 p-4 rounded-lg text-sm font-medium"></div>
+
+    <!-- Cards Grid Container -->
+    <div id="forms-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Loading State -->
+      <div class="col-span-full text-center py-12 text-gray-500">Memuat formulir...</div>
+    </div>
+
+  </main>
+
+  <!-- ================= MODAL TOKEN RESPONDEN ================= -->
+  <div id="modal-token" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 space-y-4 relative">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+          <span>🔑</span> Verifikasi Token Akses
+        </h3>
+        <button onclick="closeTokenModal()" class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
+      </div>
+
+      <p class="text-xs text-slate-500 leading-relaxed">
+        Masukan token responden untuk mengisi formulir <strong id="modal-form-title" class="text-slate-700"></strong>. Jika form ini tidak menggunakan token, Anda dapat langsung menekan tombol **Lanjutkan**.
+      </p>
+
+      <!-- Alert khusus modal -->
+      <div id="modal-alert" class="hidden p-3 rounded-lg text-xs font-medium bg-red-100 text-red-700 border border-red-200"></div>
+
+      <form id="form-check-token" onsubmit="handleVerifyToken(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Token Responden (Opsional / Jika Ada)</label>
+          <input type="text" id="input-token-respon" placeholder="Masukkan token..."
+            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t">
+          <button type="button" onclick="closeTokenModal()" class="px-4 py-2 bg-slate-100 text-slate-600 text-xs font-semibold rounded-lg hover:bg-slate-200 transition">Batal</button>
+          <button type="submit" id="btn-submit-token" class="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 shadow-sm transition flex items-center gap-1">
+            <span>Masuk Form</span> &rarr;
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE_URL = 'http://localhost:4000'; // Sesuaikan dengan URL NestJS Backend Anda
+
+    // Check Authentication
+    const token = localStorage.getItem('token');
+    if (!token) {
+      window.location.href = 'index.html';
+    }
+
+    let selectedFormSlug = null;
+
+    function handleLogout() {
+      localStorage.removeItem('token');
+      window.location.href = 'index.html';
+    }
+
+    function showAlert(message, type = 'error') {
+      const alertBox = document.getElementById('alert-box');
+      alertBox.textContent = message;
+      alertBox.className = `mb-6 p-4 rounded-lg text-sm font-medium ${
+        type === 'success' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'
+      }`;
+      alertBox.classList.remove('hidden');
+    }
+
+    function showModalAlert(message) {
+      const modalAlert = document.getElementById('modal-alert');
+      modalAlert.textContent = message;
+      modalAlert.classList.remove('hidden');
+    }
+
+    function hideModalAlert() {
+      document.getElementById('modal-alert').classList.add('hidden');
+    }
+
+    // --- FETCH DATA FORMS ---
+    async function fetchForms(category = '') {
+      const grid = document.getElementById('forms-grid');
+      grid.innerHTML = `<div class="col-span-full text-center py-12 text-gray-500">Memuat formulir...</div>`;
+      
+      let endpoint = `${API_BASE_URL}/form`;
+      if (category) {
+        endpoint = `${API_BASE_URL}/form/category?category=${encodeURIComponent(category)}`;
+      }
+
+      try {
+        const response = await fetch(endpoint, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          grid.innerHTML = `<div class="col-span-full text-center py-12 text-gray-400">${result.message || 'Gagal memuat form.'}</div>`;
+          return;
+        }
+
+        renderForms(result.data || []);
+      } catch (err) {
+        grid.innerHTML = `<div class="col-span-full text-center py-12 text-red-500">Gagal terhubung ke server.</div>`;
+      }
+    }
+
+    function renderForms(forms) {
+      const grid = document.getElementById('forms-grid');
+      
+      if (forms.length === 0) {
+        grid.innerHTML = `<div class="col-span-full text-center py-12 text-gray-400">Tidak ada form ditemukan.</div>`;
+        return;
+      }
+
+      grid.innerHTML = forms.map(form => `
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col">
+          <img src="${API_BASE_URL}${form.banner}" alt="${form.title}" class="w-full h-40 object-cover bg-gray-100" onerror="this.src='https://via.placeholder.com/400x160?text=No+Banner'">
+          <div class="p-5 flex-1 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-semibold px-2.5 py-0.5 rounded bg-blue-100 text-blue-800 uppercase">${form.category || 'General'}</span>
+                <span class="text-xs px-2 py-0.5 rounded ${form.status === 'public' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">${form.status}</span>
+              </div>
+              <h3 class="font-bold text-gray-800 text-lg mb-1 leading-snug">${form.title}</h3>
+            </div>
+            <div class="mt-4 pt-3 border-t border-gray-100 flex justify-end">
+              <button onclick="openTokenModal('${form.slug}', '${form.title.replace(/'/g, "\\'")}')" 
+                class="text-sm font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 border border-blue-100 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition">
+                Buka Form &rarr;
+              </button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // --- MODAL & TOKEN VERIFICATION ---
+    function openTokenModal(slug, title) {
+      selectedFormSlug = slug;
+      document.getElementById('modal-form-title').textContent = title;
+      document.getElementById('input-token-respon').value = '';
+      hideModalAlert();
+      document.getElementById('modal-token').classList.remove('hidden');
+    }
+
+    function closeTokenModal() {
+      selectedFormSlug = null;
+      document.getElementById('modal-token').classList.add('hidden');
+    }
+
+    async function handleVerifyToken(e) {
+      e.preventDefault();
+      hideModalAlert();
+
+      const tokenRespon = document.getElementById('input-token-respon').value.trim();
+      const btnSubmit = document.getElementById('btn-submit-token');
+
+      btnSubmit.disabled = true;
+      btnSubmit.textContent = 'Memeriksa...';
+
+      try {
+        // Panggil endpoint @Post() checkRole
+        // Sesuaikan path URL ini dengan controller milik Anda (misal: /form/submit/check-token)
+        const response = await fetch(`${API_BASE_URL}/form/submit/check-token?form_slug=${encodeURIComponent(selectedFormSlug)}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ token: tokenRespon || null })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          // Token Valid -> Redirect ke Halaman Isi Form
+          window.location.href = `fill-form.html?slug=${selectedFormSlug}&token=${encodeURIComponent(tokenRespon)}`;
+        } else {
+          // Menampilkan pesan error dari throw exception NestJS (seperti "Token Salah" atau "Anda Tidak Berhak Sebagai Responden")
+          showModalAlert(result.message || 'Gagal memverifikasi token.');
+        }
+      } catch (err) {
+        console.error(err);
+        showModalAlert('Terjadi kesalahan koneksi ke server.');
+      } finally {
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = '<span>Masuk Form</span> &rarr;';
+      }
+    }
+
+    // Initial Fetch
+    document.addEventListener('DOMContentLoaded', () => fetchForms());
+  </script>
+</body>
+</html>

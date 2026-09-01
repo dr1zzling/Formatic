@@ -1,7 +1,13 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { KnexService } from '../database/knex.service'
 import { FormEventsGateway } from '../form/form-events.gateway'
+import * as JSZip from 'jszip'
+import { XMLParser } from 'fast-xml-parser'
+import * as omml2mathml from 'omml2mathml'
 import * as mammoth from 'mammoth'
+import * as fs from 'fs'
+import * as path from 'path'
+import { v4 as uuidv4 } from 'uuid'
 
 @Injectable()
 export class SoalService {
@@ -22,70 +28,202 @@ export class SoalService {
         }
     }
 
-    async importDocx(form_slug, buffer: Buffer) {
-        const result = await mammoth.extractRawText({ buffer })
-        const lines = result.value
-            .split(/\r?\n/)
-            .map((line) => line.trim())
-            .filter(Boolean)
+    async importDocx(form_slug: any, buffer: Buffer) {
+        const zip = await JSZip.loadAsync(buffer)
+        const documentXml = await zip.file('word/document.xml')?.async('text')
 
-        const parsedSoal: any[] = []
-        let current: any = null
+        if (!documentXml) {
+            throw new BadRequestException('Document XML tidak ditemukan.')
+        }
 
-        const saveCurrent = () => {
-            if (!current) return
-            if (!current.soal.question) {
-                throw new BadRequestException('Ada soal tanpa pertanyaan')
+        const relationshipsXml = await zip.file('word/_rels/document.xml.rels')?.async('text') ?? ''
+        const relationships: Record<string, string> = {}
+
+        for (const match of relationshipsXml.matchAll(
+            /<Relationship[^>]*Id="([^"]+)"[^>]*Target="([^"]+)"/g
+        )) {
+            relationships[match[1]] = match[2]
+        }
+
+        const paragraphs = documentXml.match(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g) ?? []
+
+        const getText = (xml: string) => {
+            return [...xml.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)]
+                .map(match => match[1])
+                .join('')
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&quot;/g, '"')
+                .replace(/&apos;/g, "'")
+                .trim()
+        }
+
+        const getNumbering = (xml: string) => {
+            const numId = xml.match(/<w:numId[^>]*w:val="(\d+)"/)?.[1] ?? null
+            const ilvl = xml.match(/<w:ilvl[^>]*w:val="(\d+)"/)?.[1] ?? null
+            return { numId, ilvl }
+        }
+
+        const saveImageToLocal = async (xml: string): Promise<string | null> => {
+            const embed = xml.match(/r:embed="([^"]+)"/)?.[1]
+            if (!embed) return null
+
+            const target = relationships[embed]
+            if (!target) return null
+
+            const filePath = target.startsWith('media/')
+                ? `word/${target}`
+                : target.startsWith('../')
+                    ? `word/${target.replace('../', '')}`
+                    : `word/${target}`
+
+            const file = zip.file(filePath)
+            if (!file) return null
+
+            const imageBuffer = await file.async('nodebuffer')
+            const extension = filePath.split('.').pop()?.toLowerCase() || 'png'
+
+            const uploadDir = path.join(process.cwd(), 'uploads', 'soal')
+            if (!fs.existsSync(uploadDir)) {
+                fs.mkdirSync(uploadDir, { recursive: true })
             }
 
-            const answerKeys = current.answer
-                ? current.answer.split(/[,\s]+/).filter(Boolean).map((key) => key.toUpperCase())
+            const fileName = `${Date.now()}-${uuidv4()}.${extension}`
+            const fullPath = path.join(uploadDir, fileName)
+
+            fs.writeFileSync(fullPath, imageBuffer)
+
+            return `/uploads/soal/${fileName}`
+        }
+
+        const finalParsedSoal: any[] = []
+        let currentQuestion: any = null
+
+        const finishQuestion = () => {
+            if (!currentQuestion) return
+
+            const answerKeys = currentQuestion.answer
+                ? currentQuestion.answer
+                    .split(',')
+                    .map((x: string) => x.trim().toUpperCase())
+                    .filter(Boolean)
                 : []
-            const options = current.options.map((option) => ({
-                value: option.value,
-                is_correct: answerKeys.includes(option.key),
-            }))
 
-            parsedSoal.push({
+            const optionLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+
+            currentQuestion.options = currentQuestion.options.map(
+                (option: any, index: number) => ({
+                    value: option.value,
+                    image: option.image ?? null,
+                    is_correct:
+                        answerKeys.includes(optionLetters[index]) ||
+                        answerKeys.includes(String(index + 1)),
+                })
+            )
+
+            if (!currentQuestion.type) {
+                currentQuestion.type =
+                    currentQuestion.options.length > 0
+                        ? answerKeys.length > 1
+                            ? 'checkbox'
+                            : 'radio'
+                        : 'text'
+            }
+
+            finalParsedSoal.push({
                 soal: {
-                    question: current.soal.question,
-                    type: current.type || (options.length > 0 ? (answerKeys.length > 1 ? 'checkbox' : 'radio') : 'text'),
+                    question: currentQuestion.question.trim(),
+                    image: currentQuestion.image ?? null,
+                    type: currentQuestion.type,
                 },
-                options,
+                options: currentQuestion.options,
             })
-            current = null
+
+            currentQuestion = null
         }
 
-        for (const line of lines) {
-            const questionMatch = line.match(/^\d+[.)]\s+(.+)$/)
-            const optionMatch = line.match(/^([A-Z])[.)]\s+(.+)$/i)
-            const answerMatch = line.match(/^(?:kunci|jawaban)\s*:\s*(.+)$/i)
-            const typeMatch = line.match(/^tipe\s*:\s*(radio|checkbox|rating|text|file)$/i)
+        for (const paragraph of paragraphs) {
+            let text = getText(paragraph)
+            const image = await saveImageToLocal(paragraph)
+            const { numId, ilvl } = getNumbering(paragraph)
 
-            if (questionMatch) {
-                saveCurrent()
-                current = { soal: { question: questionMatch[1] }, options: [], answer: null, type: null }
-            } else if (!current) {
-                throw new BadRequestException('Format DOCX tidak valid: soal harus diawali nomor, contoh "1. Pertanyaan"')
-            } else if (optionMatch) {
-                current.options.push({ key: optionMatch[1].toUpperCase(), value: optionMatch[2] })
-            } else if (answerMatch) {
-                current.answer = answerMatch[1]
-            } else if (typeMatch) {
-                current.type = typeMatch[1].toLowerCase()
-            } else if (!current.options.length) {
-                current.soal.question += ` ${line}`
+            if (!text && !image) continue
+
+            const answerMatch = text.match(/Kunci\s*:\s*([A-Z0-9]+(?:\s*,\s*[A-Z0-9]+)*)/i)
+            const typeMatch = text.match(/Tipe\s*:\s*(radio|checkbox|rating|text|file)/i)
+
+            if (answerMatch) text = text.replace(answerMatch[0], '').trim()
+            if (typeMatch) text = text.replace(typeMatch[0], '').trim()
+
+            const isExplicitQuestion = numId === '1' && ilvl === '0'
+            const isExplicitOption = (numId === '1' && ilvl === '1') || numId === '2'
+            const isManualQuestion = /^\d+[\.\)]/.test(text)
+            const isManualOption = /^[a-hA-H][\.\)]/.test(text)
+
+            if (isExplicitQuestion || (isManualQuestion && (!currentQuestion || currentQuestion.options.length > 0))) {
+                finishQuestion()
+
+                currentQuestion = {
+                    question: text.replace(/^\d+[\.\)]\s*/, ''),
+                    image: image,
+                    type: typeMatch ? typeMatch[1].toLowerCase() : null,
+                    answer: answerMatch ? answerMatch[1] : null,
+                    options: [],
+                }
+                continue
+            }
+
+            if (!currentQuestion) {
+                currentQuestion = {
+                    question: text,
+                    image: image,
+                    type: typeMatch ? typeMatch[1].toLowerCase() : null,
+                    answer: answerMatch ? answerMatch[1] : null,
+                    options: [],
+                }
+                continue
+            }
+
+            if (answerMatch) currentQuestion.answer = answerMatch[1]
+            if (typeMatch) currentQuestion.type = typeMatch[1].toLowerCase()
+
+            if (isExplicitOption || isManualOption) {
+                const optVal = isManualOption ? text.replace(/^[a-hA-H][\.\)]\s*/, '') : text
+                currentQuestion.options.push({
+                    value: optVal,
+                    image: image,
+                })
+                continue
+            }
+
+            if (currentQuestion.options.length > 0) {
+                const lastOption = currentQuestion.options[currentQuestion.options.length - 1]
+
+                if (image && !lastOption.image) {
+                    lastOption.image = image
+                    if (text) lastOption.value += (lastOption.value ? '\n' : '') + text
+                } else if (image && lastOption.image) {
+                    currentQuestion.options.push({
+                        value: text,
+                        image: image,
+                    })
+                } else if (text) {
+                    lastOption.value += (lastOption.value ? '\n' : '') + text
+                }
             } else {
-                throw new BadRequestException(`Format DOCX tidak valid pada baris: ${line}`)
+                if (text) currentQuestion.question += (currentQuestion.question ? '\n' : '') + text
+                if (image && !currentQuestion.image) currentQuestion.image = image
             }
         }
 
-        saveCurrent()
-        if (parsedSoal.length === 0) {
-            throw new BadRequestException('Tidak ada soal yang ditemukan di dokumen DOCX')
+        finishQuestion()
+
+        if (finalParsedSoal.length === 0) {
+            throw new BadRequestException('Tidak ada soal yang ditemukan di dokumen DOCX.')
         }
 
-        return this.createSoalAndOption(form_slug, parsedSoal)
+        return this.createSoalAndOption(form_slug, finalParsedSoal)
     }
 
     // Get Soal From Form
@@ -132,19 +270,20 @@ export class SoalService {
             return acc
         }, {})
 
-        
         const result = Object.values(grouped) as Array<{ page: number, soal: any[] }>
 
-        return result.map((pageGroup) => ({
-            ...pageGroup,
-            soal: is_random ? shuffleArray(pageGroup.soal) : pageGroup.soal
-        }))
+        return result
+            .sort((a, b) => (a.page ?? 1) - (b.page ?? 1))
+            .map((pageGroup) => ({
+                ...pageGroup,
+                soal: is_random ? shuffleArray(pageGroup.soal) : pageGroup.soal
+            }))
     }
 
     // Create Soal And Option
     async createSoalAndOption(form_slug, body: any) {
         if (!body) throw new BadRequestException("Isi Yang Benar")
-        // Validasi
+
         const listSoal = Array.isArray(body) ? body : [body]
         if (!body || listSoal.length === 0) {
             throw new BadRequestException('Request body tidak valid!')
@@ -172,13 +311,22 @@ export class SoalService {
 
                     const optionList = Array.isArray(options) ? options : (options ? [options] : [])
 
-
                     const payloadSoalOption = optionList.map((optionValue, idx) => ({
                         soal_id: insertSoal.id,
                         image: optionValue.image ?? null,
                         value: optionValue.value,
                         is_correct: optionList[idx]?.is_correct ?? false
                     }))
+
+                    // PENCEGAHAN ERROR "The query is empty":
+                    // Jika array payload kosong, kembalikan objek tanpa query insert
+                    if (payloadSoalOption.length === 0) {
+                        return {
+                            soal: insertSoal,
+                            options: []
+                        }
+                    }
+
                     const insertSoalOption = await trx('soal_option')
                         .insert(payloadSoalOption)
                         .returning(['id', 'is_correct', 'image', 'value'])
@@ -230,7 +378,7 @@ export class SoalService {
     async updateSoal(soal_id: number, body: any) {
         const soal = { ...body.soal }
 
-        delete soal.image_filename // just for testing with that html file
+        delete soal.image_filename
         if (!soal.image) {
             delete soal.image
         }
@@ -280,7 +428,6 @@ export class SoalService {
             )
         })
 
-
         const existingSoal = await this.knexService.connection("soal")
             .where("id", soal_id)
             .first()
@@ -298,4 +445,3 @@ export class SoalService {
         }
     }
 }
-
