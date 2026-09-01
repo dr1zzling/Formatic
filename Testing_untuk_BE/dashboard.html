@@ -60,50 +60,13 @@
 
   </main>
 
-  <!-- ================= MODAL TOKEN RESPONDEN ================= -->
-  <div id="modal-token" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 space-y-4 relative">
-      <div class="flex justify-between items-center border-b pb-3">
-        <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
-          <span>🔑</span> Verifikasi Token Akses
-        </h3>
-        <button onclick="closeTokenModal()" class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
-      </div>
-
-      <p class="text-xs text-slate-500 leading-relaxed">
-        Masukan token responden untuk mengisi formulir <strong id="modal-form-title" class="text-slate-700"></strong>. Jika form ini tidak menggunakan token, Anda dapat langsung menekan tombol **Lanjutkan**.
-      </p>
-
-      <!-- Alert khusus modal -->
-      <div id="modal-alert" class="hidden p-3 rounded-lg text-xs font-medium bg-red-100 text-red-700 border border-red-200"></div>
-
-      <form id="form-check-token" onsubmit="handleVerifyToken(event)" class="space-y-4">
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Token Responden (Opsional / Jika Ada)</label>
-          <input type="text" id="input-token-respon" placeholder="Masukkan token..."
-            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
-        </div>
-
-        <div class="flex justify-end gap-2 pt-2 border-t">
-          <button type="button" onclick="closeTokenModal()" class="px-4 py-2 bg-slate-100 text-slate-600 text-xs font-semibold rounded-lg hover:bg-slate-200 transition">Batal</button>
-          <button type="submit" id="btn-submit-token" class="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 shadow-sm transition flex items-center gap-1">
-            <span>Masuk Form</span> &rarr;
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-
   <script>
-    const API_BASE_URL = 'http://localhost:4000'; // Sesuaikan dengan URL NestJS Backend Anda
+    const API_BASE_URL = 'http://localhost:4000';
 
-    // Check Authentication
     const token = localStorage.getItem('token');
     if (!token) {
       window.location.href = 'index.html';
     }
-
-    let selectedFormSlug = null;
 
     function handleLogout() {
       localStorage.removeItem('token');
@@ -119,17 +82,6 @@
       alertBox.classList.remove('hidden');
     }
 
-    function showModalAlert(message) {
-      const modalAlert = document.getElementById('modal-alert');
-      modalAlert.textContent = message;
-      modalAlert.classList.remove('hidden');
-    }
-
-    function hideModalAlert() {
-      document.getElementById('modal-alert').classList.add('hidden');
-    }
-
-    // --- FETCH DATA FORMS ---
     async function fetchForms(category = '') {
       const grid = document.getElementById('forms-grid');
       grid.innerHTML = `<div class="col-span-full text-center py-12 text-gray-500">Memuat formulir...</div>`;
@@ -177,71 +129,16 @@
               <h3 class="font-bold text-gray-800 text-lg mb-1 leading-snug">${form.title}</h3>
             </div>
             <div class="mt-4 pt-3 border-t border-gray-100 flex justify-end">
-              <button onclick="openTokenModal('${form.slug}', '${form.title.replace(/'/g, "\\'")}')" 
+              <a href="fill-form.html?slug=${form.slug}" 
                 class="text-sm font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 border border-blue-100 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition">
                 Buka Form &rarr;
-              </button>
+              </a>
             </div>
           </div>
         </div>
       `).join('');
     }
 
-    // --- MODAL & TOKEN VERIFICATION ---
-    function openTokenModal(slug, title) {
-      selectedFormSlug = slug;
-      document.getElementById('modal-form-title').textContent = title;
-      document.getElementById('input-token-respon').value = '';
-      hideModalAlert();
-      document.getElementById('modal-token').classList.remove('hidden');
-    }
-
-    function closeTokenModal() {
-      selectedFormSlug = null;
-      document.getElementById('modal-token').classList.add('hidden');
-    }
-
-    async function handleVerifyToken(e) {
-      e.preventDefault();
-      hideModalAlert();
-
-      const tokenRespon = document.getElementById('input-token-respon').value.trim();
-      const btnSubmit = document.getElementById('btn-submit-token');
-
-      btnSubmit.disabled = true;
-      btnSubmit.textContent = 'Memeriksa...';
-
-      try {
-        // Panggil endpoint @Post() checkRole
-        // Sesuaikan path URL ini dengan controller milik Anda (misal: /form/submit/check-token)
-        const response = await fetch(`${API_BASE_URL}/form/submit/check-token?form_slug=${encodeURIComponent(selectedFormSlug)}`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ token: tokenRespon || null })
-        });
-
-        const result = await response.json();
-
-        if (response.ok) {
-          // Token Valid -> Redirect ke Halaman Isi Form
-          window.location.href = `fill-form.html?slug=${selectedFormSlug}&token=${encodeURIComponent(tokenRespon)}`;
-        } else {
-          // Menampilkan pesan error dari throw exception NestJS (seperti "Token Salah" atau "Anda Tidak Berhak Sebagai Responden")
-          showModalAlert(result.message || 'Gagal memverifikasi token.');
-        }
-      } catch (err) {
-        console.error(err);
-        showModalAlert('Terjadi kesalahan koneksi ke server.');
-      } finally {
-        btnSubmit.disabled = false;
-        btnSubmit.innerHTML = '<span>Masuk Form</span> &rarr;';
-      }
-    }
-
-    // Initial Fetch
     document.addEventListener('DOMContentLoaded', () => fetchForms());
   </script>
 </body>

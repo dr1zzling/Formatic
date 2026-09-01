@@ -1,7 +1,8 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
-import { KnexService } from "../database/knex.service";
-import { ValidateIsCreator } from "../Pipe/validate.is.creator";
-import { SoalService } from "../soal/soal.service";
+import { KnexService } from "../database/knex.service"
+import { ValidateIsCreator } from "../Pipe/validate.is.creator"
+import { SoalService } from "../soal/soal.service"
+import * as ExcelJS from 'exceljs'
 
 @Injectable()
 export class SubmitService {
@@ -180,6 +181,111 @@ export class SubmitService {
       message: "Berhasil Mendapatkan Detail Submit",
       data: result
     }
+  }
+
+  async exportSubmitResponseToExcel(req: { id: number }, form: any): Promise<Buffer> {
+    const response = await this.getAllSubmitResponseByForm(req, form)
+    const pageData = response.data || []
+
+    const questionsList: { id: number, question: string }[] = []
+    const optionsMap = new Map<number, string>()
+
+    pageData.forEach((page: any) => {
+      (page.soal || []).forEach((soal: any) => {
+        questionsList.push({ id: soal.id, question: soal.question });
+
+        (soal.options || []).forEach((opt: any) => {
+          optionsMap.set(opt.id, opt.value)
+        })
+      })
+    })
+
+    const respondentMap = new Map<number, Record<string, any>>()
+
+    pageData.forEach((page: any) => {
+      (page.soal || []).forEach((soal: any) => {
+        (soal.responses || []).forEach((resp: any) => {
+          const { submitted_id, answer } = resp
+
+          if (!respondentMap.has(submitted_id)) {
+            respondentMap.set(submitted_id, { submitted_id })
+          }
+
+          let formattedAnswer = answer
+          if (typeof answer === 'number' && optionsMap.has(answer)) {
+            formattedAnswer = optionsMap.get(answer)
+          } else if (typeof answer === 'string' && answer.includes(',')) {
+            formattedAnswer = answer
+              .split(',')
+              .map((idStr) => {
+                const idNum = parseInt(idStr.trim(), 10)
+                return optionsMap.has(idNum) ? optionsMap.get(idNum) : idStr.trim()
+              })
+              .join(', ')
+          }
+
+          const respondentData = respondentMap.get(submitted_id)
+          if (respondentData) {
+            respondentData[`soal_${soal.id}`] = formattedAnswer ?? '-'
+          }
+        })
+      })
+    })
+
+    const workbook = new ExcelJS.Workbook()
+    const worksheet = workbook.addWorksheet('Hasil Respon')
+
+    const columns = [
+      { header: 'No / Submitted ID', key: 'submitted_id', width: 20 },
+      ...questionsList.map((q) => ({
+        header: q.question,
+        key: `soal_${q.id}`,
+        width: 30,
+      })),
+    ]
+    worksheet.columns = columns
+
+    const headerRow = worksheet.getRow(1)
+    headerRow.font = { bold: true, color: { argb: 'FFFFFF' } }
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: '1F4E78' },
+    }
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' }
+
+    const rows = Array.from(respondentMap.values())
+    worksheet.addRows(rows)
+
+    const baseUrl = process.env.APP_URL || 'http://localhost:4000'
+
+    worksheet.eachRow((row, rowNumber) => {
+      row.eachCell((cell) => {
+        if (rowNumber > 1) {
+          const val = cell.value
+
+          if (typeof val === 'string' && val.startsWith('/uploads/')) {
+            const fullUrl = `${baseUrl}${val}`
+
+            cell.value = {
+              text: 'Lihat Gambar',
+              hyperlink: fullUrl,
+              tooltip: 'Klik untuk membuka gambar',
+            }
+
+            cell.font = {
+              color: { argb: 'FF0000FF' },
+              underline: true,
+            }
+          }
+        }
+
+        cell.alignment = { wrapText: true, vertical: 'middle' }
+      })
+    })
+
+    const buffer = await workbook.xlsx.writeBuffer()
+    return Buffer.from(buffer)
   }
 
   async submitForm(req: { id: number }, form: any, data: string, files: Express.Multer.File[] = []) {
