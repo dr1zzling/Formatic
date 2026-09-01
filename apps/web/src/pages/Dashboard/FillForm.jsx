@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
 import { socket } from "../../utils/socket";
@@ -264,7 +265,7 @@ export default function FillForm() {
     if (!tokenInput.trim()) { setTokenError("Masukkan token terlebih dahulu."); return; }
     setTokenLoading(true); setTokenError("");
     try {
-      const res = await fetch(`http://localhost:3000/form/submit/check-token?form_slug=${slug}`, {
+      const res = await fetch(`${FORM_API_URL}/form/submit/check-token?form_slug=${slug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: JSON.stringify({ token: tokenInput.trim() }),
@@ -315,8 +316,13 @@ export default function FillForm() {
     ? rawSoal.flatMap(p => p.soal ?? [])
     : rawSoal;
 
-  // Grup per page — kalau semua page null/sama, jadi 1 grup (scroll semua)
+  // Grup per page — survey: semua soal di satu halaman. Quiz: per page sesuai urutan soal
   const buildPageGroups = () => {
+    // Survey: tampilkan semua soal sekaligus dalam 1 halaman
+    if (!isQuiz) {
+      return [{ page: 1, soal: soalList }];
+    }
+    // Quiz: pisah per page
     if (rawSoal.length > 0 && rawSoal[0]?.soal) {
       // Format baru dari backend: sudah di-group, tinggal sort
       return [...rawSoal]
@@ -385,11 +391,19 @@ export default function FillForm() {
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-semibold text-[#1a4fa0]">Lampiran Soal</p>
               </div>
-              <a href={`http://localhost:3000${soal.image.startsWith('/') ? soal.image : '/uploads/soal/' + soal.image}`}
+              <a href={`${FORM_API_URL}${soal.image.startsWith('/') ? soal.image : '/uploads/soal/' + soal.image}`}
                 target="_blank" rel="noopener noreferrer"
                 className="shrink-0 px-3 py-1.5 rounded-lg bg-[#1a4fa0] text-white text-[12px] font-semibold hover:opacity-90 transition">
                 Buka File
               </a>
+            </div>
+          )}
+
+          {/* Audio soal — survey mode */}
+          {soal.audio && (
+            <div className="mb-4 px-4 py-3 bg-purple-50 border border-purple-200 rounded-xl">
+              <p className="text-[12px] font-bold text-purple-700 mb-2">🎵 Audio Soal</p>
+              <audio controls src={`${FORM_API_URL}${soal.audio}`} className="w-full h-10" />
             </div>
           )}
 
@@ -399,19 +413,26 @@ export default function FillForm() {
                 const selected = soal.type === "radio"
                   ? answers[soal.id] === opt.id
                   : (Array.isArray(answers[soal.id]) && answers[soal.id].includes(opt.id));
+                const optImage = opt.image ? `${FORM_API_URL}${opt.image}` : null;
                 return (
                   <button key={opt.id ?? oi} onClick={() => toggleOption(soal, opt)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
+                    className={`w-full flex items-start gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
                       selected ? "border-[#1a4fa0] bg-[#f0f6fe]" : "border-[#e2e9f1] hover:border-[#1a4fa0]/40 hover:bg-[#f7fafd]"
                     }`}>
-                    <span className={`inline-grid place-items-center shrink-0 border-2 transition-all ${
+                    <span className={`inline-grid place-items-center shrink-0 border-2 transition-all mt-0.5 ${
                       soal.type === "checkbox" ? "w-6 h-6 rounded-[8px]" : "w-6 h-6 rounded-full"
                     } ${selected ? "border-[#1a4fa0] bg-[#1a4fa0]" : "border-[#5b6c7e] bg-[#eef2f6]"}`}>
                       {selected && (soal.type === "checkbox"
                         ? <Check size={15} strokeWidth={3} className="text-white" />
                         : <span className="w-3 h-3 rounded-full bg-white" />)}
                     </span>
-                    <span className="text-[15px] font-medium text-gray-700">{fallbackLabel(opt, oi)}</span>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[15px] font-medium text-gray-700 block">{fallbackLabel(opt, oi)}</span>
+                      {optImage && (
+                        <img src={optImage} alt={fallbackLabel(opt, oi)}
+                          className="mt-2.5 w-full max-h-55 object-contain rounded-xl border border-[#d4e5fa]" />
+                      )}
+                    </div>
                   </button>
                 );
               })}
@@ -620,11 +641,19 @@ export default function FillForm() {
                     <p className="text-[13px] font-semibold text-[#1a4fa0]">Lampiran Soal</p>
                     <p className="text-[11.5px] text-blue-500 truncate">{soal.image}</p>
                   </div>
-                  <a href={`http://localhost:3000${soal.image.startsWith('/') ? soal.image : '/uploads/soal/'+soal.image}`}
+                  <a href={`${FORM_API_URL}${soal.image.startsWith('/') ? soal.image : '/uploads/soal/'+soal.image}`}
                     target="_blank" rel="noopener noreferrer"
                     className="shrink-0 px-3 py-1.5 rounded-lg bg-[#1a4fa0] text-white text-[12px] font-semibold hover:opacity-90 transition">
                     Buka File
                   </a>
+                </div>
+              )}
+
+              {/* Audio soal — quiz mode */}
+              {soal.audio && (
+                <div className="mb-4 px-4 py-3 bg-purple-50 border border-purple-200 rounded-xl">
+                  <p className="text-[12px] font-bold text-purple-700 mb-2">🎵 Audio Soal</p>
+                  <audio controls src={`${FORM_API_URL}${soal.audio}`} className="w-full h-10" />
                 </div>
               )}
 
@@ -634,17 +663,24 @@ export default function FillForm() {
                     const selected = soal.type === "radio"
                       ? answers[soal.id] === opt.id
                       : (Array.isArray(answers[soal.id]) && answers[soal.id].includes(opt.id));
+                    const optImage = opt.image ? `${FORM_API_URL}${opt.image}` : null;
                     return (
                       <button key={opt.id ?? oi} onClick={() => toggleOption(soal, opt)}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
+                        className={`w-full flex items-start gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
                           selected ? "border-[#1a4fa0] bg-[#f0f6fe] text-[#102f56]" : "border-[#e2e9f1] text-gray-600 hover:border-[#1a4fa0]/40 hover:bg-[#f7fafd]"
                         }`}>
-                        <span className={`inline-grid place-items-center shrink-0 border-2 transition-all ${soal.type === "checkbox" ? "w-6 h-6 rounded-[8px]" : "w-6 h-6 rounded-full"} ${selected ? "border-[#1a4fa0] bg-[#1a4fa0]" : "border-[#5b6c7e] bg-[#eef2f6]"}`}>
+                        <span className={`inline-grid place-items-center shrink-0 border-2 transition-all mt-0.5 ${soal.type === "checkbox" ? "w-6 h-6 rounded-[8px]" : "w-6 h-6 rounded-full"} ${selected ? "border-[#1a4fa0] bg-[#1a4fa0]" : "border-[#5b6c7e] bg-[#eef2f6]"}`}>
                           {selected && (soal.type === "checkbox"
                             ? <Check size={15} strokeWidth={3} className="text-white" />
                             : <span className="w-3 h-3 rounded-full bg-white" />)}
                         </span>
-                        <span className="text-[15px] font-medium">{fallbackLabel(opt, oi)}</span>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[15px] font-medium block">{fallbackLabel(opt, oi)}</span>
+                          {optImage && (
+                            <img src={optImage} alt={fallbackLabel(opt, oi)}
+                              className="mt-2.5 w-full max-h-52 object-contain rounded-xl border border-[#d4e5fa]" />
+                          )}
+                        </div>
                       </button>
                     );
                   })}
@@ -713,148 +749,155 @@ function SoalIndicatorBtn({ allSoal, answers, hasAnswer, doubtfulIds, pageGroups
   const [open, setOpen] = useState(false);
   const total      = allSoal.length;
   const unanswered = total - answeredCount;
+  const pct        = total > 0 ? Math.round((answeredCount / total) * 100) : 0;
 
   return (
     <>
       {/* Trigger button */}
       <button
         onClick={() => setOpen(true)}
-        className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#d0e3f5] bg-white text-[13px] font-semibold text-[#1a4fa0] hover:bg-[#eef5fb] transition shadow-sm"
+        className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#d0e3f5] bg-white text-[13px] font-semibold text-[#1a4fa0] hover:bg-[#eef5fb] active:scale-95 transition-all shadow-sm"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
           <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
         </svg>
-        Soal
+        <span>Soal</span>
         {unanswered > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold grid place-items-center">
+          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold grid place-items-center leading-none">
             {unanswered}
           </span>
         )}
         {unanswered === 0 && doubtCount > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-amber-400 text-white text-[9px] font-bold grid place-items-center">
+          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-amber-400 text-white text-[9px] font-bold grid place-items-center leading-none">
             {doubtCount}
           </span>
         )}
       </button>
 
-      {/* Modal — slide up dari bawah di mobile, center di desktop */}
-      {open && (
+      {/* Modal overlay */}
+      {open && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center"
+          style={{ background: "rgba(5,20,50,0.55)", backdropFilter: "blur(6px)" }}
           onClick={() => setOpen(false)}
         >
           <div
-            className="bg-white w-full sm:w-auto sm:min-w-[360px] sm:max-w-[420px] rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden"
+            className="bg-white w-full sm:w-[420px] rounded-t-[28px] sm:rounded-2xl shadow-[0_24px_60px_rgba(5,20,50,0.25)] overflow-hidden flex flex-col"
+            style={{ maxHeight: "85dvh" }}
             onClick={e => e.stopPropagation()}
           >
-            {/* Drag handle (mobile) */}
-            <div className="flex justify-center pt-3 pb-1 sm:hidden">
-              <div className="w-10 h-1 rounded-full bg-gray-200" />
+            {/* Drag handle — mobile only */}
+            <div className="flex justify-center pt-3 pb-0 sm:hidden shrink-0">
+              <div className="w-9 h-[5px] rounded-full bg-gray-200" />
             </div>
 
             {/* Header */}
-            <div className="flex items-center justify-between px-5 pt-4 pb-3">
-              <div>
-                <h3 className="font-extrabold text-[#102f56] text-[16px] leading-tight">Navigasi Soal</h3>
-                <div className="flex items-center gap-3 mt-1">
-                  <span className="text-[12px] text-gray-400">
-                    <span className="font-bold text-[#1a4fa0]">{answeredCount}</span>/{total} dijawab
+            <div className="flex items-start justify-between px-5 pt-4 pb-2 shrink-0">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-extrabold text-[#102f56] text-[17px] leading-tight tracking-tight">
+                  Navigasi Soal
+                </h3>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
+                  <span className="text-[12.5px] text-gray-400">
+                    <span className="font-bold text-[#1a4fa0]">{answeredCount}</span>
+                    <span className="text-gray-300 mx-0.5">/</span>
+                    {total} dijawab
                   </span>
                   {doubtCount > 0 && (
-                    <span className="flex items-center gap-1 text-[12px] font-semibold text-amber-600">
-                      <span>🚩</span> {doubtCount} ragu-ragu
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-[11px] font-semibold text-amber-700">
+                      🚩 {doubtCount} ragu-ragu
                     </span>
                   )}
                   {unanswered > 0 && (
-                    <span className="flex items-center gap-1 text-[12px] font-semibold text-red-500">
-                      <span>○</span> {unanswered} belum
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 border border-red-200 text-[11px] font-semibold text-red-600">
+                      ○ {unanswered} belum
                     </span>
                   )}
                 </div>
               </div>
               <button
                 onClick={() => setOpen(false)}
-                className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 text-[18px] font-bold transition"
+                className="ml-3 shrink-0 w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 text-[17px] font-bold transition-colors"
+                aria-label="Tutup navigasi soal"
               >×</button>
             </div>
 
             {/* Progress bar */}
-            <div className="mx-5 mb-3 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-500"
-                style={{ width: `${total > 0 ? (answeredCount / total) * 100 : 0}%`, background: "linear-gradient(90deg,#1a4fa0,#3b82f6)" }}
-              />
+            <div className="mx-5 mt-1 mb-3 shrink-0">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[11px] text-gray-400 font-medium">Progress</span>
+                <span className="text-[11px] font-bold text-[#1a4fa0]">{pct}%</span>
+              </div>
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${pct}%`, background: "linear-gradient(90deg,#1a4fa0,#3b82f6)" }}
+                />
+              </div>
             </div>
 
             {/* Legend */}
-            <div className="flex items-center gap-4 px-5 pb-3 text-[11px] text-gray-500 font-medium">
-              <span className="flex items-center gap-1.5">
-                <span className="w-3.5 h-3.5 rounded bg-[#1a4fa0] inline-block shrink-0" /> Dijawab
+            <div className="flex items-center gap-3 px-5 pb-3 shrink-0">
+              <span className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium">
+                <span className="w-3.5 h-3.5 rounded-[4px] bg-[#1a4fa0] inline-block shrink-0" />
+                Dijawab
               </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3.5 h-3.5 rounded bg-amber-100 border border-amber-400 inline-block shrink-0" /> Ragu-ragu
+              <span className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium">
+                <span className="w-3.5 h-3.5 rounded-[4px] bg-amber-100 border border-amber-400 inline-block shrink-0" />
+                Ragu-ragu
               </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3.5 h-3.5 rounded bg-white border border-gray-300 inline-block shrink-0" /> Belum
+              <span className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium">
+                <span className="w-3.5 h-3.5 rounded-[4px] bg-white border border-gray-300 inline-block shrink-0" />
+                Belum
               </span>
             </div>
 
-            <div className="border-t border-gray-100" />
+            <div className="border-t border-gray-100 shrink-0" />
 
-            {/* Soal grid — per halaman, 5 kolom */}
-            <div className="px-5 py-4 max-h-[50vh] overflow-y-auto space-y-4">
-              {pageGroups.map((pg, pgIdx) => (
-                <div key={pgIdx}>
-                  <div className="flex items-center gap-2 mb-2.5">
-                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
-                      Hal. {pg.page ?? pgIdx + 1}
-                    </span>
-                    {pgIdx === currentIdx && (
-                      <span className="px-2 py-0.5 rounded-full bg-[#eef5fb] text-[#1a4fa0] text-[10px] font-bold">
-                        Sekarang
-                      </span>
-                    )}
-                  </div>
-                  {/* Grid 5 kolom */}
-                  <div className="grid grid-cols-5 gap-2">
-                    {(pg.soal ?? []).map((s) => {
-                      const globalIdx = allSoal.findIndex(x => x.id === s.id);
-                      const answered  = hasAnswer(s);
-                      const doubt     = doubtfulIds.has(s.id);
-                      return (
-                        <button
-                          key={s.id}
-                          onClick={() => { setCurrentIdx(pgIdx); setOpen(false); }}
-                          className={`aspect-square w-full rounded-xl text-[13px] font-bold border-2 transition-all active:scale-90 ${
-                            doubt
-                              ? "bg-amber-50 border-amber-400 text-amber-700 shadow-sm"
-                              : answered
-                                ? "bg-[#1a4fa0] border-[#1a4fa0] text-white shadow-sm"
-                                : "bg-white border-gray-200 text-gray-500 hover:border-[#1a4fa0] hover:text-[#1a4fa0] hover:bg-[#f0f6fe]"
-                          }`}
-                        >
-                          {globalIdx + 1}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+            {/* Soal grid — semua nomor sejajar ke kanan, wrap kalau penuh */}
+            <div className="px-5 py-4 overflow-y-auto flex-1">
+              <div className="flex flex-wrap gap-2">
+                {allSoal.map((s, globalIdx) => {
+                  const pgIdx    = pageGroups.findIndex(pg => (pg.soal ?? []).some(x => x.id === s.id));
+                  const answered = hasAnswer(s);
+                  const doubt    = doubtfulIds.has(s.id);
+                  const isCurrent = pgIdx === currentIdx;
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => { setCurrentIdx(pgIdx >= 0 ? pgIdx : 0); setOpen(false); }}
+                      title={`Soal ${globalIdx + 1}${doubt ? " — ragu-ragu" : answered ? " — sudah dijawab" : " — belum dijawab"}`}
+                      className={`w-10 h-10 rounded-xl text-[13px] font-bold border-2 transition-all active:scale-90 focus:outline-none shrink-0 ${
+                        doubt
+                          ? "bg-amber-50 border-amber-400 text-amber-700 hover:bg-amber-100"
+                          : answered
+                            ? "bg-[#1a4fa0] border-[#1a4fa0] text-white hover:opacity-90"
+                            : isCurrent
+                              ? "bg-[#eef5fb] border-[#1a4fa0] text-[#1a4fa0]"
+                              : "bg-white border-gray-200 text-gray-500 hover:border-[#1a4fa0] hover:text-[#1a4fa0] hover:bg-[#f0f6fe]"
+                      }`}
+                    >
+                      {globalIdx + 1}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Footer */}
-            <div className="px-5 py-4 border-t border-gray-100">
+            <div className="px-5 pt-3 pb-5 border-t border-gray-100 shrink-0">
               <button
                 onClick={() => setOpen(false)}
-                className="w-full py-2.5 rounded-xl text-white text-[14px] font-semibold hover:opacity-90 active:scale-[0.98] transition"
+                className="w-full py-3 rounded-xl text-white text-[14px] font-bold hover:opacity-90 active:scale-[0.98] transition-all"
                 style={{ backgroundColor: "#1a4fa0" }}
               >
                 Tutup
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

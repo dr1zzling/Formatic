@@ -200,7 +200,7 @@ function FetchFormsGrid({ search, category }) {
     if (!tokenInput.trim()) { setTokenErr("Masukkan token terlebih dahulu."); return; }
     setTokenLoading(true); setTokenErr("");
     try {
-      const res = await fetch(`http://localhost:3000/form/submit/check-token?form_slug=${tokenModal.slug}`, {
+      const res = await fetch(`${FORM_API_URL}/form/submit/check-token?form_slug=${tokenModal.slug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: JSON.stringify({ token: tokenInput.trim() }),

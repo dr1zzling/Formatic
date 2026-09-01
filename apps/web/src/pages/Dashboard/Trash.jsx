@@ -76,7 +76,7 @@ export default function Trash() {
 
   async function restore(form) {
     try {
-      const res = await fetch(`http://localhost:3000/form?form_slug=${form.form_slug}`, {
+      const res = await fetch(`${FORM_API_URL}/form?form_slug=${form.form_slug}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: JSON.stringify({ status: "public" }),
@@ -91,7 +91,7 @@ export default function Trash() {
   async function destroy(form) {
     if (!window.confirm(`Hapus permanen "${form.form_title}"? Tindakan ini tidak bisa dibatalkan.`)) return;
     try {
-      const res = await fetch(`http://localhost:3000/form?form_slug=${form.form_slug}`, {
+      const res = await fetch(`${FORM_API_URL}/form?form_slug=${form.form_slug}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });

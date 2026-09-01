@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
 import { socket } from "../../utils/socket";
-import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical } from "lucide-react";
+import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical, ImagePlus, X, QrCode, Download } from "lucide-react";
 import QuillEditor from "../../components/QuillEditor";
 import RichTextDisplay from "../../components/RichTextDisplay";
+import Toast, { useToast } from "../../components/Toast";
 
 const QUESTION_TYPES = [
   { value: "radio",    label: "Pilihan Ganda" },
@@ -25,10 +26,11 @@ export default function FormEditor() {
   const [loading, setLoading]               = useState(true);
   const [saving, setSaving]                 = useState(false);
   const [error, setError]                   = useState("");
-  const [toast, setToast]                   = useState("");
+  const { toast, showToast }                = useToast();
   const [showDelete, setShowDelete]         = useState(false);
   const [collabNotice, setCollabNotice]     = useState("");
   const [userRole, setUserRole]             = useState(null); // "Creator" | "Collaborator"
+  const [showQr, setShowQr]                 = useState(false);
   const isSavingRef = useRef(false);
 
   useEffect(() => { loadForm(); }, [slug]);
@@ -61,6 +63,7 @@ export default function FormEditor() {
           score: s.score ?? null,
           options: (s.options ?? []).map((o) => ({
             id: o.id, value: o.value ?? o.option_value, is_correct: o.is_correct,
+            image: o.image ?? null,
           })),
         }));
         const unsaved = prev.filter(q => q._new);
@@ -104,8 +107,10 @@ export default function FormEditor() {
             id: s.id, question: s.question, type: s.type, required: true,
             page: s.page ?? 1,
             score: s.score ?? null,
+            audio: s.audio ?? null,
             options: (s.options ?? []).map((o) => ({
               id: o.id, value: o.value ?? o.option_value, is_correct: o.is_correct,
+              image: o.image ?? null,
             })),
           }));
           const unsaved = prev.filter(q => q._new);
@@ -141,6 +146,12 @@ export default function FormEditor() {
     setQuestions((prev) => prev.map((q, i) => {
       if (i !== qIdx) return q;
       return { ...q, options: q.options.map((o, j) => j === oIdx ? { ...o, value: val } : o) };
+    }));
+  }
+  function updateOptField(qIdx, oIdx, field, val) {
+    setQuestions((prev) => prev.map((q, i) => {
+      if (i !== qIdx) return q;
+      return { ...q, options: q.options.map((o, j) => j === oIdx ? { ...o, [field]: val } : o) };
     }));
   }
   function addOpt(qIdx) {
@@ -196,8 +207,24 @@ export default function FormEditor() {
   async function saveQuestions() {
     const isTextEmpty = (str) => !str || str.replace(/<[^>]*>/g, '').trim() === '';
     if (questions.find((q) => isTextEmpty(q.question))) { setError("Semua pertanyaan wajib diisi."); return; }
+
+    // Cek soal yang punya audio + gambar embedded sekaligus
+    const conflictQ = questions.find((q) =>
+      (q.audioFile instanceof File || q.audio) &&
+      /<img/i.test(q.question || "")
+    );
+    if (conflictQ) {
+      const idx = questions.indexOf(conflictQ) + 1;
+      setError(`Soal ${idx}: tidak bisa menyimpan audio bersamaan dengan gambar di teks soal. Hapus gambar dari teks atau gunakan fitur Lampiran Soal.`);
+      return;
+    }
     setSaving(true); setError("");
     isSavingRef.current = true;
+
+    // Survey: semua soal di page 1. Ujian: page = urutan soal (1-indexed)
+    const isQuiz = form?.category === "ujian";
+    const getPage = (globalIdx) => isQuiz ? globalIdx + 1 : 1;
+
     try {
       const token = localStorage.getItem("token");
 
@@ -220,25 +247,47 @@ export default function FormEditor() {
         await Promise.all(
           existingOnes.map((q) => {
             const idx = questions.findIndex(x => x.id === q.id);
-            // page = posisi soal dalam array (1-indexed), drag untuk ubah urutan
-            const pageVal = idx + 1;
+            const pageVal = getPage(idx);
             const hasOpts = ["radio", "checkbox", "rating"].includes(q.type);
             const payload = {
-              soal: { question: q.question, type: q.type, page: pageVal, score: q.score ?? null },
+              soal: { question: q.question, type: q.type, page: pageVal, score: q.score ?? null,
+                // audio baru
+                ...(q.audioFile instanceof File ? { audio_filename: q.audioFile.name } : {}),
+                // pertahankan audio lama dari DB
+                ...(q.audio && !(q.audioFile instanceof File) ? { audio: q.audio } : {}),
+                // hapus audio jika di-null-kan
+                ...(!q.audio && !(q.audioFile instanceof File) ? { audio: null } : {}),
+              },
               options: hasOpts
-                ? (q.options || []).map((o, idx) => ({ id: o.id, value: o.value?.trim() || `Opsi ${idx + 1}`, is_correct: o.is_correct ?? false }))
+                ? (q.options || []).map((o, idx) => ({
+                    id: o.id,
+                    value: o.value?.trim() || `Opsi ${idx + 1}`,
+                    is_correct: o.is_correct ?? false,
+                    // kalau ada file baru, tandai dengan image_filename
+                    ...(o.imageFile ? { image_filename: o.imageFile.name } : {}),
+                    // kalau sudah ada image dari DB, tetap kirim
+                    ...(o.image && !o.imageFile ? { image: o.image } : {}),
+                  }))
                 : [],
             };
+            const fd = new FormData();
+            fd.append("data", JSON.stringify(payload));
+            // Lampirkan file audio baru
+            if (q.audioFile instanceof File) {
+              fd.append("soal_audios", q.audioFile, q.audioFile.name);
+            }
+            // Lampirkan file gambar opsi baru
+            if (hasOpts) {
+              (q.options || []).forEach((o) => {
+                if (o.imageFile instanceof File) {
+                  fd.append("option_images", o.imageFile, o.imageFile.name);
+                }
+              });
+            }
             return fetch(`${FORM_API_URL}/form/soal/${q.id}`, {
               method: "PATCH",
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-              body: (() => {
-                const fd = new FormData();
-                fd.append("data", JSON.stringify(payload));
-                return fd;
-              })(),
+              headers: { Authorization: `Bearer ${token}` },
+              body: fd,
             });
           })
         );
@@ -250,15 +299,34 @@ export default function FormEditor() {
         const fd = new FormData();
         const payload = newOnes.map((q, i) => {
           const hasOpts = ["radio", "checkbox", "rating"].includes(q.type);
-          // page = posisi global soal dalam array (1-indexed)
-          const pageVal = questions.findIndex(x => x === q) + 1;
+          const globalIdx = questions.findIndex(x => x === q);
+          const pageVal = getPage(globalIdx);
           if (q.attachment instanceof File) {
             fd.append("soal_images", q.attachment, `soal_${i}_${q.attachment.name}`);
           }
+          if (q.audioFile instanceof File) {
+            fd.append("soal_audios", q.audioFile, `audio_${i}_${q.audioFile.name}`);
+          }
           return {
-            soal: { question: q.question, type: q.type, image: q.attachment instanceof File ? q.attachment.name : null, page: pageVal, score: q.score ?? null },
+            soal: {
+              question: q.question, type: q.type,
+              image: q.attachment instanceof File ? q.attachment.name : null,
+              audio_filename: q.audioFile instanceof File ? q.audioFile.name : null,
+              page: pageVal, score: q.score ?? null,
+            },
             options: hasOpts
-              ? q.options.map((o, idx) => ({ value: o.value?.trim() || `Opsi ${idx + 1}`, image: null, is_correct: o.is_correct ?? false }))
+              ? q.options.map((o, oIdx) => {
+                  const opt = {
+                    value: o.value?.trim() || `Opsi ${oIdx + 1}`,
+                    image: null,
+                    is_correct: o.is_correct ?? false,
+                  };
+                  if (o.imageFile instanceof File) {
+                    fd.append("option_images", o.imageFile, o.imageFile.name);
+                    opt.image_filename = o.imageFile.name;
+                  }
+                  return opt;
+                })
               : [],
           };
         });
@@ -321,8 +389,6 @@ export default function FormEditor() {
     showToast("Link berhasil disalin!");
   }
 
-  function showToast(msg) { setToast(msg); setTimeout(() => setToast(""), 3000); }
-
   if (loading) return (
     <div className="flex h-screen overflow-hidden" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
       <div className="flex-1 flex items-center justify-center">
@@ -367,6 +433,9 @@ export default function FormEditor() {
           <div className="flex items-center gap-2">
             <button onClick={copyLink} title="Salin link" className="hidden sm:flex w-10 h-10 rounded-xl items-center justify-center text-gray-400 hover:bg-[#eef5fb] hover:text-[#1a4fa0] transition-all">
               <Link2 size={17} />
+            </button>
+            <button onClick={() => setShowQr(true)} title="QR Code" className="hidden sm:flex w-10 h-10 rounded-xl items-center justify-center text-gray-400 hover:bg-[#eef5fb] hover:text-[#1a4fa0] transition-all">
+              <QrCode size={17} />
             </button>
             {userRole !== "Collaborator" && (
               <button
@@ -434,7 +503,7 @@ export default function FormEditor() {
             <PertanyaanTab
               form={form} slug={slug} questions={questions} error={error}
               onAddQuestion={addQuestion}
-              onUpdateQ={updateQ} onUpdateOpt={updateOpt}
+              onUpdateQ={updateQ} onUpdateOpt={updateOpt} onUpdateOptField={updateOptField}
               onAddOpt={addOpt} onRemoveOpt={removeOpt}
               onRemoveQ={removeQ} onDuplicateQ={duplicateQ}
               onToggleCorrect={toggleCorrect}
@@ -455,11 +524,7 @@ export default function FormEditor() {
       </div>
 
       {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-sm px-5 py-3 rounded-xl shadow-lg z-50">
-          ✅ {toast}
-        </div>
-      )}
+      <Toast message={toast} />
 
       {/* Collab notice */}
       {collabNotice && (
@@ -484,12 +549,21 @@ export default function FormEditor() {
           </div>
         </div>
       )}
+
+      {/* QR Code modal */}
+      {showQr && (
+        <QrModal
+          slug={slug}
+          formTitle={form?.title ?? form?.form_title ?? "Form"}
+          onClose={() => setShowQr(false)}
+        />
+      )}
     </div>
   );
 }
 
 /* ── Pertanyaan Tab ─────────────────────────────────────────── */
-function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ, onUpdateOpt, onAddOpt, onRemoveOpt, onRemoveQ, onDuplicateQ, onToggleCorrect, onReorder, onCopyLink, onShowToast, onImported, onImportedSilent }) {
+function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ, onUpdateOpt, onUpdateOptField, onAddOpt, onRemoveOpt, onRemoveQ, onDuplicateQ, onToggleCorrect, onReorder, onCopyLink, onShowToast, onImported, onImportedSilent }) {
   const [dragFrom, setDragFrom] = useState(null);
   const [dragOver, setDragOver] = useState(null);
   // Baca scoreType dari localStorage supaya badge score realtime ikut berubah
@@ -558,6 +632,7 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ,
             index={qIdx}
             onUpdate={(f, v) => onUpdateQ(qIdx, f, v)}
             onUpdateOpt={(oIdx, v) => onUpdateOpt(qIdx, oIdx, v)}
+            onUpdateOptField={(oIdx, field, v) => onUpdateOptField(qIdx, oIdx, field, v)}
             onAddOpt={() => onAddOpt(qIdx)}
             onRemoveOpt={(oIdx) => onRemoveOpt(qIdx, oIdx)}
             onToggleCorrect={(oIdx) => onToggleCorrect(qIdx, oIdx)}
@@ -586,7 +661,7 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ,
 }
 
 /* ── Question Card ──────────────────────────────────────────── */
-function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemoveOpt, onToggleCorrect, onRemove, onDuplicate, onDragHandleStart, onDragHandleEnd, onShowToast, scoreType, totalSoal }) {
+function QuestionCard({ question, index, onUpdate, onUpdateOpt, onUpdateOptField, onAddOpt, onRemoveOpt, onToggleCorrect, onRemove, onDuplicate, onDragHandleStart, onDragHandleEnd, onShowToast, scoreType, totalSoal }) {
   const hasOptions = ["radio", "checkbox"].includes(question.type);
   // Semua soal bisa diedit (tidak hanya yang baru)
   const editable = true;
@@ -642,35 +717,81 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemo
           <p className="text-[12.5px] text-gray-500 ml-1">
             {question.type === "checkbox" ? "Klik kotak untuk menandai jawaban benar" : "Klik lingkaran untuk menandai jawaban benar"}
           </p>
-          {question.options.map((opt, oIdx) => (
-            <div key={oIdx} className="group flex items-center gap-3">
-              <button
-                title="Tandai jawaban benar"
-                onClick={() => onToggleCorrect(oIdx)}
-                className={`inline-grid place-items-center shrink-0 border-2 transition-all duration-150 active:scale-90 will-change-transform ${
-                  question.type === "checkbox" ? "w-7 h-7 rounded-[8px]" : "w-7 h-7 rounded-full"
-                } ${
-                  opt.is_correct
-                    ? "bg-green-500 border-green-500 text-white"
-                    : "bg-[#eef2f6] border-[#5b6c7e] hover:border-green-500 hover:bg-green-50"
-                }`}
-              >
-                {opt.is_correct && (
-                  question.type === "checkbox"
-                    ? <Check size={16} strokeWidth={3} />
-                    : <span className="block w-3 h-3 rounded-full bg-white" />
+          {question.options.map((opt, oIdx) => {
+            const previewUrl = opt.imageFile
+              ? URL.createObjectURL(opt.imageFile)
+              : opt.image
+                ? `${FORM_API_URL}${opt.image}`
+                : null;
+            return (
+              <div key={oIdx} className="group flex flex-col gap-1.5">
+                <div className="flex items-center gap-3">
+                  <button
+                    title="Tandai jawaban benar"
+                    onClick={() => onToggleCorrect(oIdx)}
+                    className={`inline-grid place-items-center shrink-0 border-2 transition-all duration-150 active:scale-90 will-change-transform ${
+                      question.type === "checkbox" ? "w-7 h-7 rounded-[8px]" : "w-7 h-7 rounded-full"
+                    } ${
+                      opt.is_correct
+                        ? "bg-green-500 border-green-500 text-white"
+                        : "bg-[#eef2f6] border-[#5b6c7e] hover:border-green-500 hover:bg-green-50"
+                    }`}
+                  >
+                    {opt.is_correct && (
+                      question.type === "checkbox"
+                        ? <Check size={16} strokeWidth={3} />
+                        : <span className="block w-3 h-3 rounded-full bg-white" />
+                    )}
+                  </button>
+                  <input
+                    type="text"
+                    value={opt.value}
+                    onChange={(e) => onUpdateOpt(oIdx, e.target.value)}
+                    placeholder={`Opsi ${oIdx + 1}`}
+                    className="flex-1 text-[15px] text-gray-700 outline-none border-b border-dashed border-gray-100 focus:border-[#1a4fa0] transition-colors bg-transparent py-1"
+                  />
+                  {/* Tombol upload gambar opsi */}
+                  <label
+                    title="Tambah gambar opsi"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer text-gray-300 hover:text-[#1a4fa0] hover:bg-[#eef5fb] transition-all shrink-0"
+                  >
+                    <ImagePlus size={16} />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) onUpdateOptField(oIdx, "imageFile", file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <button onClick={() => onRemoveOpt(oIdx)} className="w-8 h-8 rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-all flex items-center justify-center shrink-0">✕</button>
+                </div>
+                {/* Preview gambar opsi */}
+                {previewUrl && (
+                  <div className="ml-10 relative inline-block">
+                    <img
+                      src={previewUrl}
+                      alt={`Gambar opsi ${oIdx + 1}`}
+                      className="h-20 max-w-[180px] object-cover rounded-lg border border-[#d4e5fa]"
+                    />
+                    <button
+                      onClick={() => {
+                        onUpdateOptField(oIdx, "imageFile", null);
+                        onUpdateOptField(oIdx, "image", null);
+                      }}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+                      title="Hapus gambar"
+                    >
+                      <X size={11} strokeWidth={3} />
+                    </button>
+                  </div>
                 )}
-              </button>
-              <input
-                type="text"
-                value={opt.value}
-                onChange={(e) => onUpdateOpt(oIdx, e.target.value)}
-                placeholder={`Opsi ${oIdx + 1}`}
-                className="flex-1 text-[15px] text-gray-700 outline-none border-b border-dashed border-gray-100 focus:border-[#1a4fa0] transition-colors bg-transparent py-1"
-              />
-              <button onClick={() => onRemoveOpt(oIdx)} className="w-8 h-8 rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-all flex items-center justify-center shrink-0">✕</button>
-            </div>
-          ))}
+              </div>
+            );
+          })}
           <button onClick={onAddOpt} className="text-[14px] font-medium text-gray-400 hover:text-[#1a4fa0] flex items-center gap-2 ml-1 mt-2 transition-colors">
             <Plus size={16} /> Tambah opsi
           </button>
@@ -720,6 +841,69 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onAddOpt, onRemo
           </div>
         </div>
       )}
+
+      {/* Warning: audio + gambar di teks tidak bisa bersamaan */}
+      {(question.audioFile || question.audio) && /<img/i.test(question.question || "") && (
+        <div className="mb-4 flex items-start gap-2.5 px-4 py-3 rounded-xl bg-amber-50 border border-amber-300">
+          <span className="text-amber-500 shrink-0 mt-0.5">⚠️</span>
+          <p className="text-[12.5px] text-amber-700 leading-relaxed">
+            <strong>Konflik audio + gambar:</strong> Soal ini memiliki audio dan gambar di teks sekaligus. Saat disimpan akan error. Hapus gambar dari teks dan gunakan fitur <strong>Lampiran Soal</strong> sebagai gantinya.
+          </p>
+        </div>
+      )}
+
+      {/* ── Audio Lampiran (semua tipe soal) ───────────────────── */}
+      <div className="mt-4 mb-1">
+        <p className="text-[12px] font-extrabold text-[#1a4fa0] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          🎵 Audio Soal <span className="normal-case font-normal text-gray-400">(opsional)</span>
+        </p>
+        {question.audioFile || question.audio ? (
+          <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-purple-50 border border-purple-200">
+            <span className="text-purple-600 shrink-0">🎵</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-semibold text-purple-700 truncate">
+                {question.audioFile?.name ?? question.audio?.split("/").pop()}
+              </p>
+              {question.audioFile && (
+                <audio controls src={URL.createObjectURL(question.audioFile)} className="mt-1.5 w-full h-8" />
+              )}
+              {!question.audioFile && question.audio && (
+                <audio controls src={`${FORM_API_URL}${question.audio}`} className="mt-1.5 w-full h-8" />
+              )}
+            </div>
+            <button
+              onClick={() => { onUpdate("audioFile", null); onUpdate("audio", null); }}
+              className="w-7 h-7 rounded-lg bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 flex items-center justify-center transition-all shrink-0"
+              title="Hapus audio"
+            >
+              <X size={13} strokeWidth={3} />
+            </button>
+          </div>
+        ) : (
+          <label className="flex items-center gap-3 w-full rounded-xl border-2 border-dashed border-[#c3d4e4] bg-[#f7fafd] py-3 px-4 cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-all">
+            <span className="text-[20px] shrink-0">🎵</span>
+            <span className="text-[13px] text-gray-500">Klik untuk upload audio (mp3, wav, ogg, m4a)</span>
+            <input
+              type="file"
+              accept=".mp3,.wav,.ogg,.m4a,.aac,audio/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  const hasEmbeddedImage = /<img/i.test(question.question || "");
+                  if (hasEmbeddedImage) {
+                    onShowToast("Hapus gambar dari teks soal sebelum menambahkan audio. Gunakan fitur Lampiran Soal untuk gambar.");
+                    e.target.value = "";
+                    return;
+                  }
+                  onUpdate("audioFile", file);
+                }
+                e.target.value = "";
+              }}
+            />
+          </label>
+        )}
+      </div>
 
       <div className="flex items-center justify-between gap-2 mt-5 pt-4 border-t border-[#eef3f8]">
         <div className="flex items-center gap-1">
@@ -935,7 +1119,7 @@ function ViewAllBtn({ q, total, formSlug }) {
     if (detail) return;
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:3000/form/submit/detail?form_slug=${formSlug}`, {
+      const res = await fetch(`${FORM_API_URL}/form/submit/detail?form_slug=${formSlug}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       const data = await res.json().catch(() => ({}));
@@ -1428,7 +1612,7 @@ function ImportDocxButton({ slug, onImported, onImportedSilent }) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.message || "Gagal import.");
-      const count = data?.data?.length ?? 0;
+      const count = data?.data?.list_soal?.length ?? 0;
       showMsg(`✅ ${count} soal berhasil diimport dari Word!`);
       setTimeout(() => { onImportedSilent?.(); }, 500);
     } catch (e) {
@@ -1472,6 +1656,96 @@ function ImportDocxButton({ slug, onImported, onImportedSilent }) {
           {error}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── QR Code Modal ──────────────────────────────────────────── */
+function QrModal({ slug, formTitle, onClose }) {
+  const [qrSrc, setQrSrc]     = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState("");
+
+  useEffect(() => {
+    setLoading(true);
+    const fillUrl = `${window.location.origin}/fill/${slug}`;
+    fetch(`${FORM_API_URL}/qrcode/image?slug=${encodeURIComponent(fillUrl)}`)
+      .then(res => {
+        if (!res.ok) throw new Error("Gagal generate QR Code");
+        return res.blob();
+      })
+      .then(blob => setQrSrc(URL.createObjectURL(blob)))
+      .catch(() => setError("Gagal memuat QR Code."))
+      .finally(() => setLoading(false));
+  }, [slug]);
+
+  function downloadQr() {
+    if (!qrSrc) return;
+    const a = document.createElement("a");
+    a.href = qrSrc;
+    a.download = `qrcode-${slug}.png`;
+    a.click();
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-gray-800 text-[16px] flex items-center gap-2">
+            <QrCode size={18} className="text-[#1a4fa0]" /> QR Code Form
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-[22px] leading-none">×</button>
+        </div>
+
+        <p className="text-[13px] text-gray-400 mb-4 truncate">"{formTitle}"</p>
+
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-10 gap-3">
+            <div className="w-8 h-8 border-2 border-[#1a4fa0] border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm text-gray-400">Membuat QR Code...</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="py-6 text-red-500 text-sm">{error}</div>
+        )}
+
+        {!loading && !error && qrSrc && (
+          <>
+            <div className="flex justify-center mb-4">
+              <img
+                src={qrSrc}
+                alt="QR Code Form"
+                className="w-52 h-52 rounded-xl border border-[#e5eef7] shadow-sm"
+              />
+            </div>
+            <p className="text-[12px] text-gray-400 mb-5">
+              Scan QR ini untuk mengisi form langsung.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={downloadQr}
+                className="w-full py-3 rounded-xl text-white text-[14px] font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition"
+                style={{ backgroundColor: "#1a4fa0" }}
+              >
+                <Download size={16} /> Download PNG
+              </button>
+              <button
+                onClick={onClose}
+                className="w-full py-2.5 rounded-xl text-[13px] font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition"
+              >
+                Tutup
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

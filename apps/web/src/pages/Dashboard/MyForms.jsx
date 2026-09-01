@@ -67,20 +67,23 @@ function CreateModal({ onClose, onCreated }) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-5"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
       style={{ background: "rgba(10,30,60,0.45)", backdropFilter: "blur(4px)" }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-[420px] bg-white rounded-2xl overflow-hidden shadow-[0_24px_50px_rgba(10,30,60,0.18)]"
+        className="w-full max-w-[420px] bg-white rounded-2xl shadow-[0_24px_50px_rgba(10,30,60,0.18)] flex flex-col"
+        style={{ maxHeight: "calc(100dvh - 32px)" }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-[22px] pt-5">
+        {/* Header — sticky */}
+        <div className="flex items-center justify-between px-[22px] pt-5 pb-3 shrink-0 border-b border-[#edf3f7]">
           <h3 className="text-[17px] font-bold text-[#183056]">Buat Form Baru</h3>
           <button onClick={onClose} className="text-[#7290a9] hover:text-[#183056] text-[22px] leading-none transition-colors">×</button>
         </div>
 
-        <div className="px-[22px] py-[18px] flex flex-col gap-4">
+        {/* Scrollable body */}
+        <div className="px-[22px] py-[16px] flex flex-col gap-3.5 overflow-y-auto flex-1">
           {error && <div className="text-[12.5px] text-[#d94f4f] bg-[#fff0f0] px-3 py-2 rounded-lg border border-[#f5c0c0]">{error}</div>}
 
           <div>
@@ -107,12 +110,12 @@ function CreateModal({ onClose, onCreated }) {
 
           <div>
             <label className="block text-[11px] font-bold text-[#4d6a82] uppercase tracking-wider mb-1.5">Banner Form</label>
-            <label className="relative w-full h-20 border-2 border-dashed border-[#c5dce8] rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer bg-[#f4fafd] hover:border-[#3d91b2] hover:bg-[#edf6fb] transition-all overflow-hidden">
+            <label className="relative w-full h-[72px] border-2 border-dashed border-[#c5dce8] rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer bg-[#f4fafd] hover:border-[#3d91b2] hover:bg-[#edf6fb] transition-all overflow-hidden">
               {preview
                 ? <img src={preview} className="absolute inset-0 w-full h-full object-cover" alt="preview" />
                 : <>
-                    <span className="text-[22px] leading-none">🖼️</span>
-                    <span className="text-[11.5px] text-[#7290a9]">Klik untuk upload (JPG/PNG/WEBP, maks 5MB)</span>
+                    <span className="text-[20px] leading-none">🖼️</span>
+                    <span className="text-[11px] text-[#7290a9]">Klik untuk upload (JPG/PNG/WEBP, maks 5MB)</span>
                   </>
               }
               <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} className="absolute inset-0 opacity-0 cursor-pointer" />
@@ -122,7 +125,7 @@ function CreateModal({ onClose, onCreated }) {
           <div>
             <label className="block text-[11px] font-bold text-[#4d6a82] uppercase tracking-wider mb-1.5">
               Token Responden
-              <span className="ml-1 text-[10px] text-[#8ca0ba] normal-case tracking-normal font-normal">(opsional — kosongkan jika form terbuka untuk umum)</span>
+              <span className="ml-1 text-[10px] text-[#8ca0ba] normal-case tracking-normal font-normal">(opsional)</span>
             </label>
             <input
               className="w-full h-10 border border-[#d9e8f1] rounded-lg px-3.5 text-[14px] text-[#183056] outline-none bg-[#f7fbff] focus:border-[#3d91b2] focus:bg-white focus:ring-4 focus:ring-[#3d91b2]/10 transition-all box-border"
@@ -130,11 +133,12 @@ function CreateModal({ onClose, onCreated }) {
               value={tokenRespon}
               onChange={e => { setTokenRespon(e.target.value); setError(""); }}
             />
-            <p className="text-[11px] text-[#8ca0ba] mt-1">Token digunakan untuk membatasi siapa yang bisa mengisi form ini.</p>
+            <p className="text-[11px] text-[#8ca0ba] mt-1">Kosongkan jika form terbuka untuk umum.</p>
           </div>
         </div>
 
-        <div className="flex gap-2.5 px-[22px] pb-5">
+        {/* Footer — sticky */}
+        <div className="flex gap-2.5 px-[22px] py-4 shrink-0 border-t border-[#edf3f7]">
           <button onClick={onClose} className="flex-1 h-10 rounded-lg border border-[#d6e5ee] bg-white text-[#55738d] text-[13.5px] font-semibold hover:bg-[#f4fafd] transition-all">Batal</button>
           <button
             onClick={submit}
@@ -177,7 +181,7 @@ export default function MyForms() {
     const isConfirmed = window.confirm(`Yakin ingin menghapus form "${form.form_title}"?`);
     if (!isConfirmed) return;
     try {
-      const response = await fetch(`http://localhost:3000/form?form_slug=${form.form_slug}`, {
+      const response = await fetch(`${FORM_API_URL}/form?form_slug=${form.form_slug}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
