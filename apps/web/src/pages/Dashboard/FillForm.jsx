@@ -42,6 +42,7 @@ export default function FillForm() {
   const [liveNotice, setLiveNotice]   = useState("");
   const [currentIdx, setCurrentIdx]   = useState(0);
   const [errorSoalId, setErrorSoalId] = useState(null);
+  const [doubtfulIds, setDoubtfulIds] = useState(new Set()); // soal yang ditandai ragu-ragu
   const soalRefs = useRef({});
 
   // ── Token gate hooks — harus di atas semua early returns ──
@@ -107,8 +108,16 @@ export default function FillForm() {
 
   function setAnswer(soalId, value) {
     setAnswers((prev) => ({ ...prev, [soalId]: value }));
-    // Hapus highlight error saat soal mulai dijawab
     if (errorSoalId === soalId) setErrorSoalId(null);
+  }
+
+  function toggleDoubt(soalId) {
+    setDoubtfulIds(prev => {
+      const next = new Set(prev);
+      if (next.has(soalId)) next.delete(soalId);
+      else next.add(soalId);
+      return next;
+    });
   }
 
   function toggleOption(soal, opt) {
@@ -138,11 +147,13 @@ export default function FillForm() {
     if (empty) {
       setErrorSoalId(empty.id);
       setSubmitError("");
-      // Scroll ke card soal yang belum dijawab
       const el = soalRefs.current[empty.id];
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    // Cek ragu-ragu
+    if (doubtfulIds.size > 0) {
+      setSubmitError(`Masih ada ${doubtfulIds.size} soal yang ditandai ragu-ragu. Periksa kembali sebelum submit.`);
       return;
     }
     setErrorSoalId(null);
@@ -404,8 +415,7 @@ export default function FillForm() {
             <textarea
               key={`text-quiz-${soal.id}`}
               rows={3} placeholder="Tulis jawabanmu di sini..."
-              defaultValue={answers[soal.id] ?? ""}
-              onBlur={e => setAnswer(soal.id, e.target.value)}
+              value={answers[soal.id] ?? ""}
               onChange={e => setAnswer(soal.id, e.target.value)}
               className={inputCls} />
           )}
@@ -434,8 +444,29 @@ export default function FillForm() {
                 Halaman {currentIdx + 1} / {totalPages}
               </span>
             </div>
-            <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full rounded-full transition-all duration-300" style={{ width: `${progress}%`, background: "linear-gradient(90deg,#1a4fa0,#1e6fc7)" }} />
+        {/* Indikator soal */}
+            <div className="flex items-center gap-1.5 flex-wrap mt-2">
+              {allSoal.map((s, i) => {
+                const answered = hasAnswer(s);
+                const doubt    = doubtfulIds.has(s.id);
+                const isActive = (currPage.soal ?? []).some(cs => cs.id === s.id);
+                return (
+                  <button key={s.id ?? i}
+                    onClick={() => {
+                      // Navigasi ke halaman yang mengandung soal ini
+                      const pgIdx = pageGroups.findIndex(pg => (pg.soal ?? []).some(cs => cs.id === s.id));
+                      if (pgIdx >= 0) setCurrentIdx(pgIdx);
+                    }}
+                    title={`Soal ${i+1}${doubt ? " (ragu-ragu)" : answered ? " (dijawab)" : " (belum)"}`}
+                    className={`w-7 h-7 rounded-lg text-[11px] font-bold transition border ${
+                      doubt    ? "bg-amber-100 border-amber-400 text-amber-700" :
+                      answered ? "bg-[#1a4fa0] border-[#1a4fa0] text-white" :
+                                 "bg-white border-gray-300 text-gray-500 hover:border-[#1a4fa0]"
+                    } ${isActive ? "ring-2 ring-[#1a4fa0] ring-offset-1" : ""}`}>
+                    {i+1}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -455,10 +486,26 @@ export default function FillForm() {
             </div>
           )}
 
-          {/* Semua soal di halaman ini */}
+        {/* Semua soal di halaman ini */}
           {(currPage.soal ?? []).map((soal, idx) => {
             const globalIdx = allSoal.findIndex(s => s.id === soal.id);
-            return <SoalItem key={soal.id ?? idx} soal={soal} idx={globalIdx >= 0 ? globalIdx : idx} />;
+            const isDoubt = doubtfulIds.has(soal.id);
+            return (
+              <div key={soal.id ?? idx}>
+                <SoalItem soal={soal} idx={globalIdx >= 0 ? globalIdx : idx} />
+                {/* Tombol ragu-ragu */}
+                <div className="flex justify-end mb-4 -mt-2 pr-1">
+                  <button onClick={() => toggleDoubt(soal.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border transition ${
+                      isDoubt
+                        ? "bg-amber-50 border-amber-300 text-amber-700"
+                        : "bg-white border-gray-200 text-gray-400 hover:border-amber-300 hover:text-amber-600"
+                    }`}>
+                    <span>🚩</span> {isDoubt ? "Ragu-ragu" : "Tandai ragu-ragu"}
+                  </button>
+                </div>
+              </div>
+            );
           })}
 
           {submitError && (
@@ -557,6 +604,7 @@ export default function FillForm() {
         {(currPageS.soal ?? []).map((soal, qi) => {
           const globalIdx = allSoal.findIndex(s => s.id === soal.id);
           const isError = errorSoalId === soal.id;
+          const isDoubt = doubtfulIds.has(soal.id);
           return (
             <div key={soal.id ?? qi} ref={el => { if (el) soalRefs.current[soal.id] = el; }}
               className={`bg-white rounded-2xl border shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-6 mb-4 transition-all ${isError ? "border-red-400 ring-2 ring-red-100" : "border-[#e5eef7]"}`}>
@@ -610,8 +658,7 @@ export default function FillForm() {
               )}
               {soal.type === "text" && (
                 <textarea key={`text-s-${soal.id}`} rows={3} placeholder="Tulis jawabanmu di sini..."
-                  defaultValue={answers[soal.id] ?? ""}
-                  onBlur={e => setAnswer(soal.id, e.target.value)}
+                  value={answers[soal.id] ?? ""}
                   onChange={e => setAnswer(soal.id, e.target.value)}
                   className={inputCls} />
               )}
@@ -623,6 +670,15 @@ export default function FillForm() {
                   <input type="file" className="hidden" onChange={e => setAnswer(soal.id, { file: e.target.files?.[0] })} />
                 </label>
               )}
+              {/* Tombol ragu-ragu */}
+              <div className="flex justify-end mt-3">
+                <button onClick={() => toggleDoubt(soal.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border transition ${
+                    isDoubt ? "bg-amber-50 border-amber-300 text-amber-700" : "bg-white border-gray-200 text-gray-400 hover:border-amber-300 hover:text-amber-600"
+                  }`}>
+                  <span>🚩</span> {isDoubt ? "Ragu-ragu" : "Tandai ragu-ragu"}
+                </button>
+              </div>
             </div>
           );
         })}
