@@ -101,8 +101,15 @@ body {
 [data-theme="dark"] .bg-\[\#f0f6fe\],
 [data-theme="dark"] .bg-\[\#edf4ff\],
 [data-theme="dark"] .bg-\[\#f7fafd\],
-[data-theme="dark"] .bg-\[\#f8fafc\] {
+[data-theme="dark"] .bg-\[\#f8fafc\],
+[data-theme="dark"] .bg-\[\#f5f9ff\],
+[data-theme="dark"] .bg-\[\#faf9ff\] {
   background-color: var(--fm-hover) !important;
+}
+
+[data-theme="dark"] .border-\[\#c3d4e4\],
+[data-theme="dark"] .border-dashed {
+  border-color: #2a3a54 !important;
 }
 
 /* ── Dark mode: semua teks utama yang tidak tertangkap ───────── */
@@ -166,18 +173,27 @@ body {
   border-color: var(--fm-card-border) !important;
 }
 
-[data-theme="dark"] .bg-purple-50 {
-  background-color: #1e1a2e !important;
-}
+[data-theme="dark"] .bg-blue-50 { background-color: #0f2236 !important; }
+[data-theme="dark"] .bg-blue-100 { background-color: #0f2236 !important; }
+[data-theme="dark"] .border-blue-100 { border-color: #1a3a5c !important; }
+[data-theme="dark"] .border-blue-200 { border-color: #1a3a5c !important; }
+[data-theme="dark"] .text-blue-700 { color: #7ab3ef !important; }
 
-[data-theme="dark"] .border-purple-200 {
-  border-color: #3d2d5c !important;
-}
+[data-theme="dark"] .bg-amber-50 { background-color: #1f1a0f !important; }
+[data-theme="dark"] .bg-yellow-50 { background-color: #1f1a0f !important; }
+[data-theme="dark"] .border-amber-100 { border-color: #3d2e0a !important; }
+[data-theme="dark"] .border-amber-200 { border-color: #3d2e0a !important; }
+[data-theme="dark"] .border-amber-300 { border-color: #5a4010 !important; }
+[data-theme="dark"] .text-amber-700 { color: #fbbf24 !important; }
+[data-theme="dark"] .text-amber-600 { color: #f59e0b !important; }
 
-[data-theme="dark"] .text-purple-700,
-[data-theme="dark"] .text-purple-600 {
-  color: #b794f4 !important;
-}
+[data-theme="dark"] .bg-indigo-50 { background-color: #0f1230 !important; }
+[data-theme="dark"] .border-indigo-100 { border-color: #1e2560 !important; }
+[data-theme="dark"] .text-indigo-700 { color: #a5b4fc !important; }
+
+[data-theme="dark"] .bg-green-50 { background-color: #0a1f12 !important; }
+[data-theme="dark"] .border-green-100 { border-color: #14401e !important; }
+[data-theme="dark"] .text-green-700 { color: #4ade80 !important; }
 
 /* ── Dark mode: option input bg warna lain ───────────────────── */
 [data-theme="dark"] .bg-\[\#eef2f6\] {
