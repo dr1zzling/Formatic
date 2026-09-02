@@ -50,6 +50,31 @@ exports.seed = async function(knex) {
     // Form 10 (Creator: 1, Collab: 3) -> Submitter: User 2, 4, 5
     { user_id: 2, form_id: 10, submitted_at: knex.fn.now() },
     { user_id: 4, form_id: 10, submitted_at: knex.fn.now() },
-    { user_id: 5, form_id: 10, submitted_at: knex.fn.now() }
+    { user_id: 5, form_id: 10, submitted_at: knex.fn.now() },
+
+    // Form 11 (Creator: 3, Collab: 5) -> Submitter: User 1, 2, 4
+    { user_id: 1, form_id: 11, submitted_at: knex.fn.now() }, // submitted_id 26
+    { user_id: 2, form_id: 11, submitted_at: knex.fn.now() }, // submitted_id 27
+    { user_id: 4, form_id: 11, submitted_at: knex.fn.now() }, // submitted_id 28
+ 
+    // Form 12 (Creator: 4) -> Submitter: User 1, 3, 5
+    { user_id: 1, form_id: 12, submitted_at: knex.fn.now() }, // submitted_id 29
+    { user_id: 3, form_id: 12, submitted_at: knex.fn.now() }, // submitted_id 30
+    { user_id: 5, form_id: 12, submitted_at: knex.fn.now() }, // submitted_id 31
+ 
+    // Form 13 (Creator: 1, Collab: 4) -> Submitter: User 2, 3, 5
+    { user_id: 2, form_id: 13, submitted_at: knex.fn.now() }, // submitted_id 32
+    { user_id: 3, form_id: 13, submitted_at: knex.fn.now() }, // submitted_id 33
+    { user_id: 5, form_id: 13, submitted_at: knex.fn.now() }, // submitted_id 34
+ 
+    // Form 14 (Creator: 5) -> Submitter: User 2, 3, 4
+    { user_id: 2, form_id: 14, submitted_at: knex.fn.now() }, // submitted_id 35
+    { user_id: 3, form_id: 14, submitted_at: knex.fn.now() }, // submitted_id 36
+    { user_id: 4, form_id: 14, submitted_at: knex.fn.now() }, // submitted_id 37
+ 
+    // Form 15 (Creator: 2, Collab: 1) -> Submitter: User 3, 4, 5
+    { user_id: 3, form_id: 15, submitted_at: knex.fn.now() }, // submitted_id 38
+    { user_id: 4, form_id: 15, submitted_at: knex.fn.now() }, // submitted_id 39
+    { user_id: 5, form_id: 15, submitted_at: knex.fn.now() }  // submitted_id 40
   ]);
 };

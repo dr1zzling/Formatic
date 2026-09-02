@@ -85,37 +85,93 @@ flutter run
 
 Pastikan emulator Android atau perangkat Android sudah terhubung sebelum menjalankan `flutter run`.
 
-## Backend
+## Menjalankan Backend
 
-Backend dibagi menjadi dua service:
+Backend dibagi menjadi dua service yang dapat dijalankan secara terpisah:
 
-### Form API
+### Setup Awal
+
+1. Siapkan dua instance database terpisah (Form Database dan User Database).
+2. Buat file `.env` di masing-masing service berdasarkan `.env.example`.
+3. Konfigurasi environment variable untuk koneksi database.
+
+### Form API (NestJS)
 
 Service NestJS ini menangani:
 
 - CRUD form dan soal.
 - Penyimpanan jawaban dan hasil pengerjaan.
+- WebSocket untuk real-time updates.
 
-### User API
+**Menjalankan Form API:**
+
+```bash
+cd services/form-api
+npm install
+npm run migrate      # Jalankan database migrations (jika ada)
+npm run start:dev    # Development mode dengan auto-reload
+```
+
+Perintah lain yang tersedia:
+
+```bash
+npm run build        # Build untuk production
+npm run start:prod   # Jalankan production build
+npm run lint         # Jalankan linter
+npm test            # Jalankan test suite
+```
+
+**Database Setup untuk Form API:**
+
+Pastikan file `.env` sudah dikonfigurasi:
+
+```env
+DB_NAME     = YOUR_DB_NAME
+DB_HOST     = YOUR_DB_HOST
+DB_PASSWORD = YOUR_DB_PASSWORD
+DB_USER     = YOUR_DB_USERNAME
+PORT        = 4000
+
+SECRET = "" # Same as SECRET From user-api
+```
+
+### User API (Node.js)
 
 Service Node.js ini menangani:
 
-- Registrasi dan login.
+- Registrasi dan login pengguna.
 - Token atau session autentikasi.
+- Validasi dan manajemen data pengguna.
 
-Masing-masing service harus menggunakan konfigurasi koneksi database sendiri. Jangan mengarahkan Form API dan User API ke database yang sama.
+**Menjalankan User API:**
 
-Contoh konfigurasi environment:
-
-```env
-# Form API
-FORM_DATABASE_URL=<connection-ke-form-database>
-
-# User API
-USER_DATABASE_URL=<connection-ke-user-database>
+```bash
+cd services/user-api
+npm install
+npm run migrate      # Jalankan database migrations
+node server
 ```
 
-Nama environment variable dan port dapat disesuaikan dengan implementasi backend. Simpan file environment lokal di luar version control dan jangan memasukkan kredensial database ke repository.
+**Database Setup untuk User API:**
+
+Pastikan file `.env` sudah dikonfigurasi:
+
+```env
+DB_NAME     = YOUR_DB_NAME
+DB_HOST     = YOUR_DB_HOST
+DB_PASSWORD = YOUR_DB_PASSWORD
+DB_PORT        = 4000
+DB_USER     = YOUR_DB_USERNAME
+
+APP_PORT = 3000
+SECRET = "" # Same as SECRET From user-api
+```
+
+**Catatan Penting:**
+
+- Masing-masing service harus menggunakan konfigurasi koneksi database sendiri.
+- Jangan mengarahkan Form API dan User API ke database yang sama.
+- Simpan file `.env` lokal di luar version control dan jangan memasukkan kredensial database ke repository.
 
 ## Alur Penggunaan
 
@@ -125,15 +181,35 @@ Nama environment variable dan port dapat disesuaikan dengan implementasi backend
 4. Peserta membuka form dan mengerjakan soal sebelum timer berakhir.
 5. Jawaban dikirim ke Form API untuk divalidasi dan disimpan sebagai hasil pengerjaan.
 
+## Tools & Testing
+
+Folder `Testing_untuk_BE/` berisi:
+
+- **HTML Testing Pages** - Interface untuk testing manual backend:
+  - `index.html` - Dashboard utama
+  - `create-soal.html` - Form pembuatan soal
+  - `fill-form.html` - Form pengerjaan soal
+  - `my-forms.html` - Daftar form pengguna
+  - `dashboard.html` - Dashboard user
+
+- **Python Scripts** - Utilities untuk parsing dan debugging:
+  - `debug_math.py`, `debug_soal4.py` - Debug mathematical content
+  - `inspect_docx.py` - Inspeksi file DOCX
+  - `verify_*.py` - Verification scripts
+
+- **Soal Template Generator** - Generate soal dari template:
+  - `generate_soal.py` - Script untuk generate soal otomatis
+
 ## Status Pengembangan
 
-- [ ] Client Flutter tersedia di `apps/mobile`.
-- [ ] Client React tersedia di `apps/web`.
-- [ ] Integrasi client dengan Form API.
-- [ ] Integrasi client dengan User API.
-- [ ] Implementasi Form API berbasis NestJS.
-- [ ] Implementasi User API berbasis Node.js.
-- [ ] Konfigurasi dan migrasi dua database terpisah.
+- [x] Client Flutter tersedia di `apps/mobile`.
+- [x] Client React tersedia di `apps/web`.
+- [x] Implementasi Form API berbasis NestJS.
+- [x] Implementasi User API berbasis Node.js.
+- [x] Konfigurasi dan migrasi dua database terpisah.
+- [x] Database seeders untuk testing.
+- [x] Integrasi penuh client dengan Form API.
+- [x] Integrasi penuh client dengan User API.
 
 
 #
