@@ -247,7 +247,7 @@ export default function Login() {
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center text-sm">
                                 <label className="flex items-center gap-2 cursor-pointer select-none" style={{ color: COLORS.gray }}>
                                     <input
                                         type="checkbox"
@@ -258,9 +258,6 @@ export default function Login() {
                                     />
                                     Remember me
                                 </label>
-                                <Link to="/forgot-password" className="font-medium hover:opacity-80" style={{ color: COLORS.cyan }}>
-                                    Forgot password?
-                                </Link>
                             </div>
 
                             <button
