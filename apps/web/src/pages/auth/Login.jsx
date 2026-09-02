@@ -63,6 +63,7 @@ export default function Login() {
             style={{
                 background:
                     "linear-gradient(120deg, #062457 0%, #0b3f66 20%, #1c5f86 38%, #4d91b2 55%, #8fbccb 68%, #cde3ea 82%, #f7fafb 94%, #ffffff 100%)",
+                minHeight: "100dvh",
             }}
         >
             <div className="hidden md:grid absolute top-8 left-8 grid-cols-4 gap-1.5 z-10">
@@ -180,6 +181,12 @@ export default function Login() {
                 </div>
 
                 <div className="relative w-full max-w-sm">
+                    {/* Logo mobile — hanya muncul di layar kecil */}
+                    <div className="flex md:hidden justify-center mb-6">
+                        <h1 className="text-3xl font-bold text-white tracking-tight">
+                            Form<span style={{ color: COLORS.cyan }}>Matic</span>
+                        </h1>
+                    </div>
                     <div className="relative w-full bg-white rounded-3xl shadow-2xl px-8 py-10">
                         <div className="text-center mb-8">
                             <h2 className="text-2xl font-bold" style={{ color: COLORS.navy }}>
