@@ -191,9 +191,21 @@ body {
 [data-theme="dark"] .border-indigo-100 { border-color: #1e2560 !important; }
 [data-theme="dark"] .text-indigo-700 { color: #a5b4fc !important; }
 
+[data-theme="dark"] .bg-violet-50 { background-color: #160d2a !important; }
+[data-theme="dark"] .border-violet-300 { border-color: #4c1d95 !important; }
+[data-theme="dark"] .text-violet-700 { color: #c4b5fd !important; }
+[data-theme="dark"] .hover\:bg-violet-100:hover { background-color: #1e1040 !important; }
+
 [data-theme="dark"] .bg-green-50 { background-color: #0a1f12 !important; }
 [data-theme="dark"] .border-green-100 { border-color: #14401e !important; }
 [data-theme="dark"] .text-green-700 { color: #4ade80 !important; }
+
+[data-theme="dark"] .bg-white\/90 { background-color: rgba(26,34,53,0.92) !important; }
+[data-theme="dark"] .bg-white\/95 { background-color: rgba(26,34,53,0.96) !important; }
+[data-theme="dark"] .bg-red-50 { background-color: #1f0a0a !important; }
+[data-theme="dark"] .border-red-100 { border-color: #3d1414 !important; }
+[data-theme="dark"] .text-red-400 { color: #f87171 !important; }
+[data-theme="dark"] .text-red-500 { color: #ef4444 !important; }
 
 /* ── Dark mode: option input bg warna lain ───────────────────── */
 [data-theme="dark"] .bg-\[\#eef2f6\] {
