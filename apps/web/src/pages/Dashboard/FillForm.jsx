@@ -52,6 +52,11 @@ export default function FillForm() {
   const [tokenLoading, setTokenLoading]   = useState(false);
   const [tokenError, setTokenError]       = useState("");
 
+  // ── Timer hooks — harus di atas semua early returns ──
+  const [timeLeft, setTimeLeft]   = useState(null); // detik tersisa
+  const [timedOut, setTimedOut]   = useState(false);
+  const timerRef                  = useRef(null);
+
   useEffect(() => {
     (async () => {
       try {
@@ -106,6 +111,43 @@ export default function FillForm() {
       if (!needsToken) setTokenVerified(true);
     }
   }, [form]);
+
+  // ── Timer: mulai countdown setelah form load + token verified ──
+  useEffect(() => {
+    if (!form || !tokenVerified) return;
+
+    const duration = form?.duration; // menit
+    const startAt  = form?.start_at; // timestamp ms
+
+    if (!duration || duration <= 0) return; // tidak ada timer
+
+    // Hitung sisa waktu
+    const totalSecs = duration * 60;
+
+    let startSecs = totalSecs;
+    if (startAt && Number(startAt) > 0) {
+      const elapsed = Math.floor((Date.now() - Number(startAt)) / 1000);
+      startSecs = Math.max(0, totalSecs - elapsed);
+    }
+
+    if (startSecs <= 0) { setTimedOut(true); return; }
+
+    setTimeLeft(startSecs);
+
+    timerRef.current = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev === null) return null;
+        if (prev <= 1) {
+          clearInterval(timerRef.current);
+          setTimedOut(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timerRef.current);
+  }, [form?.duration, form?.start_at, tokenVerified]);
 
   function setAnswer(soalId, value) {
     setAnswers((prev) => ({ ...prev, [soalId]: value }));
@@ -316,6 +358,21 @@ export default function FillForm() {
     </div>
   );
 
+  /* ── Timed out ──────────────────────────────────────── */
+  if (timedOut && !done) return (
+    <div className="min-h-screen grid place-items-center px-4" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
+      <div className="rounded-3xl shadow-[0_16px_50px_rgba(23,64,120,0.12)] p-10 max-w-sm text-center border"
+        style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}>
+        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-50 text-red-500 grid place-items-center text-3xl">⏰</div>
+        <h2 className="text-[19px] font-extrabold mb-1" style={{ color: "var(--fm-text)" }}>Waktu Habis!</h2>
+        <p className="text-[14px] mb-6" style={{ color: "var(--fm-text-2)" }}>Maaf, waktu pengerjaan telah habis. Jawaban tidak dapat dikirim.</p>
+        <button onClick={() => navigate("/")} className="w-full py-3 rounded-xl text-white text-[14px] font-semibold" style={{ backgroundColor: "#1a4fa0" }}>
+          Kembali ke Beranda
+        </button>
+      </div>
+    </div>
+  );
+
   /* ── Success ────────────────────────────────────────── */
   if (done) return (
     <div className="min-h-screen grid place-items-center px-4" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
@@ -424,18 +481,24 @@ export default function FillForm() {
               <span className="text-[13px] font-semibold text-gray-500">
                 Halaman {currentIdx + 1} / {totalPages}
               </span>
-              {/* Tombol Soal */}
-              <SoalIndicatorBtn
-                allSoal={allSoal}
-                answers={answers}
-                hasAnswer={hasAnswer}
-                doubtfulIds={doubtfulIds}
-                pageGroups={pageGroups}
-                currentIdx={currentIdx}
-                setCurrentIdx={setCurrentIdx}
-                answeredCount={answeredCount}
-                doubtCount={doubtCount}
-              />
+              <div className="flex items-center gap-2">
+                {/* Timer */}
+                {timeLeft !== null && (
+                  <TimerBadge timeLeft={timeLeft} />
+                )}
+                {/* Tombol Soal */}
+                <SoalIndicatorBtn
+                  allSoal={allSoal}
+                  answers={answers}
+                  hasAnswer={hasAnswer}
+                  doubtfulIds={doubtfulIds}
+                  pageGroups={pageGroups}
+                  currentIdx={currentIdx}
+                  setCurrentIdx={setCurrentIdx}
+                  answeredCount={answeredCount}
+                  doubtCount={doubtCount}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -555,6 +618,7 @@ export default function FillForm() {
             <span className="text-[13px] font-semibold text-gray-500">
               {totalPagesS > 1 ? `Halaman ${currentIdx + 1} / ${totalPagesS}` : title}
             </span>
+            {timeLeft !== null && <TimerBadge timeLeft={timeLeft} />}
           </div>
           {totalPagesS > 1 && (
             <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -796,6 +860,25 @@ function SoalItem({ soal, idx, answers, setAnswer, toggleOption, errorSoalId, so
           <input type="file" className="hidden" onChange={e => setAnswer(soal.id, { file: e.target.files?.[0] })} />
         </label>
       )}
+    </div>
+  );
+}
+
+/* ── Timer Badge ─────────────────────────────────────────────── */
+function TimerBadge({ timeLeft }) {
+  const mins = Math.floor(timeLeft / 60);
+  const secs = timeLeft % 60;
+  const str  = `${String(mins).padStart(2,"0")}:${String(secs).padStart(2,"0")}`;
+  const urgent = timeLeft <= 60; // merah jika ≤ 1 menit
+  const warn   = timeLeft <= 300 && timeLeft > 60; // kuning jika ≤ 5 menit
+
+  return (
+    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[13px] font-bold tabular-nums transition-colors ${
+      urgent ? "bg-red-50 text-red-600 border border-red-200 animate-pulse" :
+      warn   ? "bg-amber-50 text-amber-600 border border-amber-200" :
+               "bg-[#eef5fb] text-[#1a4fa0] border border-[#d4e5fa]"
+    }`}>
+      <span>⏱</span> {str}
     </div>
   );
 }

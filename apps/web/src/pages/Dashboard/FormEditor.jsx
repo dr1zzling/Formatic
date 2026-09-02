@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
 import { socket } from "../../utils/socket";
 import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical, ImagePlus, X, QrCode, Download } from "lucide-react";
+import QRCode from "qrcode";
 import QuillEditor from "../../components/QuillEditor";
 import RichTextDisplay from "../../components/RichTextDisplay";
 import Toast, { useToast } from "../../components/Toast";
@@ -1749,9 +1750,12 @@ function QrModal({ slug, formTitle, onClose }) {
     setLoading(true);
     const baseUrl = import.meta.env.VITE_APP_URL ?? window.location.origin;
     const fillUrl = `${baseUrl}/fill/${slug}`;
-    import("qrcode")
-      .then(QRCode => QRCode.toDataURL(fillUrl, { width: 300, margin: 2 }))
-      .then(dataUrl => setQrSrc(dataUrl))
+    QRCode.toDataURL(fillUrl, {
+      width: 300,
+      margin: 2,
+      color: { dark: "#102f56", light: "#ffffff" },
+    })
+      .then(url => setQrSrc(url))
       .catch(() => setError("Gagal membuat QR Code."))
       .finally(() => setLoading(false));
   }, [slug]);
@@ -1761,7 +1765,9 @@ function QrModal({ slug, formTitle, onClose }) {
     const a = document.createElement("a");
     a.href = qrSrc;
     a.download = `qrcode-${slug}.png`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
   }
 
   return (
