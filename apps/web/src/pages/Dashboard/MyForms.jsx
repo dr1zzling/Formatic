@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
 import { addToTrash } from "./Trash";
@@ -65,9 +66,9 @@ function CreateModal({ onClose, onCreated }) {
     finally { setLoading(false); }
   }
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:pl-[220px] xl:pl-[240px]"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
       style={{ background: "rgba(10,30,60,0.45)", backdropFilter: "blur(4px)" }}
       onClick={onClose}
     >
@@ -151,10 +152,8 @@ function CreateModal({ onClose, onCreated }) {
         </div>
       </div>
     </div>
-  );
+  , document.body);
 }
-
-/* ── Main ────────────────────────────────────────────────────── */
 export default function MyForms() {
   const navigate  = useNavigate();
   const username  = getUsername();
@@ -438,8 +437,8 @@ function JoinModal({ onClose, onJoined }) {
     } finally { setLoading(false); }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 md:pl-[220px] xl:pl-[240px]"
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
       onClick={onClose}>
       <div className="w-full max-w-[420px] bg-white rounded-2xl overflow-hidden shadow-2xl"
         onClick={e => e.stopPropagation()}>
@@ -485,5 +484,5 @@ function JoinModal({ onClose, onJoined }) {
         </div>
       </div>
     </div>
-  );
+  , document.body);
 }
