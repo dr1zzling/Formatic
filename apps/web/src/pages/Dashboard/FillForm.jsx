@@ -186,7 +186,15 @@ export default function FillForm() {
   }
 
   async function submit() {
-    const empty = (allSoal ?? []).find((s) => !hasAnswer(s));
+    // Baca required map dari localStorage (disimpan creator)
+    let reqMap = {};
+    try {
+      const saved = localStorage.getItem(`soal_required_${slug}`);
+      if (saved) reqMap = JSON.parse(saved);
+    } catch { /* ignore */ }
+    const isRequired = (s) => reqMap[s.id] !== undefined ? reqMap[s.id] : true; // default wajib
+
+    const empty = (allSoal ?? []).find((s) => isRequired(s) && !hasAnswer(s));
     if (empty) {
       setErrorSoalId(empty.id);
       setSubmitError("");
@@ -450,7 +458,10 @@ export default function FillForm() {
     const pageNum     = currPage.page ?? (currentIdx + 1);
 
     function goNext() {
-      const unanswered = (currPage.soal ?? []).find(s => !hasAnswer(s));
+      let reqMap = {};
+      try { const s = localStorage.getItem(`soal_required_${slug}`); if (s) reqMap = JSON.parse(s); } catch {}
+      const isReq = (s) => reqMap[s.id] !== undefined ? reqMap[s.id] : true;
+      const unanswered = (currPage.soal ?? []).find(s => isReq(s) && !hasAnswer(s));
       if (unanswered) {
         const clean = (unanswered.question || "Wajib").replace(/<[^>]*>/g, "").trim();
         setSubmitError(`Pertanyaan "${clean}" belum dijawab.`);
@@ -589,7 +600,10 @@ export default function FillForm() {
   const progressS    = totalPagesS > 0 ? ((currentIdx + 1) / totalPagesS) * 100 : 0;
 
   function goNextS() {
-    const unanswered = (currPageS.soal ?? []).find(s => !hasAnswer(s));
+    let reqMap = {};
+    try { const s = localStorage.getItem(`soal_required_${slug}`); if (s) reqMap = JSON.parse(s); } catch {}
+    const isReq = (s) => reqMap[s.id] !== undefined ? reqMap[s.id] : true;
+    const unanswered = (currPageS.soal ?? []).find(s => isReq(s) && !hasAnswer(s));
     if (unanswered) {
       setErrorSoalId(unanswered.id);
       const el = soalRefs.current[unanswered.id];

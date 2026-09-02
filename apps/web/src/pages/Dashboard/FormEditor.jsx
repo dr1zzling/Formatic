@@ -141,7 +141,16 @@ export default function FormEditor() {
     }]);
   }
   function updateQ(idx, field, val) {
-    setQuestions((prev) => prev.map((q, i) => i === idx ? { ...q, [field]: val } : q));
+    setQuestions((prev) => {
+      const updated = prev.map((q, i) => i === idx ? { ...q, [field]: val } : q);
+      // Simpan required state per soal ke localStorage supaya FillForm bisa baca
+      if (field === "required") {
+        const reqMap = {};
+        updated.forEach(q => { if (q.id) reqMap[q.id] = q.required !== false; });
+        localStorage.setItem(`soal_required_${slug}`, JSON.stringify(reqMap));
+      }
+      return updated;
+    });
   }
   function updateOpt(qIdx, oIdx, val) {
     setQuestions((prev) => prev.map((q, i) => {
