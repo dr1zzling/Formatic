@@ -67,7 +67,7 @@ function CreateModal({ onClose, onCreated }) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:pl-[220px] xl:pl-[240px]"
       style={{ background: "rgba(10,30,60,0.45)", backdropFilter: "blur(4px)" }}
       onClick={onClose}
     >
@@ -439,7 +439,7 @@ function JoinModal({ onClose, onJoined }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 md:pl-[220px] xl:pl-[240px]"
       onClick={onClose}>
       <div className="w-full max-w-[420px] bg-white rounded-2xl overflow-hidden shadow-2xl"
         onClick={e => e.stopPropagation()}>

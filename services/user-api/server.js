@@ -27,9 +27,8 @@ async function userExist (username){
         return get.rows[0]
     }
     catch(err){
-        return {
-            message: `Internal Server Error, ${err.message}`
-        }
+        console.error('userExist error:', err.message)
+        return null  // fix: return null bukan object saat error
     }
 }
 
