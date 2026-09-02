@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
@@ -219,9 +219,84 @@ export default function FillForm() {
     } finally { setSubmitting(false); }
   }
 
+  const title = form?.title ?? form?.form_title ?? "Form";
+  const isQuiz = form?.category === "ujian";
+
+  // ── Flatten & group soal — harus di atas early returns (Rules of Hooks) ──
+  const rawSoal  = form?.soal ?? [];
+  const soalList = rawSoal.length > 0 && rawSoal[0]?.soal
+    ? rawSoal.flatMap(p => p.soal ?? [])
+    : rawSoal;
+
+  // pageGroups di-memo — hanya dihitung ulang saat form berubah
+  // Ini penting supaya shuffle tidak berulang saat user ketik (re-render)
+  const pageGroups = useMemo(() => {
+    if (!form) return [];
+
+    // Survey: tampilkan semua soal dalam 1 halaman
+    if (form?.category !== "ujian") {
+      const flat = (form?.soal ?? []).length > 0 && (form?.soal ?? [])[0]?.soal
+        ? (form?.soal ?? []).flatMap(p => p.soal ?? [])
+        : (form?.soal ?? []);
+      return [{ page: 1, soal: flat }];
+    }
+
+    const raw = form?.soal ?? [];
+    const rFlat = raw.length > 0 && raw[0]?.soal ? raw : null;
+
+    // Ambil locked IDs dari localStorage
+    let lockedIds = new Set();
+    try {
+      const slug = form?.slug ?? form?.form_slug ?? "";
+      const saved = localStorage.getItem(`locked_soal_${slug}`);
+      lockedIds = new Set(saved ? JSON.parse(saved).map(Number) : []);
+    } catch { /* ignore */ }
+
+    // Bangun pages
+    let pages = [];
+    if (rFlat) {
+      pages = [...rFlat]
+        .sort((a, b) => (a.page ?? 1) - (b.page ?? 1))
+        .map(p => ({ page: p.page ?? 1, soal: p.soal ?? [] }));
+    } else {
+      const groups = {};
+      for (const s of raw) {
+        const p = parseInt(s.page) || 1;
+        if (!groups[p]) groups[p] = [];
+        groups[p].push(s);
+      }
+      pages = Object.keys(groups).map(Number).sort((a,b) => a - b)
+        .map(p => ({ page: p, soal: groups[p] }));
+    }
+
+    if (!form?.is_random) return pages;
+
+    // Shuffle: locked tetap posisi, unlocked diacak
+    function shuffleArr(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    const unlockedPages = pages.filter(pg => !(pg.soal ?? []).some(s => lockedIds.has(Number(s.id))));
+    const shuffled = shuffleArr(unlockedPages);
+    const result = [...pages];
+    let ui = 0;
+    for (let i = 0; i < result.length; i++) {
+      const isLocked = (result[i].soal ?? []).some(s => lockedIds.has(Number(s.id)));
+      if (!isLocked) result[i] = shuffled[ui++];
+    }
+    return result;
+  }, [form?.soal, form?.is_random, form?.slug, form?.category]);
+
+  const allSoal = soalList;
+
   /* ── Loading ────────────────────────────────────────── */
   if (loading) return (
-    <div className="min-h-screen grid place-items-center" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
+    <div className="min-h-screen grid place-items-center" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
       <div className="text-center">
         <div className="w-10 h-10 border-2 border-[#1a4fa0] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
         <p className="text-gray-500 text-sm">Memuat form...</p>
@@ -231,7 +306,7 @@ export default function FillForm() {
 
   /* ── Error ──────────────────────────────────────────── */
   if (error) return (
-    <div className="min-h-screen grid place-items-center px-4" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
+    <div className="min-h-screen grid place-items-center px-4" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
       <div className="bg-white rounded-3xl shadow-[0_16px_50px_rgba(23,64,120,0.12)] p-10 max-w-sm text-center border border-[#e5eef7]">
         <p className="text-3xl mb-3">😕</p>
         <p className="font-bold text-gray-800 mb-1">Form tidak ditemukan</p>
@@ -243,7 +318,7 @@ export default function FillForm() {
 
   /* ── Success ────────────────────────────────────────── */
   if (done) return (
-    <div className="min-h-screen grid place-items-center px-4" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
+    <div className="min-h-screen grid place-items-center px-4" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
       <div className="bg-white rounded-3xl shadow-[0_16px_50px_rgba(23,64,120,0.12)] p-10 max-w-sm text-center border border-[#e5eef7]">
         <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-green-50 text-green-600 grid place-items-center">
           <CheckCircle2 size={36} />
@@ -254,9 +329,6 @@ export default function FillForm() {
       </div>
     </div>
   );
-
-  const title = form?.title ?? form?.form_title ?? "Form";
-  const isQuiz = form?.category === "ujian";
 
   // ── Token gate ────────────────────────────────────────────
   const needsToken = Boolean(form?.token_respon);
@@ -282,7 +354,7 @@ export default function FillForm() {
 
   // Tampilkan halaman input token jika belum diverifikasi
   if (needsToken && !tokenVerified) return (
-    <div className="min-h-screen grid place-items-center px-4" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
+    <div className="min-h-screen grid place-items-center px-4" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
       <div className="bg-white rounded-3xl shadow-[0_16px_50px_rgba(23,64,120,0.12)] p-8 w-full max-w-sm border border-[#e5eef7] text-center">
         <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-blue-50 flex items-center justify-center text-2xl">🔐</div>
         <h2 className="text-[18px] font-extrabold text-[#102f56] mb-1">Form Terbatas</h2>
@@ -310,38 +382,6 @@ export default function FillForm() {
       </div>
     </div>
   );
-  // Flatten soal dari format baru {page, soal:[]} atau format lama flat[]
-  const rawSoal = form?.soal ?? [];
-  const soalList = rawSoal.length > 0 && rawSoal[0]?.soal
-    ? rawSoal.flatMap(p => p.soal ?? [])
-    : rawSoal;
-
-  // Grup per page — survey: semua soal di satu halaman. Quiz: per page sesuai urutan soal
-  const buildPageGroups = () => {
-    // Survey: tampilkan semua soal sekaligus dalam 1 halaman
-    if (!isQuiz) {
-      return [{ page: 1, soal: soalList }];
-    }
-    // Quiz: pisah per page
-    if (rawSoal.length > 0 && rawSoal[0]?.soal) {
-      // Format baru dari backend: sudah di-group, tinggal sort
-      return [...rawSoal]
-        .sort((a, b) => (a.page ?? 1) - (b.page ?? 1))
-        .map(p => ({ page: p.page ?? 1, soal: p.soal ?? [] }));
-    }
-    // Format lama: flat array — grup manual berdasarkan field page di soal
-    const groups = {};
-    for (const s of rawSoal) {
-      const p = parseInt(s.page) || 1;
-      if (!groups[p]) groups[p] = [];
-      groups[p].push(s);
-    }
-    const pages = Object.keys(groups).map(Number).sort((a,b) => a - b);
-    return pages.map(p => ({ page: p, soal: groups[p] }));
-  };
-  const pageGroups = buildPageGroups();
-  const allSoal = soalList;
-
   // Quiz: step-by-step navigation
 
   if (isQuiz) {
@@ -371,97 +411,11 @@ export default function FillForm() {
     const answeredCount = allSoal.filter(s => hasAnswer(s)).length;
     const doubtCount    = doubtfulIds.size;
 
-    const SoalItem = ({ soal, idx }) => {
-      const isError = errorSoalId === soal.id;
-      return (
-        <div ref={el => { if (el) soalRefs.current[soal.id] = el; }}
-          className={`bg-white rounded-2xl border shadow-sm p-6 mb-4 transition-all ${isError ? "border-red-400 ring-2 ring-red-100" : "border-[#e5eef7]"}`}>
-          <div className="flex items-start gap-3 mb-5">
-            <span className="w-9 h-9 rounded-xl bg-[#eef5fb] text-[#1a4fa0] text-[14px] font-extrabold grid place-items-center shrink-0 mt-0.5">{idx + 1}</span>
-            <div className="flex-1">
-              <RichTextDisplay content={soal.question} className="text-[16px] font-bold text-[#102f56] leading-snug" />
-              <span className="text-[12px] font-medium text-[#1a4fa0] block mt-1">{TYPE_LABEL[soal.type] ?? soal.type}</span>
-            </div>
-            <span className="text-[#c9393f] font-bold shrink-0">*</span>
-          </div>
-
-          {soal.image && (
-            <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-100 rounded-xl">
-              <FileText size={18} className="text-[#1a4fa0] shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-[#1a4fa0]">Lampiran Soal</p>
-              </div>
-              <a href={`${FORM_API_URL}${soal.image.startsWith('/') ? soal.image : '/uploads/soal/' + soal.image}`}
-                target="_blank" rel="noopener noreferrer"
-                className="shrink-0 px-3 py-1.5 rounded-lg bg-[#1a4fa0] text-white text-[12px] font-semibold hover:opacity-90 transition">
-                Buka File
-              </a>
-            </div>
-          )}
-
-          {/* Audio soal — survey mode */}
-          {soal.audio && (
-            <div className="mb-4 px-4 py-3 bg-purple-50 border border-purple-200 rounded-xl">
-              <p className="text-[12px] font-bold text-purple-700 mb-2">🎵 Audio Soal</p>
-              <audio controls src={`${FORM_API_URL}${soal.audio}`} className="w-full h-10" />
-            </div>
-          )}
-
-          {(soal.type === "radio" || soal.type === "checkbox") && (
-            <div className="space-y-2.5">
-              {(soal.options ?? []).map((opt, oi) => {
-                const selected = soal.type === "radio"
-                  ? answers[soal.id] === opt.id
-                  : (Array.isArray(answers[soal.id]) && answers[soal.id].includes(opt.id));
-                const optImage = opt.image ? `${FORM_API_URL}${opt.image}` : null;
-                return (
-                  <button key={opt.id ?? oi} onClick={() => toggleOption(soal, opt)}
-                    className={`w-full flex items-start gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
-                      selected ? "border-[#1a4fa0] bg-[#f0f6fe]" : "border-[#e2e9f1] hover:border-[#1a4fa0]/40 hover:bg-[#f7fafd]"
-                    }`}>
-                    <span className={`inline-grid place-items-center shrink-0 border-2 transition-all mt-0.5 ${
-                      soal.type === "checkbox" ? "w-6 h-6 rounded-[8px]" : "w-6 h-6 rounded-full"
-                    } ${selected ? "border-[#1a4fa0] bg-[#1a4fa0]" : "border-[#5b6c7e] bg-[#eef2f6]"}`}>
-                      {selected && (soal.type === "checkbox"
-                        ? <Check size={15} strokeWidth={3} className="text-white" />
-                        : <span className="w-3 h-3 rounded-full bg-white" />)}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-[15px] font-medium text-gray-700 block">{fallbackLabel(opt, oi)}</span>
-                      {optImage && (
-                        <img src={optImage} alt={fallbackLabel(opt, oi)}
-                          className="mt-2.5 w-full max-h-55 object-contain rounded-xl border border-[#d4e5fa]" />
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {soal.type === "text" && (
-            <textarea
-              key={`text-quiz-${soal.id}`}
-              rows={3} placeholder="Tulis jawabanmu di sini..."
-              value={answers[soal.id] ?? ""}
-              onChange={e => setAnswer(soal.id, e.target.value)}
-              className={inputCls} />
-          )}
-          {soal.type === "file" && (
-            <label className="flex flex-col items-center justify-center gap-2 w-full rounded-xl border-2 border-dashed border-[#c3d4e4] bg-[#f7fafd] py-8 cursor-pointer hover:border-[#1a4fa0] hover:bg-[#f0f6fe] transition-all">
-              {answers[soal.id]?.file
-                ? <><FileText size={28} className="text-[#1a4fa0]" /><span className="text-[14px] font-semibold text-[#102f56]">{answers[soal.id].file.name}</span></>
-                : <><UploadCloud size={28} className="text-[#1a4fa0]" /><span className="text-[14px] font-semibold">Unggah file jawaban</span></>}
-              <input type="file" className="hidden" onChange={e => setAnswer(soal.id, { file: e.target.files?.[0] })} />
-            </label>
-          )}
-        </div>
-      );
-    };
-
     return (
-      <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
+      <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
         {/* Top bar */}
-        <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-[#e5eef7] px-4 py-3">
+        <div className="sticky top-0 z-10 backdrop-blur border-b border-[#e5eef7] px-4 py-3 transition-colors"
+          style={{ backgroundColor: "var(--fm-card)" }}>
           <div className="max-w-2xl mx-auto">
             <div className="flex items-center justify-between">
               <button onClick={() => navigate("/")} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#1a4fa0] hover:underline">
@@ -503,11 +457,21 @@ export default function FillForm() {
 
         {/* Semua soal di halaman ini */}
           {(currPage.soal ?? []).map((soal, idx) => {
-            const globalIdx = allSoal.findIndex(s => s.id === soal.id);
+            // Nomor soal = posisi dalam urutan pageGroups setelah shuffle (bukan urutan DB)
+            const shuffledIdx = pageGroups.findIndex(pg => (pg.soal ?? []).some(s => s.id === soal.id));
+            const displayNum  = shuffledIdx >= 0 ? shuffledIdx : idx;
             const isDoubt = doubtfulIds.has(soal.id);
             return (
               <div key={soal.id ?? idx}>
-                <SoalItem soal={soal} idx={globalIdx >= 0 ? globalIdx : idx} />
+                <SoalItem
+                  soal={soal}
+                  idx={displayNum}
+                  answers={answers}
+                  setAnswer={setAnswer}
+                  toggleOption={toggleOption}
+                  errorSoalId={errorSoalId}
+                  soalRefs={soalRefs}
+                />
                 {/* Tombol ragu-ragu */}
                 <div className="flex justify-end mb-4 -mt-2 pr-1">
                   <button onClick={() => toggleDoubt(soal.id)}
@@ -580,7 +544,7 @@ export default function FillForm() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
+    <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
       {/* Top bar */}
       <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-[#e5eef7] px-4 py-3">
         <div className="max-w-2xl mx-auto">
@@ -617,15 +581,18 @@ export default function FillForm() {
 
         {/* Soal di halaman ini */}
         {(currPageS.soal ?? []).map((soal, qi) => {
-          const globalIdx = allSoal.findIndex(s => s.id === soal.id);
+          // Nomor soal = posisi halaman dalam pageGroups (sudah di-shuffle kalau is_random)
+          const pgIdx   = pageGroups.findIndex(pg => (pg.soal ?? []).some(s => s.id === soal.id));
+          const displayNum = pgIdx >= 0 ? pgIdx : qi;
           const isError = errorSoalId === soal.id;
           const isDoubt = doubtfulIds.has(soal.id);
           return (
             <div key={soal.id ?? qi} ref={el => { if (el) soalRefs.current[soal.id] = el; }}
-              className={`bg-white rounded-2xl border shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-6 mb-4 transition-all ${isError ? "border-red-400 ring-2 ring-red-100" : "border-[#e5eef7]"}`}>
+              className={`rounded-2xl border shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-6 mb-4 transition-all ${isError ? "border-red-400 ring-2 ring-red-100" : ""}`}
+              style={{ backgroundColor: "var(--fm-card)", borderColor: isError ? undefined : "var(--fm-card-border)" }}>
               <div className="flex items-start gap-3 mb-4">
                 <span className="w-9 h-9 rounded-xl bg-[#eef5fb] text-[#1a4fa0] text-[14px] font-extrabold grid place-items-center shrink-0 mt-0.5">
-                  {(globalIdx >= 0 ? globalIdx : qi) + 1}
+                  {displayNum + 1}
                 </span>
                 <div className="flex-1 min-w-0">
                   <RichTextDisplay content={soal.question} className="text-[16px] font-bold text-[#102f56] leading-snug" />
@@ -744,6 +711,95 @@ export default function FillForm() {
   );
 }
 
+/* ── SoalItem — komponen soal untuk quiz mode ───────────────── */
+function SoalItem({ soal, idx, answers, setAnswer, toggleOption, errorSoalId, soalRefs }) {
+  const isError = errorSoalId === soal.id;
+  return (
+    <div ref={el => { if (el) soalRefs.current[soal.id] = el; }}
+      className={`rounded-2xl border shadow-sm p-6 mb-4 transition-all ${isError ? "border-red-400 ring-2 ring-red-100" : ""}`}
+      style={{ backgroundColor: "var(--fm-card)", borderColor: isError ? undefined : "var(--fm-card-border)" }}>
+      <div className="flex items-start gap-3 mb-5">
+        <span className="w-9 h-9 rounded-xl bg-[#eef5fb] text-[#1a4fa0] text-[14px] font-extrabold grid place-items-center shrink-0 mt-0.5">{idx + 1}</span>
+        <div className="flex-1">
+          <RichTextDisplay content={soal.question} className="text-[16px] font-bold text-[#102f56] leading-snug" />
+          <span className="text-[12px] font-medium text-[#1a4fa0] block mt-1">{TYPE_LABEL[soal.type] ?? soal.type}</span>
+        </div>
+        <span className="text-[#c9393f] font-bold shrink-0">*</span>
+      </div>
+
+      {soal.image && (
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-100 rounded-xl">
+          <FileText size={18} className="text-[#1a4fa0] shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-semibold text-[#1a4fa0]">Lampiran Soal</p>
+          </div>
+          <a href={`${FORM_API_URL}${soal.image.startsWith('/') ? soal.image : '/uploads/soal/' + soal.image}`}
+            target="_blank" rel="noopener noreferrer"
+            className="shrink-0 px-3 py-1.5 rounded-lg bg-[#1a4fa0] text-white text-[12px] font-semibold hover:opacity-90 transition">
+            Buka File
+          </a>
+        </div>
+      )}
+
+      {soal.audio && (
+        <div className="mb-4 px-4 py-3 bg-purple-50 border border-purple-200 rounded-xl">
+          <p className="text-[12px] font-bold text-purple-700 mb-2">🎵 Audio Soal</p>
+          <audio controls src={`${FORM_API_URL}${soal.audio}`} className="w-full h-10" />
+        </div>
+      )}
+
+      {(soal.type === "radio" || soal.type === "checkbox") && (
+        <div className="space-y-2.5">
+          {(soal.options ?? []).map((opt, oi) => {
+            const selected = soal.type === "radio"
+              ? answers[soal.id] === opt.id
+              : (Array.isArray(answers[soal.id]) && answers[soal.id].includes(opt.id));
+            const optImage = opt.image ? `${FORM_API_URL}${opt.image}` : null;
+            return (
+              <button key={opt.id ?? oi} onClick={() => toggleOption(soal, opt)}
+                className={`w-full flex items-start gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
+                  selected ? "border-[#1a4fa0] bg-[#f0f6fe]" : "border-[#e2e9f1] hover:border-[#1a4fa0]/40 hover:bg-[#f7fafd]"
+                }`}>
+                <span className={`inline-grid place-items-center shrink-0 border-2 transition-all mt-0.5 ${
+                  soal.type === "checkbox" ? "w-6 h-6 rounded-[8px]" : "w-6 h-6 rounded-full"
+                } ${selected ? "border-[#1a4fa0] bg-[#1a4fa0]" : "border-[#5b6c7e] bg-[#eef2f6]"}`}>
+                  {selected && (soal.type === "checkbox"
+                    ? <Check size={15} strokeWidth={3} className="text-white" />
+                    : <span className="w-3 h-3 rounded-full bg-white" />)}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <span className="text-[15px] font-medium text-gray-700 block">{fallbackLabel(opt, oi)}</span>
+                  {optImage && (
+                    <img src={optImage} alt={fallbackLabel(opt, oi)}
+                      className="mt-2.5 w-full max-h-55 object-contain rounded-xl border border-[#d4e5fa]" />
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {soal.type === "text" && (
+        <textarea
+          rows={3}
+          placeholder="Tulis jawabanmu di sini..."
+          value={answers[soal.id] ?? ""}
+          onChange={e => setAnswer(soal.id, e.target.value)}
+          className={inputCls}
+        />
+      )}
+      {soal.type === "file" && (
+        <label className="flex flex-col items-center justify-center gap-2 w-full rounded-xl border-2 border-dashed border-[#c3d4e4] bg-[#f7fafd] py-8 cursor-pointer hover:border-[#1a4fa0] hover:bg-[#f0f6fe] transition-all">
+          {answers[soal.id]?.file
+            ? <><FileText size={28} className="text-[#1a4fa0]" /><span className="text-[14px] font-semibold text-[#102f56]">{answers[soal.id].file.name}</span></>
+            : <><UploadCloud size={28} className="text-[#1a4fa0]" /><span className="text-[14px] font-semibold">Unggah file jawaban</span></>}
+          <input type="file" className="hidden" onChange={e => setAnswer(soal.id, { file: e.target.files?.[0] })} />
+        </label>
+      )}
+    </div>
+  );
+}
+
 /* ── Soal Indicator Button + Modal ─────────────────────────── */
 function SoalIndicatorBtn({ allSoal, answers, hasAnswer, doubtfulIds, pageGroups, currentIdx, setCurrentIdx, answeredCount, doubtCount }) {
   const [open, setOpen] = useState(false);
@@ -855,19 +911,20 @@ function SoalIndicatorBtn({ allSoal, answers, hasAnswer, doubtfulIds, pageGroups
 
             <div className="border-t border-gray-100 shrink-0" />
 
-            {/* Soal grid — semua nomor sejajar ke kanan, wrap kalau penuh */}
+            {/* Soal grid — nomor ikut urutan shuffle (pageGroups), wrap kalau penuh */}
             <div className="px-5 py-4 overflow-y-auto flex-1">
               <div className="flex flex-wrap gap-2">
-                {allSoal.map((s, globalIdx) => {
-                  const pgIdx    = pageGroups.findIndex(pg => (pg.soal ?? []).some(x => x.id === s.id));
+                {pageGroups.map((pg, pgIdx) => {
+                  const s       = (pg.soal ?? [])[0]; // 1 soal per halaman
+                  if (!s) return null;
                   const answered = hasAnswer(s);
                   const doubt    = doubtfulIds.has(s.id);
                   const isCurrent = pgIdx === currentIdx;
                   return (
                     <button
                       key={s.id}
-                      onClick={() => { setCurrentIdx(pgIdx >= 0 ? pgIdx : 0); setOpen(false); }}
-                      title={`Soal ${globalIdx + 1}${doubt ? " — ragu-ragu" : answered ? " — sudah dijawab" : " — belum dijawab"}`}
+                      onClick={() => { setCurrentIdx(pgIdx); setOpen(false); }}
+                      title={`Soal ${pgIdx + 1}${doubt ? " — ragu-ragu" : answered ? " — sudah dijawab" : " — belum dijawab"}`}
                       className={`w-10 h-10 rounded-xl text-[13px] font-bold border-2 transition-all active:scale-90 focus:outline-none shrink-0 ${
                         doubt
                           ? "bg-amber-50 border-amber-400 text-amber-700 hover:bg-amber-100"
@@ -878,7 +935,7 @@ function SoalIndicatorBtn({ allSoal, answers, hasAnswer, doubtfulIds, pageGroups
                               : "bg-white border-gray-200 text-gray-500 hover:border-[#1a4fa0] hover:text-[#1a4fa0] hover:bg-[#f0f6fe]"
                       }`}
                     >
-                      {globalIdx + 1}
+                      {pgIdx + 1}
                     </button>
                   );
                 })}

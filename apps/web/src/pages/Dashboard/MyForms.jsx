@@ -181,18 +181,20 @@ export default function MyForms() {
     const isConfirmed = window.confirm(`Yakin ingin menghapus form "${form.form_title}"?`);
     if (!isConfirmed) return;
     try {
+      // Soft delete — ubah status ke private, simpan ke trash localStorage
+      // Form tetap ada di DB, bisa dipulihkan dari Trash
       const response = await fetch(`${FORM_API_URL}/form?form_slug=${form.form_slug}`, {
-        method: "DELETE",
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
+        body: JSON.stringify({ status: "private" }),
       });
-      if (!response.ok) throw new Error("Gagal menghapus data dari server");
-      // Simpan ke trash localStorage
+      if (!response.ok) throw new Error("Gagal memindahkan ke trash");
       addToTrash(form);
       setForms(prev => prev.filter(f => f.form_slug !== form.form_slug));
-      alert("Form berhasil dihapus dan dipindahkan ke Trash!");
+      alert("Form dipindahkan ke Trash!");
     } catch (error) {
       console.error("Error delete:", error);
       alert("Gagal menghapus form.");
@@ -217,7 +219,7 @@ export default function MyForms() {
       <main className="flex-1 min-w-0" style={{ width: "calc(100% - 366px)" }}>
         <div
           className="min-h-screen px-[42px] py-[34px] pb-[60px] max-[1050px]:px-[25px] max-[800px]:px-4 max-[800px]:py-[28px] box-border"
-          style={{ background: "linear-gradient(135deg,#f5faff 0%,#eef7fc 55%,#e6f3fa 100%)", color: "#102f56" }}
+          style={{ background: "linear-gradient(135deg, var(--fm-bg) 0%, var(--fm-bg-2) 55%, var(--fm-bg-3) 100%)", color: "var(--fm-text)" }}
         >
           {/* ── Header ─────────────────────────────── */}
           <header className="flex items-center justify-between gap-4 mb-[25px] max-[800px]:flex-col max-[800px]:items-start">
@@ -282,13 +284,13 @@ export default function MyForms() {
 
           {/* ── Grid ───────────────────────────────── */}
           {loading && (
-            <div className="grid grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] gap-[18px] items-stretch max-[1050px]:grid-cols-[1fr_0.8fr] max-[800px]:grid-cols-1">
+            <div className="grid grid-cols-2 gap-[18px] items-stretch max-[800px]:grid-cols-1">
               {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
             </div>
           )}
 
           {!loading && filtered.length > 0 && (
-            <div className="grid grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] gap-[18px] items-stretch max-[1050px]:grid-cols-[1fr_0.8fr] max-[800px]:grid-cols-1">
+            <div className="grid grid-cols-2 gap-[18px] items-stretch max-[800px]:grid-cols-1">
               {filtered.map((form, index) => {
                 const banner = form.form_banner ?? form.banner;
                 const cat    = form.category ?? "";
@@ -298,7 +300,8 @@ export default function MyForms() {
                 return (
                   <div
                     key={form.form_id ?? index}
-                    className="group rounded-2xl bg-white/95 border border-[#dceaf2] overflow-hidden cursor-pointer flex flex-col min-h-[310px] shadow-[0_5px_16px_rgba(30,73,105,0.05)] hover:-translate-y-1 hover:border-[#b7d7e6] hover:shadow-[0_12px_28px_rgba(30,73,105,0.12)] transition-all"
+                    style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}
+                    className="group rounded-2xl border overflow-hidden cursor-pointer flex flex-col min-h-[310px] shadow-[0_5px_16px_rgba(30,73,105,0.05)] hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(30,73,105,0.12)] transition-all"
                     onClick={() => navigate(`/form/${form.form_slug}`)}
                   >
                     {/* Image */}

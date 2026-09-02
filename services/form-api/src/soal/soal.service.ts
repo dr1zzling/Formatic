@@ -383,10 +383,8 @@ export class SoalService {
                 }
             }
 
-            let options = getOption.filter((option) => option.soal_id == row.id)
-            if (is_random) {
-                options = shuffleArray(options)
-            }
+            // Opsi TIDAK diacak — hanya urutan soal/halaman yang diacak
+            const options = getOption.filter((option) => option.soal_id == row.id)
             acc[row.page].soal.push({
                 id: row.id,
                 question: row.question,
@@ -402,12 +400,8 @@ export class SoalService {
 
         const result = Object.values(grouped) as Array<{ page: number, soal: any[] }>
 
-        return result
-            .sort((a, b) => (a.page ?? 1) - (b.page ?? 1))
-            .map((pageGroup) => ({
-                ...pageGroup,
-                soal: is_random ? shuffleArray(pageGroup.soal) : pageGroup.soal
-            }))
+        // Selalu return urutan normal — shuffle ditangani di frontend
+        return result.sort((a, b) => (a.page ?? 1) - (b.page ?? 1))
     }
 
     // Create Soal And Option

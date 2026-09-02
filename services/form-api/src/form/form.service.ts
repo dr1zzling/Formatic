@@ -188,7 +188,7 @@ export class FormService {
     const updateForm = await this.knexService.connection("forms")
     .update({
       duration: body.duration,
-      start_at: new Date(body.start_at),
+      start_at: body.start_at ? new Date(body.start_at) : null,
       is_random: body.is_random
     })
     .where("id", form.id)

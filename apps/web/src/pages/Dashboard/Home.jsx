@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
 import { Bell, HelpCircle, Plus, ArrowRight, FileText, Search } from "lucide-react";
+import { useTheme } from "../../context/ThemeContext";
 
 const FORM_API = FORM_API_URL;
 
@@ -30,7 +31,8 @@ function ActivityCard({ forms, loading }) {
   const navigate = useNavigate();
   const CAT_STYLE = { ujian: "bg-[#eee7ff] text-[#7850d9]", survey: "bg-[#e9f2ff] text-[#1768df]", default: "bg-[#e5faee] text-[#21a964]" };
   return (
-    <section className="bg-white border border-[#e0eaf6] rounded-xl shadow-[0_8px_25px_rgba(35,83,145,0.08)] p-6 min-h-[355px] flex flex-col">
+    <section className="border border-[#e0eaf6] rounded-xl shadow-[0_8px_25px_rgba(35,83,145,0.08)] p-6 min-h-[355px] flex flex-col transition-colors"
+      style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}>
       <div className="flex items-center justify-between mb-4">
         <h3 className="m-0 text-[16px] font-bold text-[#17366d]">Aktivitas Terbaru</h3>
         <button onClick={() => navigate("/my-forms")} className="bg-transparent border-none text-[#1764d6] text-[11px] font-semibold cursor-pointer">View all</button>
@@ -78,7 +80,8 @@ function HistoryPengerjaan({ loading: parentLoading }) {
   }, []);
 
   return (
-    <section className="bg-white border border-[#e0eaf6] rounded-xl shadow-[0_8px_25px_rgba(35,83,145,0.08)] p-6">
+    <section className="border border-[#e0eaf6] rounded-xl shadow-[0_8px_25px_rgba(35,83,145,0.08)] p-6 transition-colors"
+      style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}>
       <div className="flex items-center justify-between mb-4">
         <h3 className="m-0 text-[16px] font-bold text-[#17366d]">History Pengerjaan</h3>
         <button onClick={() => navigate("/history")} className="bg-transparent border-none text-[#1764d6] text-[11px] font-semibold cursor-pointer hover:underline">View all</button>
@@ -126,26 +129,40 @@ function HistoryPengerjaan({ loading: parentLoading }) {
 /* ── Manage Forms Card ─────────────────────────────────────────── */
 function ManageFormsCard({ totalForms }) {
   const navigate = useNavigate();
+  const { dark }  = useTheme();
   return (
-    <section className="relative flex items-center min-h-[315px] px-[38px] py-[35px] bg-white border border-[#e0eaf6] rounded-xl overflow-hidden shadow-[0_8px_25px_rgba(35,83,145,0.08)]"
-      style={{ background: "radial-gradient(circle at 82% 45%,rgba(93,174,255,0.14),transparent 35%),linear-gradient(135deg,#ffffff,#f0f7ff)" }}>
+    <section className="relative flex items-center min-h-[315px] px-[38px] py-[35px] border border-[#e0eaf6] rounded-xl overflow-hidden shadow-[0_8px_25px_rgba(35,83,145,0.08)]"
+      style={{ background: dark
+        ? "radial-gradient(circle at 82% 45%,rgba(26,79,160,0.18),transparent 35%),linear-gradient(135deg,#1a2235,#1e2d45)"
+        : "radial-gradient(circle at 82% 45%,rgba(93,174,255,0.14),transparent 35%),linear-gradient(135deg,#ffffff,#f0f7ff)",
+        borderColor: dark ? "#2a3a54" : "#e0eaf6"
+      }}>
       <div className="relative z-10">
         <span className="text-[10px] font-bold tracking-[1px] text-[#3d8ad1] uppercase">FORM MANAGEMENT</span>
-        <h2 className="mt-3 mb-4 text-[26px] font-bold leading-[1.22] text-[#103b86]">Kelola Semua Form<br />Dalam Satu Tempat</h2>
-        <p className="m-0 text-[#7088a8] text-[13px] leading-relaxed">Pantau respons, lihat statistik, dan kelola form<br />dengan praktis dan efisien.</p>
+        <h2 className="mt-3 mb-4 text-[26px] font-bold leading-[1.22]"
+          style={{ color: dark ? "#e2eaf8" : "#103b86" }}>Kelola Semua Form<br />Dalam Satu Tempat</h2>
+        <p className="m-0 text-[13px] leading-relaxed"
+          style={{ color: dark ? "#8fa8cc" : "#7088a8" }}>Pantau respons, lihat statistik, dan kelola form<br />dengan praktis dan efisien.</p>
         <button onClick={() => navigate("/my-forms")}
-          className="mt-[22px] h-[42px] inline-flex items-center gap-[11px] px-[18px] border border-[#1b67dc] rounded-[7px] bg-white text-[#155dc4] text-[12px] font-semibold cursor-pointer hover:bg-[#f0f7ff] transition-colors">
+          className="mt-[22px] h-[42px] inline-flex items-center gap-[11px] px-[18px] border rounded-[7px] text-[12px] font-semibold cursor-pointer transition-colors"
+          style={{
+            backgroundColor: dark ? "#1e2d45" : "#ffffff",
+            borderColor: dark ? "#3a5070" : "#1b67dc",
+            color: dark ? "#7ab3ef" : "#155dc4",
+          }}>
           Go to My Form <ArrowRight size={18} />
         </button>
       </div>
       <div className="absolute right-[30px] top-[28px] w-[44%] h-[260px]">
-        <div className="absolute right-[30px] top-[15px] w-[250px] h-[215px] rounded-xl bg-white shadow-[0_18px_30px_rgba(31,89,151,0.14)] overflow-hidden rotate-[2deg]">
+        <div className="absolute right-[30px] top-[15px] w-[250px] h-[215px] rounded-xl shadow-[0_18px_30px_rgba(31,89,151,0.14)] overflow-hidden rotate-[2deg]"
+          style={{ backgroundColor: dark ? "#1e2a40" : "#ffffff" }}>
           <div className="h-[27px] flex items-center gap-[5px] px-[11px] bg-[#1b63cc]">
             {[0,1,2].map(i => <span key={i} className="w-[7px] h-[7px] rounded-full bg-white/70" />)}
           </div>
           <div className="relative h-[calc(100%-27px)] p-[17px]">
             <div className="w-[76px] h-[76px] rounded-full relative" style={{ background: "conic-gradient(#2772dc 0 62%,#6db8ee 62% 82%,#c9e5fb 82% 100%)" }}>
-              <div className="w-[34px] h-[34px] absolute top-[21px] left-[21px] rounded-full bg-white" />
+              <div className="w-[34px] h-[34px] absolute top-[21px] left-[21px] rounded-full"
+                style={{ backgroundColor: dark ? "#1e2a40" : "#ffffff" }} />
             </div>
             <div className="absolute left-[110px] top-[18px] w-[90px] space-y-[9px]">
               {["85%","65%","75%","45%"].map((w,i) => <span key={i} className="block h-1.5 rounded bg-[#e1ebf7]" style={{width:w}} />)}
@@ -155,9 +172,10 @@ function ManageFormsCard({ totalForms }) {
             </div>
           </div>
         </div>
-        <div className="absolute right-0 bottom-[23px] w-[130px] p-3 rounded-[9px] bg-white shadow-[0_10px_25px_rgba(35,83,145,0.14)]">
-          <span className="block text-[8px] text-[#879bb5]">Total Forms</span>
-          <strong className="block mt-1 text-[18px] text-[#173b78]">{totalForms}</strong>
+        <div className="absolute right-0 bottom-[23px] w-[130px] p-3 rounded-[9px] shadow-[0_10px_25px_rgba(35,83,145,0.14)]"
+          style={{ backgroundColor: dark ? "#1e2a40" : "#ffffff" }}>
+          <span className="block text-[8px]" style={{ color: dark ? "#6b85a8" : "#879bb5" }}>Total Forms</span>
+          <strong className="block mt-1 text-[18px]" style={{ color: dark ? "#e2eaf8" : "#173b78" }}>{totalForms}</strong>
           <small className="text-[#2eb56e] text-[9px]">↗ aktif</small>
         </div>
       </div>
@@ -389,7 +407,7 @@ export default function Home() {
     <div className="flex h-screen overflow-hidden">
       <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
         <div className="px-4 sm:px-6 md:px-8 xl:px-11 py-16 md:py-9 pb-24 md:pb-16"
-          style={{ background: "radial-gradient(circle at 85% 10%,rgba(93,174,255,0.1),transparent 28%),#f5f9ff" }}>
+          style={{ background: "linear-gradient(135deg, var(--fm-bg) 0%, var(--fm-bg-2) 55%, var(--fm-bg-3) 100%)", minHeight: "100%" }}>
           <header className="flex items-start justify-between mb-6 gap-3">
             <div className="min-w-0">
               <h1 className="m-0 text-[22px] sm:text-[28px] font-bold text-[#102f68] leading-tight">Hi, {username}! 👋</h1>
