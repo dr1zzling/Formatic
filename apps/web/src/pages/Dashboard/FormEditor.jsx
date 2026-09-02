@@ -386,7 +386,8 @@ export default function FormEditor() {
   }
 
   function copyLink() {
-    navigator.clipboard.writeText(`${window.location.origin}/fill/${slug}`);
+    const baseUrl = import.meta.env.VITE_APP_URL ?? window.location.origin;
+    navigator.clipboard.writeText(`${baseUrl}/fill/${slug}`);
     showToast("Link berhasil disalin!");
   }
 
@@ -442,7 +443,8 @@ export default function FormEditor() {
             {userRole !== "Collaborator" && (
               <button
                 onClick={() => {
-                  const collabLink = `${window.location.origin}/form/${slug}/collaborate?token=${form?.token_collab ?? ""}`;
+                  const baseUrl = import.meta.env.VITE_APP_URL ?? window.location.origin;
+                  const collabLink = `${baseUrl}/form/${slug}/collaborate?token=${form?.token_collab ?? ""}`;
                   navigator.clipboard.writeText(collabLink);
                   showToast("Link collaborator berhasil disalin!");
                 }}
@@ -616,7 +618,7 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ,
           className="w-full text-[15px] text-gray-500 resize-none outline-none border-b border-dashed border-gray-200 pb-2 bg-transparent focus:border-[#1a4fa0] transition-colors"
         />
         <div className="mt-4 flex items-center gap-3 bg-[#eef5fb] rounded-xl px-4 py-3">
-          <span className="text-[13.5px] text-[#1a4fa0] font-medium truncate flex-1">{window.location.origin}/fill/{slug}</span>
+          <span className="text-[13.5px] text-[#1a4fa0] font-medium truncate flex-1">{import.meta.env.VITE_APP_URL ?? window.location.origin}/fill/{slug}</span>
           <button onClick={onCopyLink} className="text-[13px] text-white font-semibold px-3.5 py-2 rounded-lg hover:opacity-90 transition-all shrink-0 flex items-center gap-1.5" style={{ backgroundColor: "#1a4fa0" }}>
             <Share2 size={14} /> Salin
           </button>
@@ -1746,7 +1748,8 @@ function QrModal({ slug, formTitle, onClose }) {
 
   useEffect(() => {
     setLoading(true);
-    const fillUrl = `${window.location.origin}/fill/${slug}`;
+    const baseUrl = import.meta.env.VITE_APP_URL ?? window.location.origin;
+    const fillUrl = `${baseUrl}/fill/${slug}`;
     QRCode.toDataURL(fillUrl, {
       width: 300,
       margin: 2,
