@@ -17,7 +17,7 @@ const options = {
 
         servers: [
             {
-                url: "http://localhost:3000",
+                url: "http://localhost:5000",
                 description: "Local Development Server",
             },
         ],
@@ -240,7 +240,7 @@ swaggerSpec.paths = {
         get: {
             tags: ["Form"],
             summary: "Mendapatkan seluruh form",
-            description: "Mengambil maksimal 10 form.",
+            description: "Mengambil maksimal 20 form.",
             responses: {
                 200: {
                     description: "Berhasil mendapatkan seluruh form",
