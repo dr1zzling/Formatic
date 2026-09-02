@@ -82,7 +82,7 @@ export default function Register() {
         ))}
       </div>
 
-      <div className="relative w-full flex items-center justify-between gap-10" style={{ maxWidth: "1200px" }}>
+      <div className="relative w-full flex items-center justify-between gap-10 md:justify-between justify-center" style={{ maxWidth: "1200px" }}>
         <div className="relative hidden md:flex flex-col justify-center overflow-visible" style={{ width: "620px" }}>
           <div
             className="absolute rounded-full bg-white/15 border border-white/25"

@@ -76,7 +76,7 @@ export default function Login() {
                 ))}
             </div>
 
-            <div className="relative w-full flex items-center justify-between gap-10" style={{ maxWidth: "1200px" }}>
+            <div className="relative w-full flex items-center justify-between gap-10 md:justify-between justify-center" style={{ maxWidth: "1200px" }}>
 
                 {/* Left panel */}
                 <div className="relative hidden md:flex flex-col justify-center overflow-visible" style={{ width: "620px" }}>
