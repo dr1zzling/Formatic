@@ -130,15 +130,13 @@ Route publik dapat dipanggil tanpa header autentikasi. Pastikan nilai `SECRET` d
 | `POST` | `/form/soal/import?form_slug=<slug>` | Mengimpor soal dari file `.docx` | Ya |
 | `DELETE` | `/form/soal/:soal_id` | Menghapus soal | Ya |
 
-### Submit dan QR code
+### Submit
 
 | Method | Endpoint | Keterangan | Auth |
 | --- | --- | --- | --- |
 | `POST` | `/form/submit/check-token?form_slug=<slug>` | Memeriksa token responden | Ya |
 | `GET` | `/form/submit?form_slug=<slug>` | Mendapatkan daftar submit form | Ya |
 | `GET` | `/form/submit/detail?form_slug=<slug>` | Mendapatkan detail jawaban submit | Ya |
-| `GET` | `/qrcode/json?slug=<nilai>` | Menghasilkan QR code dalam data URL | Tidak |
-| `GET` | `/qrcode/image?slug=<nilai>` | Menghasilkan QR code PNG | Tidak |
 
 ## Upload file
 

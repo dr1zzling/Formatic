@@ -10,7 +10,8 @@ exports.up = function(knex) {
         table.integer('form_id').unsigned()
         table.enum('type', ['radio', 'text', 'file', 'checkbox']).notNullable()
         table.decimal('score', 10, 2).nullable()
-        table.integer('page')
+        table.integer('page').defaultTo(1)
+        table.text('audio').nullable()
         
         table.foreign('form_id').references('forms.id').onDelete('CASCADE')
     })
