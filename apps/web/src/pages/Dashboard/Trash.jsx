@@ -76,14 +76,10 @@ export default function Trash() {
 
   async function restore(form) {
     try {
-      const res = await fetch(`${FORM_API_URL}/form?form_slug=${form.form_slug}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
-        body: JSON.stringify({ status: "public" }),
-      });
-      if (!res.ok) throw new Error();
+      // Form masih ada di DB dengan status private — cukup keluarkan dari trash localStorage
+      // Status tetap private, user bisa publish ulang dari MyForms
       removeFromTrash(form.form_slug);
-      showToast("✅ Form berhasil dipulihkan!");
+      showToast("✅ Form berhasil dipulihkan ke My Forms!");
       load();
     } catch { showToast("❌ Gagal memulihkan."); }
   }
@@ -118,12 +114,13 @@ export default function Trash() {
   })();
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "#F5F6FA" }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: "var(--fm-bg)" }}>
 
       <div className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-[52px] md:pt-0 pb-20 md:pb-0">
 
         {/* Header */}
-        <div className="px-4 sm:px-6 md:px-8 xl:px-10 pt-6 pb-5 flex items-center justify-between gap-4 bg-white border-b border-gray-100">
+        <div className="px-4 sm:px-6 md:px-8 xl:px-10 pt-6 pb-5 flex items-center justify-between gap-4 border-b transition-colors"
+          style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-border)" }}>
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-red-50 border border-red-100 flex items-center justify-center shrink-0">
               <Trash2 size={17} className="text-red-400" />
@@ -145,11 +142,13 @@ export default function Trash() {
         </div>
 
         {/* Search + filters */}
-        <div className="px-4 sm:px-6 md:px-8 xl:px-10 py-4 bg-white border-b border-gray-100 flex items-center gap-3 flex-wrap">
+        <div className="px-4 sm:px-6 md:px-8 xl:px-10 py-4 border-b flex items-center gap-3 flex-wrap transition-colors"
+          style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-border)" }}>
           <div className="relative min-w-[180px] flex-1 max-w-sm">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search deleted forms..."
-              className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[13px] outline-none focus:bg-white focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition" />
+              className="w-full pl-9 pr-3 py-2 border rounded-lg text-[13px] outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition"
+              style={{ backgroundColor: "var(--fm-input-bg)", borderColor: "var(--fm-border)", color: "var(--fm-text)" }} />
           </div>
           <div className="flex items-center gap-1.5">
             {FILTERS.map(f => (
@@ -174,7 +173,8 @@ export default function Trash() {
         {/* List */}
         <div className="flex-1 px-4 sm:px-6 md:px-8 xl:px-10 py-4 space-y-2.5">
           {loading && [...Array(3)].map((_, i) => (
-            <div key={i} className="h-20 bg-white rounded-xl border border-gray-100 animate-pulse" />
+            <div key={i} className="h-20 rounded-xl border animate-pulse"
+              style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }} />
           ))}
 
           {!loading && visible.length === 0 && (
@@ -193,8 +193,8 @@ export default function Trash() {
             const urgent = days <= 3;
             return (
               <div key={form.form_slug ?? i}
-                className="bg-white rounded-xl border border-gray-100 flex items-center gap-0 overflow-hidden hover:border-gray-200 hover:shadow-sm transition group"
-                style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                className="rounded-xl border flex items-center gap-0 overflow-hidden hover:shadow-sm transition group"
+                style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
 
                 {/* Thumbnail */}
                 <div className="w-16 sm:w-20 h-16 sm:h-[72px] shrink-0 overflow-hidden"

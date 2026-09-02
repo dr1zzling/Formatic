@@ -4,9 +4,214 @@
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
+/* ── Theme variables ─────────────────────────────────────────── */
+:root, [data-theme="light"] {
+  --fm-bg:          #f5f9ff;
+  --fm-bg-2:        #eef7fc;
+  --fm-bg-3:        #e6f3fa;
+  --fm-card:        #ffffff;
+  --fm-card-border: #dceaf2;
+  --fm-text:        #102f56;
+  --fm-text-2:      #64779d;
+  --fm-text-3:      #8195b2;
+  --fm-border:      #dae6f1;
+  --fm-input-bg:    #ffffff;
+  --fm-hover:       #eef5fb;
+  --fm-divider:     #e8f0f8;
+}
+
+[data-theme="dark"] {
+  --fm-bg:          #0d1117;
+  --fm-bg-2:        #111827;
+  --fm-bg-3:        #161d2b;
+  --fm-card:        #1a2235;
+  --fm-card-border: #2a3a54;
+  --fm-text:        #f0f6ff;
+  --fm-text-2:      #a8bdd8;
+  --fm-text-3:      #8aaac8;
+  --fm-border:      #243047;
+  --fm-input-bg:    #1e2d45;
+  --fm-hover:       #1e2d45;
+  --fm-divider:     #1e2d45;
+}
+
+html { transition: color-scheme 0.2s; }
+
 body {
   font-family: var(--font-sans);
+  background-color: var(--fm-bg);
+  color: var(--fm-text);
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
+
+/* ── Global dark-mode overrides — otomatis apply ke semua card ── */
+[data-theme="dark"] .bg-white,
+[data-theme="dark"] .bg-white\/90,
+[data-theme="dark"] .bg-white\/95 {
+  background-color: var(--fm-card) !important;
+}
+
+[data-theme="dark"] .bg-gray-50,
+[data-theme="dark"] .bg-gray-100 {
+  background-color: var(--fm-bg-3) !important;
+}
+
+[data-theme="dark"] .border-gray-100,
+[data-theme="dark"] .border-gray-200,
+[data-theme="dark"] .border-\[\#e5eef7\],
+[data-theme="dark"] .border-\[\#dae6f1\],
+[data-theme="dark"] .border-\[\#dceaf2\],
+[data-theme="dark"] .border-\[\#e7edf6\],
+[data-theme="dark"] .border-\[\#e5ebf4\],
+[data-theme="dark"] .border-\[\#edf1f7\],
+[data-theme="dark"] .border-\[\#f0f4fa\] {
+  border-color: var(--fm-card-border) !important;
+}
+
+[data-theme="dark"] .text-gray-700,
+[data-theme="dark"] .text-gray-800,
+[data-theme="dark"] .text-gray-900,
+[data-theme="dark"] .text-\[\#102f56\],
+[data-theme="dark"] .text-\[\#102f68\],
+[data-theme="dark"] .text-\[\#142d63\],
+[data-theme="dark"] .text-\[\#17366d\] {
+  color: var(--fm-text) !important;
+}
+
+[data-theme="dark"] .text-gray-400,
+[data-theme="dark"] .text-gray-500,
+[data-theme="dark"] .text-gray-600,
+[data-theme="dark"] .text-\[\#64779d\],
+[data-theme="dark"] .text-\[\#7284a3\],
+[data-theme="dark"] .text-\[\#7384a4\],
+[data-theme="dark"] .text-\[\#8195b2\],
+[data-theme="dark"] .text-\[\#8ca0ba\] {
+  color: var(--fm-text-2) !important;
+}
+
+[data-theme="dark"] input:not([type="file"]),
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  background-color: var(--fm-input-bg) !important;
+  color: var(--fm-text) !important;
+  border-color: var(--fm-border) !important;
+}
+
+[data-theme="dark"] .bg-\[\#eef5fb\],
+[data-theme="dark"] .bg-\[\#f0f6fe\],
+[data-theme="dark"] .bg-\[\#edf4ff\],
+[data-theme="dark"] .bg-\[\#f7fafd\],
+[data-theme="dark"] .bg-\[\#f8fafc\] {
+  background-color: var(--fm-hover) !important;
+}
+
+/* ── Dark mode: semua teks utama yang tidak tertangkap ───────── */
+[data-theme="dark"] * {
+  --tw-text-opacity: 1;
+}
+
+[data-theme="dark"] p,
+[data-theme="dark"] span:not([class*="text-white"]):not([class*="text-red"]):not([class*="text-green"]):not([class*="text-blue"]):not([class*="text-amber"]):not([class*="text-purple"]):not([class*="text-indigo"]):not([class*="text-violet"]):not([class*="badge"]),
+[data-theme="dark"] h1:not([class*="text-white"]),
+[data-theme="dark"] h2:not([class*="text-white"]),
+[data-theme="dark"] h3:not([class*="text-white"]),
+[data-theme="dark"] label:not([class*="text-white"]),
+[data-theme="dark"] li {
+  color: var(--fm-text);
+}
+
+/* ── Dark mode: Quill editor ─────────────────────────────────── */
+[data-theme="dark"] .quill-wrapper {
+  background-color: var(--fm-input-bg) !important;
+  border-color: var(--fm-card-border) !important;
+}
+
+[data-theme="dark"] .quill-wrapper .ql-toolbar.ql-snow {
+  background-color: #1a2538 !important;
+  border-color: var(--fm-card-border) !important;
+}
+
+[data-theme="dark"] .quill-wrapper .ql-container.ql-snow,
+[data-theme="dark"] .quill-wrapper .ql-editor {
+  background-color: var(--fm-input-bg) !important;
+  color: var(--fm-text) !important;
+  border-color: var(--fm-card-border) !important;
+}
+
+[data-theme="dark"] .quill-wrapper .ql-editor.ql-blank::before {
+  color: var(--fm-text-3) !important;
+}
+
+[data-theme="dark"] .quill-wrapper .ql-stroke {
+  stroke: #8fa8cc !important;
+}
+
+[data-theme="dark"] .quill-wrapper .ql-fill {
+  fill: #8fa8cc !important;
+}
+
+[data-theme="dark"] .quill-wrapper .ql-picker-label,
+[data-theme="dark"] .quill-wrapper .ql-picker-item {
+  color: #8fa8cc !important;
+}
+
+[data-theme="dark"] .quill-wrapper .ql-picker-options {
+  background-color: var(--fm-card) !important;
+  border-color: var(--fm-card-border) !important;
+}
+
+/* toolbar bottom bar (LaTeX/Code/upload buttons) */
+[data-theme="dark"] .quill-wrapper > div:last-child {
+  background-color: #1a2538 !important;
+  border-color: var(--fm-card-border) !important;
+}
+
+[data-theme="dark"] .bg-purple-50 {
+  background-color: #1e1a2e !important;
+}
+
+[data-theme="dark"] .border-purple-200 {
+  border-color: #3d2d5c !important;
+}
+
+[data-theme="dark"] .text-purple-700,
+[data-theme="dark"] .text-purple-600 {
+  color: #b794f4 !important;
+}
+
+/* ── Dark mode: option input bg warna lain ───────────────────── */
+[data-theme="dark"] .bg-\[\#eef2f6\] {
+  background-color: #243047 !important;
+}
+
+[data-theme="dark"] .border-\[\#5b6c7e\] {
+  border-color: #4a5e78 !important;
+}
+
+[data-theme="dark"] .border-\[\#c3d4e4\],
+[data-theme="dark"] .border-dashed.border-\[\#c3d4e4\] {
+  border-color: #2a3a54 !important;
+}
+
+/* ── Dark mode: teks di dalam card/soal ─────────────────────── */
+[data-theme="dark"] .text-\[\#364a6e\],
+[data-theme="dark"] .text-\[\#1a4fa0\] {
+  color: #7ab3ef !important;
+}
+
+[data-theme="dark"] .text-\[\#102f56\],
+[data-theme="dark"] .text-gray-700,
+[data-theme="dark"] .text-gray-800,
+[data-theme="dark"] .text-gray-900 {
+  color: var(--fm-text) !important;
+}
+
+[data-theme="dark"] .text-gray-500,
+[data-theme="dark"] .text-gray-600,
+[data-theme="dark"] .text-gray-400 {
+  color: var(--fm-text-2) !important;
+}
+
 
 @layer utilities {
   .scrollbar-hide {

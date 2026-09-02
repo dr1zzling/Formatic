@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
+import { ThemeProvider } from "./context/ThemeContext";
 import Login          from "./pages/auth/Login";
 import Register       from "./pages/auth/Register";
 import ForgotPassword from "./pages/auth/ForgotPassword";
@@ -174,11 +175,13 @@ function PageContent({ location }) {
 
 function App() {
   return (
-    <Router>
-      <AnimatedContent>
-        <PageContent />
-      </AnimatedContent>
-    </Router>
+    <ThemeProvider>
+      <Router>
+        <AnimatedContent>
+          <PageContent />
+        </AnimatedContent>
+      </Router>
+    </ThemeProvider>
   );
 }
 
