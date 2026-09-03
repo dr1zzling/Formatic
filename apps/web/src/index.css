@@ -198,9 +198,21 @@ body {
 [data-theme="dark"] .border-indigo-100 { border-color: #1e2560 !important; }
 [data-theme="dark"] .text-indigo-700 { color: #a5b4fc !important; }
 
+[data-theme="dark"] .bg-violet-50 { background-color: #160d2a !important; }
+[data-theme="dark"] .border-violet-300 { border-color: #4c1d95 !important; }
+[data-theme="dark"] .text-violet-700 { color: #c4b5fd !important; }
+[data-theme="dark"] .hover\:bg-violet-100:hover { background-color: #1e1040 !important; }
+
 [data-theme="dark"] .bg-green-50 { background-color: #0a1f12 !important; }
 [data-theme="dark"] .border-green-100 { border-color: #14401e !important; }
 [data-theme="dark"] .text-green-700 { color: #4ade80 !important; }
+
+[data-theme="dark"] .bg-white\/90 { background-color: rgba(26,34,53,0.92) !important; }
+[data-theme="dark"] .bg-white\/95 { background-color: rgba(26,34,53,0.96) !important; }
+[data-theme="dark"] .bg-red-50 { background-color: #1f0a0a !important; }
+[data-theme="dark"] .border-red-100 { border-color: #3d1414 !important; }
+[data-theme="dark"] .text-red-400 { color: #f87171 !important; }
+[data-theme="dark"] .text-red-500 { color: #ef4444 !important; }
 
 /* ── Dark mode: option input bg warna lain ───────────────────── */
 [data-theme="dark"] .bg-\[\#eef2f6\] {
@@ -217,23 +229,45 @@ body {
 }
 
 /* ── Dark mode: teks di dalam card/soal ─────────────────────── */
-[data-theme="dark"] .text-\[\#364a6e\],
-[data-theme="dark"] .text-\[\#1a4fa0\] {
-  color: #7ab3ef !important;
+[data-theme="dark"] .text-\[\#364a6e\] { color: #a8c4e0 !important; }
+[data-theme="dark"] .text-\[\#1a4fa0\] { color: #7ab3ef !important; }
+[data-theme="dark"] .text-\[\#102f56\] { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-\[\#102f68\] { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-\[\#142d63\] { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-\[\#17366d\] { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-\[\#103b86\] { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-\[\#183056\] { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-\[\#1b3d6e\] { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-gray-900 { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-gray-800 { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-gray-700 { color: #d0dff0 !important; }
+[data-theme="dark"] .text-gray-600 { color: #b0c4d8 !important; }
+[data-theme="dark"] .text-gray-500 { color: #8fa8c8 !important; }
+[data-theme="dark"] .text-gray-400 { color: #7090b0 !important; }
+[data-theme="dark"] .text-\[\#64779d\] { color: #8fa8c8 !important; }
+[data-theme="dark"] .text-\[\#7284a3\] { color: #8fa8c8 !important; }
+[data-theme="dark"] .text-\[\#7384a4\] { color: #8fa8c8 !important; }
+[data-theme="dark"] .text-\[\#8195b2\] { color: #8fa8c8 !important; }
+[data-theme="dark"] .text-\[\#8ca0ba\] { color: #8fa8c8 !important; }
+[data-theme="dark"] .text-\[\#7088a8\] { color: #8fa8c8 !important; }
+[data-theme="dark"] .text-\[\#879bb5\] { color: #7090b0 !important; }
+[data-theme="dark"] .text-\[\#7290a9\] { color: #8fa8c8 !important; }
+
+/* ── Dark mode: semua p/span/h yang tidak punya class teks ────── */
+[data-theme="dark"] body { color: var(--fm-text); }
+[data-theme="dark"] button:not([class*="text-white"]):not([class*="text-blue"]):not([class*="text-red"]):not([class*="text-green"]):not([class*="text-amber"]):not([class*="text-violet"]):not([class*="text-purple"]):not([class*="text-indigo"]) {
+  color: var(--fm-text);
 }
 
-[data-theme="dark"] .text-\[\#102f56\],
-[data-theme="dark"] .text-gray-700,
-[data-theme="dark"] .text-gray-800,
-[data-theme="dark"] .text-gray-900 {
-  color: var(--fm-text) !important;
-}
+/* ── Dark mode: strong/b tag ─────────────────────────────────── */
+[data-theme="dark"] strong, [data-theme="dark"] b { color: var(--fm-text) !important; }
 
-[data-theme="dark"] .text-gray-500,
-[data-theme="dark"] .text-gray-600,
-[data-theme="dark"] .text-gray-400 {
-  color: var(--fm-text-2) !important;
-}
+/* ── Dark mode: placeholder ──────────────────────────────────── */
+[data-theme="dark"] ::placeholder { color: #4a6080 !important; }
+
+/* ── Dark mode: hr dan divider ───────────────────────────────── */
+[data-theme="dark"] .h-px { background-color: var(--fm-border) !important; }
+[data-theme="dark"] .divide-gray-100 > * + * { border-color: var(--fm-border) !important; }
 
 
 @layer utilities {

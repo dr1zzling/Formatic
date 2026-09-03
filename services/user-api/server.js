@@ -31,7 +31,8 @@ async function userExist(username){
         if (get.rows.length === 0) return null
         return get.rows[0]
     } catch(err) {
-        throw err 
+        console.error('userExist error:', err.message)
+        return null  // fix: return null bukan object saat error
     }
 }
 

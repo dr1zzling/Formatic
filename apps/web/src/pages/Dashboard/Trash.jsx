@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
 import { Search, Trash2, RotateCcw, Bell, FileText, AlertTriangle, Clock } from "lucide-react";
+import AlertModal from "../../components/AlertModal";
 
 const TRASH_KEY = "formatic_trash";
 const DAYS_30   = 30 * 24 * 60 * 60 * 1000;
@@ -65,6 +66,7 @@ export default function Trash() {
   const [filter, setFilter] = useState("Semua");
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState("");
+  const [confirmDestroy, setConfirmDestroy] = useState(null);
 
   useEffect(() => { load(); }, []);
 
@@ -85,7 +87,11 @@ export default function Trash() {
   }
 
   async function destroy(form) {
-    if (!window.confirm(`Hapus permanen "${form.form_title}"? Tindakan ini tidak bisa dibatalkan.`)) return;
+    setConfirmDestroy(form);
+  }
+
+  async function doDestroy(form) {
+    setConfirmDestroy(null);
     try {
       const res = await fetch(`${FORM_API_URL}/form?form_slug=${form.form_slug}`, {
         method: "DELETE",
@@ -250,6 +256,16 @@ export default function Trash() {
           {toast}
         </div>
       )}
+      <AlertModal
+        open={!!confirmDestroy}
+        type="trash"
+        title="Hapus Permanen?"
+        message={`Form "${confirmDestroy?.form_title}" akan dihapus selamanya. Tindakan ini tidak bisa dibatalkan.`}
+        confirmLabel="Hapus Permanen"
+        cancelLabel="Batal"
+        onConfirm={() => doDestroy(confirmDestroy)}
+        onCancel={() => setConfirmDestroy(null)}
+      />
     </div>
   );
 }

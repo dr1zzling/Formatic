@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
+import AlertModal from "../../components/AlertModal";
 import { socket } from "../../utils/socket";
 import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical, ImagePlus, X, QrCode, Download } from "lucide-react";
 import QRCode from "qrcode";
@@ -142,7 +143,16 @@ export default function FormEditor() {
     }]);
   }
   function updateQ(idx, field, val) {
-    setQuestions((prev) => prev.map((q, i) => i === idx ? { ...q, [field]: val } : q));
+    setQuestions((prev) => {
+      const updated = prev.map((q, i) => i === idx ? { ...q, [field]: val } : q);
+      // Simpan required state per soal ke localStorage supaya FillForm bisa baca
+      if (field === "required") {
+        const reqMap = {};
+        updated.forEach(q => { if (q.id) reqMap[q.id] = q.required !== false; });
+        localStorage.setItem(`soal_required_${slug}`, JSON.stringify(reqMap));
+      }
+      return updated;
+    });
   }
   function updateOpt(qIdx, oIdx, val) {
     setQuestions((prev) => prev.map((q, i) => {
@@ -1012,6 +1022,7 @@ function ResponsesTab({ formId, form }) {
   const [loading, setLoading]           = useState(true);
   const [activeSubTab, setActiveSubTab] = useState("Ringkasan");
   const [exporting, setExporting]       = useState(false);
+  const [exportAlert, setExportAlert]   = useState(null);
 
   useEffect(() => {
     if (!formSlug) { setLoading(false); return; }
@@ -1033,7 +1044,7 @@ function ResponsesTab({ formId, form }) {
 
   // ── Export Excel — pakai endpoint backend ────────────────────
   async function handleExport() {
-    if (total === 0) { alert("Belum ada data untuk diekspor."); return; }
+    if (total === 0) { setExportAlert({ type: "alert", title: "Tidak Ada Data", message: "Belum ada data untuk diekspor." }); return; }
     setExporting(true);
     try {
       const res = await fetch(`${FORM_API_URL}/form/submit/export-excel?form_slug=${formSlug}`, {
@@ -1041,11 +1052,11 @@ function ResponsesTab({ formId, form }) {
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        alert("Gagal mengekspor: " + (errData?.message || `Error ${res.status}`));
+        setExportAlert({ type: "error", title: "Gagal Ekspor", message: errData?.message || `Error ${res.status}` });
         return;
       }
       const blob = await res.blob();
-      if (blob.size === 0) { alert("File kosong, tidak ada data."); return; }
+      if (blob.size === 0) { setExportAlert({ type: "alert", title: "File Kosong", message: "Tidak ada data untuk diekspor." }); return; }
       const url = URL.createObjectURL(blob);
       const a   = document.createElement("a");
       a.href    = url;
@@ -1055,11 +1066,12 @@ function ResponsesTab({ formId, form }) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e) {
-      alert("Gagal mengekspor: " + (e.message || "Error tidak diketahui"));
+      setExportAlert({ type: "error", title: "Gagal Ekspor", message: e.message || "Error tidak diketahui" });
     } finally { setExporting(false); }
   }
 
   return (
+    <>
     <div className="min-h-full px-8 py-6 pb-16 transition-colors"
       style={{ background: "linear-gradient(135deg, var(--fm-bg) 0%, var(--fm-bg-2) 55%, var(--fm-bg-3) 100%)" }}>
 
@@ -1211,6 +1223,14 @@ function ResponsesTab({ formId, form }) {
         )}
       </div>
     </div>
+    <AlertModal
+      open={!!exportAlert}
+      type={exportAlert?.type ?? "alert"}
+      title={exportAlert?.title}
+      message={exportAlert?.message}
+      onConfirm={() => setExportAlert(null)}
+    />
+    </>
   );
 }
 
