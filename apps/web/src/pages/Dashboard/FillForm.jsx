@@ -774,7 +774,7 @@ export default function FillForm() {
                             : <span className="w-3 h-3 rounded-full bg-white" />)}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <span className="text-[15px] font-medium block">{fallbackLabel(opt, oi)}</span>
+                          <RichTextDisplay content={opt.value?.trim() || opt.option_value?.trim() || `Opsi ${oi + 1}`} className="text-[15px] font-medium" />
                           {optImage && (
                             <img src={optImage} alt={fallbackLabel(opt, oi)}
                               className="mt-2.5 w-full max-h-52 object-contain rounded-xl border border-[#d4e5fa]" />
@@ -900,7 +900,7 @@ function SoalItem({ soal, idx, answers, setAnswer, toggleOption, errorSoalId, so
                     : <span className="w-3 h-3 rounded-full bg-white" />)}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <span className="text-[15px] font-medium text-gray-700 block">{fallbackLabel(opt, oi)}</span>
+                  <RichTextDisplay content={opt.value?.trim() || opt.option_value?.trim() || `Opsi ${oi + 1}`} className="text-[15px] font-medium text-gray-700" />
                   {optImage && (
                     <img src={optImage} alt={fallbackLabel(opt, oi)}
                       className="mt-2.5 w-full max-h-55 object-contain rounded-xl border border-[#d4e5fa]" />

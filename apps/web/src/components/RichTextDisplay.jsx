@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import 'quill/dist/quill.snow.css';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
+import renderMathInElement from 'katex/contrib/auto-render';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github.css';
 
@@ -19,11 +20,14 @@ function renderMath(expr, display) {
   const isLatex = /\\[a-zA-Z{([\\]/.test(expr);
   if (isLatex) {
     try {
-      return katex.renderToString(expr.trim(), {
+      const rendered = katex.renderToString(expr.trim(), {
         displayMode: display,
         throwOnError: false,
         output: 'html',
       });
+      // Bungkus dalam span dengan font-size eksplisit agar bisa dikontrol CSS
+      const cls = display ? 'katex-display-wrap' : 'katex-inline-wrap';
+      return `<span class="${cls}">${rendered}</span>`;
     } catch {
       // fallback ke unicode display
     }
@@ -181,21 +185,112 @@ function renderInlineText(text) {
   return html;
 }
 
+// ── Strip HTML tags dari dalam ekspresi math, konversi <sup> → ^{} ──────────
+function stripHtmlFromMath(expr) {
+  // Konversi <sup>...</sup> → ^{...} (Quill mengubah pangkat jadi <sup>)
+  let result = expr.replace(/<sup[^>]*>([\s\S]*?)<\/sup>/gi, (_, inner) => {
+    const text = inner.replace(/<[^>]+>/g, '').trim();
+    return text.length === 1 ? `^${text}` : `^{${text}}`;
+  });
+  // Konversi <sub>...</sub> → _{...}
+  result = result.replace(/<sub[^>]*>([\s\S]*?)<\/sub>/gi, (_, inner) => {
+    const text = inner.replace(/<[^>]+>/g, '').trim();
+    return text.length === 1 ? `_${text}` : `_{${text}}`;
+  });
+  // Strip sisa tag HTML
+  result = result.replace(/<[^>]+>/g, '');
+  // Decode HTML entities
+  result = result
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+  return result;
+}
+
+// ── Cek apakah string terlihat seperti ekspresi math (ada pangkat, operasi) ──
+function looksLikeMath(text) {
+  return /[a-zA-Z]\^/.test(text) ||      // a^2, x^n
+         /[0-9]\^/.test(text) ||          // 2^3
+         /[a-zA-Z]_[0-9a-zA-Z]/.test(text) || // x_n, a_1
+         /\^[{0-9a-zA-Z]/.test(text);    // ^2, ^{...}
+}
+
+// ── Konversi satu segmen teks HTML (dalam satu blok) yang mengandung <sup>/<sub> ──
+function convertSupSubToKatex(segment) {
+  // Ambil teks plain dari segmen (dengan konversi sup/sub ke LaTeX)
+  const latexExpr = stripHtmlFromMath(segment);
+  if (!latexExpr.trim()) return segment;
+  if (!looksLikeMath(latexExpr)) return segment;
+  try {
+    return katex.renderToString(latexExpr.trim(), {
+      throwOnError: true,
+      output: 'html',
+    });
+  } catch {
+    return segment; // fallback
+  }
+}
+
 // ── Post-process HTML dari Quill ─────────────────────────────────────────────
 function processQuillHtml(html) {
   if (!html) return '';
 
-  // 1. Display math $$...$$
-  html = html.replace(/\$\$([\s\S]+?)\$\$/g, (_, expr) =>
-    `<span class="katex-display-wrap">${renderMath(expr, true)}</span>`
-  );
+  // 1. Display math $$...$$ — strip inner HTML tags dulu
+  html = html.replace(/\$\$([\s\S]+?)\$\$/g, (_, expr) => {
+    const clean = stripHtmlFromMath(expr);
+    return `<span class="katex-display-wrap">${renderMath(clean, true)}</span>`;
+  });
 
-  // 2. Inline math $...$
-  html = html.replace(/\$([^$\n<>]+?)\$/g, (_, expr) =>
-    renderMath(expr, false)
-  );
+  // 2. Inline math $...$ — tangani kasus ada tag HTML di dalam $...$
+  html = html.replace(/\$((?:[^$]|<[^>]+>)+?)\$/g, (match, expr) => {
+    const clean = stripHtmlFromMath(expr).trim();
+    if (!clean) return match;
+    return renderMath(clean, false);
+  });
 
-  // 3. <pre> code blocks dari Quill
+  // 3. Handle ekspresi math di luar $...$ dalam <p> tag
+  //    Kasus A: Quill <sup>/<sub> mewakili pangkat  → <p>x<sup>2</sup></p>
+  //    Kasus B: User ketik ^ langsung sebagai teks   → <p>a^2-b^3</p>
+  html = html.replace(/<p([^>]*)>([\s\S]*?)<\/p>/gi, (fullMatch, attrs, inner) => {
+    // Sudah dihandle dollar sign di atas
+    if (/\$/.test(inner)) return fullMatch;
+
+    // Dapatkan teks bersih dari inner HTML
+    const plainText = stripHtmlFromMath(inner).trim();
+
+    // Cek apakah terlihat seperti ekspresi math
+    if (!looksLikeMath(plainText)) return fullMatch;
+
+    // Coba render seluruh ekspresi sebagai KaTeX
+    try {
+      const rendered = katex.renderToString(plainText, {
+        throwOnError: true,
+        output: 'html',
+      });
+      const cls = 'katex-inline-wrap';
+      return `<p${attrs}><span class="${cls}">${rendered}</span></p>`;
+    } catch {
+      // Kalau gagal render sekaligus, coba split per token math
+      // dan render bagian-bagian yang mengandung ^ atau _ saja
+      const converted = plainText.replace(
+        /([a-zA-Z0-9]+(?:\^[{]?[a-zA-Z0-9]+[}]?|_[{]?[a-zA-Z0-9]+[}]?)+)/g,
+        (seg) => {
+          if (!looksLikeMath(seg)) return escapeHtml(seg);
+          try {
+            const r = katex.renderToString(seg, { throwOnError: true, output: 'html' });
+            return `<span class="katex-inline-wrap">${r}</span>`;
+          } catch { return escapeHtml(seg); }
+        }
+      );
+      // Escape karakter non-math yang tersisa
+      return `<p${attrs}>${converted}</p>`;
+    }
+  });
+
+  // 4. <pre> code blocks dari Quill
   html = html.replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gi, (_, inner) => {
     const decoded = inner
       .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
@@ -213,9 +308,29 @@ export default function RichTextDisplay({ content, className = '' }) {
 
   useEffect(() => {
     if (!containerRef.current) return;
+
+    // Syntax highlight code blocks
     containerRef.current.querySelectorAll('pre code.hljs').forEach((block) => {
       hljs.highlightElement(block);
     });
+
+    // Auto-render LaTeX: scan semua $...$ dan $$...$$ di dalam elemen,
+    // termasuk yang ada di dalam tag HTML dari Quill (span, p, dll)
+    try {
+      renderMathInElement(containerRef.current, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$',  right: '$',  display: false },
+        ],
+        throwOnError: false,
+        output: 'html',
+        // Jangan masuk ke dalam elemen yang sudah dirender katex
+        ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+        ignoredClasses: ['katex', 'katex-display'],
+      });
+    } catch {
+      // ignore render errors
+    }
   }, [content]);
 
   if (!content) return null;
