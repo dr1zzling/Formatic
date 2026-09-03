@@ -5,10 +5,12 @@
 exports.up = function(knex) {
   return knex.schema.createTable('form_submit', function(table) {
     table.increments()
-    table.integer('user_id').unsigned().notNullable()
+    table.integer('user_id').notNullable()
+    table.string('user_username').notNullable()
     table.integer('form_id').unsigned().notNullable()
-    table.timestamp('submitted_at', { useTz: true }).defaultTo(knex.fn.now())
-    table.enum('status', ['submitted', 'draft', 'reviewed']).notNullable().defaultTo('submitted')
+    table.timestamp('start_at', { useTz: true }).defaultTo(knex.fn.now())
+    table.timestamp('submitted_at', { useTz: true })
+    table.enum('status', ['progress', 'completed']).notNullable().defaultTo('submitted')
 
     table.foreign('form_id').references('forms.id').onDelete('CASCADE')
   })

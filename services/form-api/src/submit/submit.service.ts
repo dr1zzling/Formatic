@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { KnexService } from "../database/knex.service"
 import { ValidateIsCreator } from "../Pipe/validate.is.creator"
 import { SoalService } from "../soal/soal.service"
@@ -12,22 +12,68 @@ export class SubmitService {
     private soalService: SoalService
   ) { }
 
+  // Insert/Update form_submit
+  async changeFormSubmit(event, user_id: number, form_id: number, status: string, submitted_at?: number){
+    if(event == "insert"){
+      const [insertFormSubmit] = await this.knexService.connection("form_submit")
+      .insert({ user_id: user_id, form_id: form_id, status: status })
+      .returning("*")
+
+      return insertFormSubmit
+    }
+
+    if(event == "update"){
+      const [update] = await this.knexService.connection("form_submit")
+      .update({ status: status, submitted_at: submitted_at })
+      .where({user_id: user_id, form_id: form_id})
+
+      const getUpdate = await this.knexService.connection("forms_submit")
+      .select("*")
+      .where({user_id: user_id, form_id: form_id})
+      .first("*")
+
+      return getUpdate
+    }
+
+    return false
+  }
+
   // Check Token
   async checkTokenResponden(req: { id: number }, form: any, token: string) {
     const checkRole = await this.isCreator.isCreator(req.id, form.id)
+    if (checkRole != false) throw new ForbiddenException("Anda Tidak Berhak Sebagai Responden")
 
-    if (checkRole != false) throw new UnauthorizedException("Anda Tidak Berhak Sebagai Responden")
+    const isAlreadyProgress = await this.knexService.connection("form_submit")
+    .select("id")
+    .where({form_id: form.id, user_id: req.id})
+    .first()
 
-    if (form.token_respon == null) return { message: "Berhasil" }
+    if(isAlreadyProgress) throw new ForbiddenException("Anda sedang mengerjakan, harap minta creator untuk mereset")
+
+    if (form.token_respon == null) {
+      const insertFormSubmit = await this.changeFormSubmit("insert", req.id, form.id, "progress")
+
+      return {
+        message: "Berhasil",
+        data: insertFormSubmit
+      }
+    }
+
     if (form.token_respon != token) throw new BadRequestException("Token Salah")
 
+    const insertFormSubmit = await this.changeFormSubmit("insert", req.id, form.id, "progress")
+
     return {
-      message: "Berhasil"
+      message: "Berhasil",
+      data: insertFormSubmit
     }
   }
 
   // Get All Submit By Form
   async getAllSubmitByForm(req: { id: number }, form: any) {
+    const checkRole = await this.isCreator.isCreator(req.id, form.id)
+    if(checkRole == false) throw new ForbiddenException("Anda Tidak Berhak")
+
     const getSoal: any[] = await this.soalService.getSoalByForm(form.id, form.is_random)
 
     const totalSubmit = await this.knexService.connection('form_submit')
@@ -92,9 +138,10 @@ export class SubmitService {
     }
   }
 
+  // Get All Submit Detail
   async getAllSubmitResponseByForm(req: { id: number }, form: any) {
     const checkRole = await this.isCreator.isCreator(req.id, form.id)
-    if (checkRole === false) throw new UnauthorizedException("Anda Tidak Berhak")
+    if (checkRole === false) throw new ForbiddenException("Anda Tidak Berhak")
 
     const getSoal: any[] = await this.soalService.getSoalByForm(form.id, form.is_random)
 
@@ -183,7 +230,25 @@ export class SubmitService {
     }
   }
 
+  // Monitoring 
+  async monitoringSubmit(req: { id: number}, form: any){
+    const checkRole = await this.isCreator.isCreator(req.id, form.id)
+    if(checkRole === false) throw new ForbiddenException("Anda Tidak Berhak")
+
+    const getAllStatusSubmit = await this.knexService.connection("form_submit")
+    .select("user_id", "start_at", "submitted_at", "status")
+
+    return {
+      message: "Berhasil mendapatkan status submit",
+      status: getAllStatusSubmit
+    }
+  }
+
+  // Export Excel
   async exportSubmitResponseToExcel(req: { id: number }, form: any): Promise<Buffer> {
+    const checkRole = await this.isCreator.isCreator(req.id, form.id)
+    if(checkRole == false) throw new ForbiddenException("Anda Tidak Berhak")
+
     const response = await this.getAllSubmitResponseByForm(req, form)
     const pageData = response.data || []
 
@@ -288,9 +353,10 @@ export class SubmitService {
     return Buffer.from(buffer)
   }
 
+  // Submit Form
   async submitForm(req: { id: number }, form: any, data: string, files: Express.Multer.File[] = []) {
     const checkRole = await this.isCreator.isCreator(req.id, form.id)
-    if (checkRole != false) throw new UnauthorizedException("Anda Tidak Berhak Sebagai Responden")
+    if (checkRole != false) throw new ForbiddenException("Anda Tidak Berhak Sebagai Responden")
 
     let payload: any[]
     try {
@@ -348,17 +414,15 @@ export class SubmitService {
       const existingSubmit = await trx('form_submit')
         .where({ user_id: req.id, form_id: form.id })
         .first()
-      if (existingSubmit) throw new ConflictException("Anda sudah mengisi form ini")
+      if (existingSubmit.status == "completed") throw new ConflictException("Anda sudah mengisi form ini")
 
-      const [submitted] = await trx('form_submit')
-        .insert({ user_id: req.id, form_id: form.id, status: 'submitted' })
-        .returning(['id', 'submitted_at', 'status'])
+      const updateToCompleted = await this.changeFormSubmit("update", req.id, form.id, "completed", this.knexService.connection.fn.now())
 
       await trx('user_answer').insert(
-        answers.map((answer) => ({ ...answer, submitted_id: submitted.id }))
+        answers.map((answer) => ({ ...answer, submitted_id: updateToCompleted.id }))
       )
 
-      return submitted
+      return updateToCompleted
     })
 
     return {

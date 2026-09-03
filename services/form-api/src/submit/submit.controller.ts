@@ -43,6 +43,15 @@ export class SubmitController {
     return this.submitService.getAllSubmitResponseByForm(req.user, form_slug)
   }
 
+  @Get('/monitoring')
+  @UseGuards(JwtAuthGuard)
+  monitoringSubmit(
+    @Request() req,
+    @Query('form_slug', ValidateFormExist) form_slug
+  ){
+    return this.submitService.monitoringSubmit(req.user, form_slug)
+  }
+
   // Download Excel
   @Get('/export-excel')
   @UseGuards(JwtAuthGuard)

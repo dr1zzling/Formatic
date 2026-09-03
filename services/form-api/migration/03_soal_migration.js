@@ -12,6 +12,7 @@ exports.up = function(knex) {
         table.decimal('score', 10, 2).nullable()
         table.integer('page').defaultTo(1)
         table.text('audio').nullable()
+        table.boolean('is_required')
         
         table.foreign('form_id').references('forms.id').onDelete('CASCADE')
     })

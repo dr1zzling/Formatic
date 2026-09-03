@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Home, FileText, Trash2, LogOut, User, ChevronDown, Clock, History } from "lucide-react";
+import { Home, FileText, Trash2, LogOut, User, ChevronDown, History } from "lucide-react";
+import { useTheme } from "../context/ThemeContext";
 
 function getUser() {
   const token = localStorage.getItem("token");
@@ -30,6 +31,7 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const [user, setUser]         = useState({ username: "User", initial: "U" });
   const [dropdown, setDropdown] = useState(false);
+  const { dark, toggle }        = useTheme();
 
   useEffect(() => { setUser(getUser()); }, []);
 
@@ -47,8 +49,11 @@ export default function Sidebar() {
     <>
       {/* ── Desktop sidebar ───────────────────────── */}
       <aside
-        className="hidden md:flex w-[220px] xl:w-[240px] min-w-[220px] h-screen sticky top-0 shrink-0 flex-col"
-        style={{ background: "linear-gradient(180deg,#06245a 0%,#0a438f 48%,#257dc6 100%)" }}
+        className="hidden md:flex w-[220px] xl:w-[240px] min-w-[220px] h-screen sticky top-0 shrink-0 flex-col transition-all duration-300"
+        style={{ background: dark
+          ? "linear-gradient(180deg,#0d1117 0%,#111827 48%,#161d2b 100%)"
+          : "linear-gradient(180deg,#06245a 0%,#0a438f 48%,#257dc6 100%)"
+        }}
       >
         {/* Brand */}
         <div className="flex items-center gap-3 px-6 pt-7 pb-10">
@@ -74,8 +79,33 @@ export default function Sidebar() {
           })}
         </nav>
 
-        {/* User footer */}
+        {/* Theme toggle + User footer */}
         <div className="px-4 py-4 relative">
+          {/* Dark/Light toggle */}
+          <button
+            onClick={toggle}
+            className="w-full flex items-center gap-3 py-2.5 px-3 rounded-xl border-none cursor-pointer mb-2 transition-all"
+            style={{ background: dark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.06)" }}
+          >
+            {/* Track */}
+            <div className="relative w-11 h-6 rounded-full shrink-0 transition-all duration-300"
+              style={{ background: dark ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.15)" }}>
+              {/* Icons inside track */}
+              <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[11px] transition-opacity duration-200"
+                style={{ opacity: dark ? 0 : 1 }}>☀️</span>
+              <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[11px] transition-opacity duration-200"
+                style={{ opacity: dark ? 1 : 0 }}>🌙</span>
+              {/* Thumb */}
+              <span className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all duration-300 flex items-center justify-center text-[10px]"
+                style={{ left: dark ? "calc(100% - 22px)" : "2px" }}>
+                {dark ? "🌙" : "☀️"}
+              </span>
+            </div>
+            <span className="text-[13px] font-medium text-white/80 flex-1 text-left">
+              {dark ? "Mode Gelap" : "Mode Terang"}
+            </span>
+          </button>
+
           <div className="h-px bg-white/15 mb-3" />
           <button onClick={() => setDropdown(v => !v)}
             className="w-full flex items-center gap-3 py-2.5 px-3 rounded-xl bg-transparent border-none cursor-pointer hover:bg-white/10 transition-colors"
@@ -108,18 +138,28 @@ export default function Sidebar() {
 
       {/* ── Mobile top bar (logo only, no hamburger) ── */}
       <header
-        className="md:hidden fixed top-0 inset-x-0 z-40 flex items-center px-4 h-[52px]"
-        style={{ background: "linear-gradient(90deg,#06245a,#0a438f)" }}
+        className="md:hidden fixed top-0 inset-x-0 z-40 flex items-center justify-between px-4 h-[52px] transition-all duration-300"
+        style={{ background: dark
+          ? "linear-gradient(90deg,#0d1117,#111827)"
+          : "linear-gradient(90deg,#06245a,#0a438f)"
+        }}
       >
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center text-[13px] font-extrabold text-[#1251aa]">F</div>
           <span className="text-[15px] font-bold text-white">Formatic</span>
         </div>
+        {/* Mobile dark mode toggle */}
+        <button onClick={toggle}
+          className="w-9 h-9 rounded-xl flex items-center justify-center text-lg transition-all active:scale-90"
+          style={{ background: dark ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.1)" }}
+        >
+          {dark ? "☀️" : "🌙"}
+        </button>
       </header>
 
       {/* ── Mobile bottom nav ─────────────────────── */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200 shadow-[0_-2px_12px_rgba(0,0,0,0.08)]"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t shadow-[0_-2px_12px_rgba(0,0,0,0.08)] transition-colors"
+        style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-border)", paddingBottom: "env(safe-area-inset-bottom)" }}>
         <div className="flex">
           {BOTTOM_NAV.map(({ id, label, path, Icon }) => {
             const on = isActive({ id, path });

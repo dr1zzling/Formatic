@@ -65,7 +65,7 @@ export class FormController {
       }),
     )
     banner: Express.Multer.File,
-    @Body() body: { title: string; category: string, token_respon: string },
+    @Body() body: { title: string; category: string, token_respon: string, theme_color: string },
   ) {
     if (!body.title || !body.category) {
       throw new BadRequestException('Judul dan kategori wajib diisi');
@@ -120,7 +120,7 @@ export class FormController {
   updateForm(
     @Request() req,
     @Query('form_slug', ValidateFormExist) form_slug: string,
-    @Body() body: { duration: number, start_at: number, is_random: boolean}
+    @Body() body: { token_respon: string, duration: number, start_at: number, is_random: boolean, theme_color: string}
   ){
     return this.formService.updateForm(req.user, form_slug, body)
   }

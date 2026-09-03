@@ -390,7 +390,7 @@ export default function FormEditor() {
   }
 
   if (loading) return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: "linear-gradient(135deg, var(--fm-bg) 0%, var(--fm-bg-2) 60%, var(--fm-bg-3) 100%)" }}>
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <div className="w-10 h-10 border-2 border-[#1a4fa0] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
@@ -401,7 +401,7 @@ export default function FormEditor() {
   );
 
   if (error && !form) return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: "linear-gradient(135deg, var(--fm-bg) 0%, var(--fm-bg-2) 60%, var(--fm-bg-3) 100%)" }}>
       <div className="flex-1 flex items-center justify-center text-center px-4">
         <div>
           <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center text-2xl mx-auto mb-4">😕</div>
@@ -416,11 +416,12 @@ export default function FormEditor() {
   const isPublished = form?.status === "public" || form?.form_status === "public";
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "linear-gradient(135deg,#f7fafd 0%,#eef5fb 60%,#e6f0f9 100%)" }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: "linear-gradient(135deg, var(--fm-bg) 0%, var(--fm-bg-2) 60%, var(--fm-bg-3) 100%)" }}>
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden pt-[52px] md:pt-0">
         {/* ── Top Bar ───────────────────────────────────── */}
-        <header className="flex items-center gap-3 px-4 md:px-6 xl:px-9 py-3.5 border-b border-[#dae6f1] bg-white/95 backdrop-blur shrink-0" style={{ boxShadow: "0 1px 0 rgba(23,64,120,0.04), 0 6px 18px rgba(23,64,120,0.05)" }}>
+        <header className="flex items-center gap-3 px-4 md:px-6 xl:px-9 py-3.5 border-b backdrop-blur shrink-0 transition-colors"
+          style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-border)", boxShadow: "0 1px 0 rgba(23,64,120,0.04), 0 6px 18px rgba(23,64,120,0.05)" }}>
           <button onClick={() => navigate("/my-forms")} className="w-10 h-10 rounded-xl hover:bg-[#eef5fb] flex items-center justify-center text-gray-500 hover:text-[#1a4fa0] transition-all">
             <ArrowLeft size={19} />
           </button>
@@ -570,6 +571,26 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ,
   const [scoreType, setScoreType] = useState(() =>
     localStorage.getItem(`score_type_${form?.slug ?? slug}`) ?? "none"
   );
+
+  // Lock state — simpan set soal ID yang dikunci di localStorage
+  const lockKey = `locked_soal_${form?.slug ?? slug}`;
+  const [lockedIds, setLockedIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`locked_soal_${form?.slug ?? slug}`);
+      return new Set(saved ? JSON.parse(saved) : []);
+    } catch { return new Set(); }
+  });
+
+  function toggleLock(soalId) {
+    if (!soalId) return; // soal baru (_new) belum punya id, skip
+    setLockedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(soalId)) next.delete(soalId);
+      else next.add(soalId);
+      localStorage.setItem(lockKey, JSON.stringify([...next]));
+      return next;
+    });
+  }
   // Sync saat form berubah
   useEffect(() => {
     const key = `score_type_${form?.slug ?? slug}`;
@@ -643,6 +664,8 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ,
             onShowToast={onShowToast}
             scoreType={scoreType}
             totalSoal={questions.length}
+            isLocked={lockedIds.has(q.id)}
+            onToggleLock={() => toggleLock(q.id)}
           />
         </div>
       ))}
@@ -661,14 +684,14 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ,
 }
 
 /* ── Question Card ──────────────────────────────────────────── */
-function QuestionCard({ question, index, onUpdate, onUpdateOpt, onUpdateOptField, onAddOpt, onRemoveOpt, onToggleCorrect, onRemove, onDuplicate, onDragHandleStart, onDragHandleEnd, onShowToast, scoreType, totalSoal }) {
+function QuestionCard({ question, index, onUpdate, onUpdateOpt, onUpdateOptField, onAddOpt, onRemoveOpt, onToggleCorrect, onRemove, onDuplicate, onDragHandleStart, onDragHandleEnd, onShowToast, scoreType, totalSoal, isLocked, onToggleLock }) {
   const hasOptions = ["radio", "checkbox"].includes(question.type);
   // Semua soal bisa diedit (tidak hanya yang baru)
   const editable = true;
   return (
-    <div className={`bg-white rounded-2xl border shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-6 transition-all hover:shadow-[0_14px_40px_rgba(23,64,120,0.12)] ${
-      question._new ? "border-[#1a4fa0]/50 ring-1 ring-[#1a4fa0]/10" : "border-[#e5eef7]"
-    }`}>
+    <div className={`rounded-2xl border shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-6 transition-all hover:shadow-[0_14px_40px_rgba(23,64,120,0.12)] ${
+      question._new ? "border-[#1a4fa0]/50 ring-1 ring-[#1a4fa0]/10" : ""
+    }`} style={{ backgroundColor: "var(--fm-card)", borderColor: question._new ? undefined : "var(--fm-card-border)" }}>
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-3">
           <button
@@ -909,6 +932,18 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onUpdateOptField
         <div className="flex items-center gap-1">
           <button title="Duplikat" onClick={onDuplicate} className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-400 hover:bg-[#eef5fb] hover:text-[#1a4fa0] transition-all"><Copy size={16} /></button>
           <button title="Hapus" onClick={onRemove} className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all"><Trash2 size={16} /></button>
+          {/* Tombol lock — kunci posisi soal agar tidak ikut shuffle */}
+          <button
+            title={isLocked ? "Soal terkunci (tidak diacak) — klik untuk buka kunci" : "Kunci posisi soal (tidak ikut shuffle)"}
+            onClick={onToggleLock}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+              isLocked
+                ? "bg-amber-50 text-amber-500 hover:bg-amber-100"
+                : "text-gray-300 hover:bg-[#eef5fb] hover:text-[#1a4fa0]"
+            }`}
+          >
+            {isLocked ? <span className="text-[16px]">🔒</span> : <span className="text-[16px]">🔓</span>}
+          </button>
         </div>
 
         <div className="flex items-center gap-3">
@@ -947,6 +982,7 @@ function ResponsesTab({ formId, form }) {
   const [summary, setSummary]           = useState(null);
   const [loading, setLoading]           = useState(true);
   const [activeSubTab, setActiveSubTab] = useState("Ringkasan");
+  const [exporting, setExporting]       = useState(false);
 
   useEffect(() => {
     if (!formSlug) { setLoading(false); return; }
@@ -957,16 +993,46 @@ function ResponsesTab({ formId, form }) {
   }, [formSlug]);
 
   const total     = summary?.total_submit ?? 0;
-  // Backend return questions sebagai array of pages [{page, soal:[]}] — flatten
   const rawQ      = summary?.questions ?? [];
-  const questions = rawQ.length > 0 && rawQ[0]?.soal
+  const questionsFlat = rawQ.length > 0 && rawQ[0]?.soal
     ? rawQ.flatMap(pg => pg.soal ?? [])
     : rawQ;
+  // Deduplicate by id supaya tidak double
+  const questions = questionsFlat.filter((q, i, arr) => arr.findIndex(x => x.id === q.id) === i);
   const isPublic  = form?.status === "public" || form?.form_status === "public";
   const title     = form?.title ?? form?.form_title ?? "Form";
 
+  // ── Export Excel — pakai endpoint backend ────────────────────
+  async function handleExport() {
+    if (total === 0) { alert("Belum ada data untuk diekspor."); return; }
+    setExporting(true);
+    try {
+      const res = await fetch(`${FORM_API_URL}/form/submit/export-excel?form_slug=${formSlug}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        alert("Gagal mengekspor: " + (errData?.message || `Error ${res.status}`));
+        return;
+      }
+      const blob = await res.blob();
+      if (blob.size === 0) { alert("File kosong, tidak ada data."); return; }
+      const url = URL.createObjectURL(blob);
+      const a   = document.createElement("a");
+      a.href    = url;
+      a.download = `${(title || "form").replace(/[^a-z0-9]/gi, "_")}_responses.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert("Gagal mengekspor: " + (e.message || "Error tidak diketahui"));
+    } finally { setExporting(false); }
+  }
+
   return (
-    <div className="min-h-full px-8 py-6 pb-16" style={{ background: "linear-gradient(135deg,#ffffff 0%,#f5f9ff 55%,#edf5ff 100%)" }}>
+    <div className="min-h-full px-8 py-6 pb-16 transition-colors"
+      style={{ background: "linear-gradient(135deg, var(--fm-bg) 0%, var(--fm-bg-2) 55%, var(--fm-bg-3) 100%)" }}>
 
       {/* FORM HEADING */}
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
@@ -977,8 +1043,19 @@ function ResponsesTab({ formId, form }) {
           </span>
         </div>
         <div className="flex gap-3">
-          <button className="h-[39px] px-5 rounded-lg bg-[#eef5ff] text-[#075ee0] text-[12px] font-semibold border-none cursor-pointer hover:bg-[#daeaff] transition-colors">↓ Ekspor</button>
-          <button className="h-[39px] px-5 rounded-lg bg-[#075ee0] text-white text-[12px] font-semibold border-none cursor-pointer hover:bg-[#0550c0] transition-colors">Lihat Form ↗</button>
+          <button
+            onClick={handleExport}
+            disabled={exporting || total === 0}
+            className="h-[39px] px-5 rounded-lg bg-[#eef5ff] text-[#075ee0] text-[12px] font-semibold border-none cursor-pointer hover:bg-[#daeaff] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+          >
+            {exporting ? "Mengekspor..." : "↓ Ekspor Excel"}
+          </button>
+          <button
+            onClick={() => window.open(`/fill/${formSlug}`, "_blank")}
+            className="h-[39px] px-5 rounded-lg bg-[#075ee0] text-white text-[12px] font-semibold border-none cursor-pointer hover:bg-[#0550c0] transition-colors"
+          >
+            Lihat Form ↗
+          </button>
         </div>
       </div>
 
@@ -996,9 +1073,6 @@ function ResponsesTab({ formId, form }) {
               {activeSubTab === t && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#075ee0] rounded-t" />}
             </button>
           ))}
-          <button className="ml-auto h-9 px-[14px] border border-[#e0e7f2] rounded-lg bg-white text-[#4c6189] text-[11px] cursor-pointer whitespace-nowrap">
-            ▣ Semua waktu ⌄
-          </button>
         </div>
 
         {/* LOADING */}
@@ -1024,10 +1098,10 @@ function ResponsesTab({ formId, form }) {
             {/* STATISTICS */}
             <div className="grid grid-cols-4 gap-[15px] p-[22px] pb-[10px] max-[900px]:grid-cols-2">
               {[
-                { icon: "♙", color: "bg-[#edf4ff] text-[#075ee0]", label: "Total Respon",         value: total,              sub: "responden" },
-                { icon: "✓", color: "bg-[#eafaf3] text-[#18ae70]", label: "Tingkat Penyelesaian",  value: "100%",             sub: "selesai" },
-                { icon: "◷", color: "bg-[#fff5e8] text-[#ee941c]", label: "Rata-rata Waktu",       value: "—",                sub: "menit" },
-                { icon: "◔", color: "bg-[#f5edff] text-[#8e4de7]", label: "Selesai Hari Ini", value: (() => { const today = new Date().toDateString(); return 0; })(), sub: "responden" },
+                { icon: "♙", color: "bg-[#edf4ff] text-[#075ee0]", label: "Total Respon",        value: total,  sub: "responden" },
+                { icon: "✓", color: "bg-[#eafaf3] text-[#18ae70]", label: "Tingkat Penyelesaian", value: "100%", sub: "selesai" },
+                { icon: "◷", color: "bg-[#fff5e8] text-[#ee941c]", label: "Rata-rata Waktu",      value: "—",    sub: "menit" },
+                { icon: "◔", color: "bg-[#f5edff] text-[#8e4de7]", label: "Selesai Hari Ini",    value: 0,      sub: "responden" },
               ].map((s, i) => (
                 <div key={i} className="min-h-[110px] border border-[#e7edf6] rounded-xl p-[17px] flex items-center gap-[15px] bg-white">
                   <div className={`w-[43px] h-[43px] shrink-0 flex items-center justify-center rounded-[9px] text-[20px] ${s.color}`}>{s.icon}</div>
@@ -1042,7 +1116,7 @@ function ResponsesTab({ formId, form }) {
 
             {/* PER-QUESTION CARDS */}
             {questions.map((q, qi) => {
-              const opts = q.options ?? [];
+              const opts    = q.options ?? [];
               const answered = opts.reduce((s, o) => s + (o.total_answer ?? 0), 0);
               const maxCount = Math.max(...opts.map(o => o.total_answer ?? 0), 1);
 
@@ -1067,22 +1141,25 @@ function ResponsesTab({ formId, form }) {
                       {opts.map((opt, oi) => {
                         const count  = opt.total_answer ?? 0;
                         const pctVal = answered > 0 ? ((count / answered) * 100).toFixed(1) : "0.0";
-                        const barW   = answered > 0 ? `${(count / maxCount) * 100}%` : "0%";
+                        // Bar width max 70% dari container supaya label % tidak tertutupi
+                        const barPct = answered > 0 ? (count / maxCount) * 70 : 0;
                         return (
-                          <div key={oi}>
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-[13px] text-[#364a6e] font-medium truncate max-w-[60%]">
-                                {opt.value ?? opt.option_value ?? `Opsi ${oi+1}`}
+                          <div key={oi} className="flex items-center gap-3">
+                            {/* Label opsi */}
+                            <span className="w-[30%] text-[12px] text-[#364a6e] font-medium truncate shrink-0">
+                              {opt.value ?? opt.option_value ?? `Opsi ${oi+1}`}
+                            </span>
+                            {/* Bar */}
+                            <div className="flex-1 flex items-center gap-2">
+                              <div className="flex-1 h-2.5 bg-[#edf1f7] rounded-full overflow-hidden">
+                                <div
+                                  className="h-full rounded-full transition-all duration-500"
+                                  style={{ width: `${barPct}%`, background: CHART_COLORS[oi % CHART_COLORS.length] }}
+                                />
+                              </div>
+                              <span className="text-[11px] font-bold text-[#142d63] shrink-0 w-[52px] text-right">
+                                {count} <span className="text-[#9aabbd] font-normal">({pctVal}%)</span>
                               </span>
-                              <span className="text-[12px] font-bold text-[#142d63] shrink-0 ml-2">
-                                {count} <span className="text-[#7384a4] font-normal">({pctVal}%)</span>
-                              </span>
-                            </div>
-                            <div className="w-full h-2.5 bg-[#edf1f7] rounded-full overflow-hidden">
-                              <div
-                                className="h-full rounded-full transition-all duration-500"
-                                style={{ width: barW, background: CHART_COLORS[oi % CHART_COLORS.length] }}
-                              />
                             </div>
                           </div>
                         );

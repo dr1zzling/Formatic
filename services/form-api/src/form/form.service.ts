@@ -111,11 +111,15 @@ export class FormService {
   }
 
   // Create Form
-  async create(user: { id: number, username: string }, body: { title: string, category: string, token_respon: string }, banner: Express.Multer.File) {
+  async create(
+    user: { id: number, username: string }, 
+    body: { title: string, category: string, token_respon: string, theme_color: string }, 
+    banner: Express.Multer.File
+  ){
     const slug = slugify(body.title, { lower: true, strict: true })
     const finalSlug = `${slug}-${Date.now()}`
     const bannerPath = `/uploads/banner/${banner.filename}`
-    const tokenCollab = await crypto.randomBytes(64).toString('hex')
+    const tokenCollab = await crypto.randomBytes(8).toString('hex')
 
     const formResult = await this.knexService.connection.transaction(async (trx) => {
 
@@ -180,7 +184,10 @@ export class FormService {
     }
   }
 
-  async updateForm(req: {id: number }, form, body: { duration: number, start_at: number, is_random: boolean}){
+  async updateForm(
+    req: {id: number }, 
+    form, 
+    body: { token_respon: string, duration: number, start_at: number, is_random: boolean, theme_color: string}){
     const isCreator = await this.isCreator.isCreator(req.id, form.id)
     if(isCreator == false) throw new UnauthorizedException("Anda Tidak Berhak Update Form Ini")
 
@@ -188,13 +195,15 @@ export class FormService {
     const updateForm = await this.knexService.connection("forms")
     .update({
       duration: body.duration,
-      start_at: new Date(body.start_at),
-      is_random: body.is_random
+      token_respon: body.token_respon,
+      start_at: body.start_at ? new Date(body.start_at) : null,
+      is_random: body.is_random,
+      theme_color: body.theme_color
     })
     .where("id", form.id)
 
     return {
-      message: "Berhasil Mengubah Waktu Pengerjaan"
+      message: "Berhasil Update"
     }
   }
 

@@ -25,6 +25,7 @@ export class SoalService {
         }
     }
 
+    // Import Word
     async importDocx(form_slug: any, buffer: Buffer) {
         const zip = await JSZip.loadAsync(buffer)
         const documentXml = await zip.file('word/document.xml')?.async('text')
@@ -383,10 +384,7 @@ export class SoalService {
                 }
             }
 
-            let options = getOption.filter((option) => option.soal_id == row.id)
-            if (is_random) {
-                options = shuffleArray(options)
-            }
+            const options = getOption.filter((option) => option.soal_id == row.id)
             acc[row.page].soal.push({
                 id: row.id,
                 question: row.question,
@@ -402,12 +400,7 @@ export class SoalService {
 
         const result = Object.values(grouped) as Array<{ page: number, soal: any[] }>
 
-        return result
-            .sort((a, b) => (a.page ?? 1) - (b.page ?? 1))
-            .map((pageGroup) => ({
-                ...pageGroup,
-                soal: is_random ? shuffleArray(pageGroup.soal) : pageGroup.soal
-            }))
+        return result.sort((a, b) => (a.page ?? 1) - (b.page ?? 1))
     }
 
     // Create Soal And Option
@@ -434,9 +427,10 @@ export class SoalService {
                             score: soal.score,
                             image: soal.image ?? null,
                             audio: soal.audio ?? null,
-                            page: soal.page
+                            page: soal.page,
+                            is_required: soal.is_required
                         })
-                        .returning(['id', 'question', 'type', 'image', 'audio', 'page'])
+                        .returning(['id', 'question', 'type', 'image', 'audio', 'page', 'is_required'])
 
                     if (!optionTypes.includes(soal.type)) return insertSoal
 
@@ -449,8 +443,6 @@ export class SoalService {
                         is_correct: optionList[idx]?.is_correct ?? false
                     }))
 
-                    // PENCEGAHAN ERROR "The query is empty":
-                    // Jika array payload kosong, kembalikan objek tanpa query insert
                     if (payloadSoalOption.length === 0) {
                         return {
                             soal: insertSoal,

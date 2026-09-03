@@ -18,6 +18,6 @@ app.use(
     })
 )
 
-app.listen(3001, () => {
-    console.log("Swagger berjalan di http://localhost:3001/api-docs")
+app.listen(4000, () => {
+    console.log("Swagger berjalan di http://localhost:4000/api-docs")
 })

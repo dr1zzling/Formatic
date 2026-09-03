@@ -15,6 +15,7 @@ exports.up = function(knex) {
     table.integer('duration').nullable()
     table.timestamp('start_at', { useTz: true }).nullable()
     table.text('banner').notNullable()
+    table.string('theme_color')
   })
 };
 
