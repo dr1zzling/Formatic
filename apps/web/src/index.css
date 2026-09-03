@@ -37,6 +37,13 @@
 
 html { transition: color-scheme 0.2s; }
 
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: var(--fm-bg);
@@ -101,8 +108,15 @@ body {
 [data-theme="dark"] .bg-\[\#f0f6fe\],
 [data-theme="dark"] .bg-\[\#edf4ff\],
 [data-theme="dark"] .bg-\[\#f7fafd\],
-[data-theme="dark"] .bg-\[\#f8fafc\] {
+[data-theme="dark"] .bg-\[\#f8fafc\],
+[data-theme="dark"] .bg-\[\#f5f9ff\],
+[data-theme="dark"] .bg-\[\#faf9ff\] {
   background-color: var(--fm-hover) !important;
+}
+
+[data-theme="dark"] .border-\[\#c3d4e4\],
+[data-theme="dark"] .border-dashed {
+  border-color: #2a3a54 !important;
 }
 
 /* ── Dark mode: semua teks utama yang tidak tertangkap ───────── */
@@ -166,18 +180,39 @@ body {
   border-color: var(--fm-card-border) !important;
 }
 
-[data-theme="dark"] .bg-purple-50 {
-  background-color: #1e1a2e !important;
-}
+[data-theme="dark"] .bg-blue-50 { background-color: #0f2236 !important; }
+[data-theme="dark"] .bg-blue-100 { background-color: #0f2236 !important; }
+[data-theme="dark"] .border-blue-100 { border-color: #1a3a5c !important; }
+[data-theme="dark"] .border-blue-200 { border-color: #1a3a5c !important; }
+[data-theme="dark"] .text-blue-700 { color: #7ab3ef !important; }
 
-[data-theme="dark"] .border-purple-200 {
-  border-color: #3d2d5c !important;
-}
+[data-theme="dark"] .bg-amber-50 { background-color: #1f1a0f !important; }
+[data-theme="dark"] .bg-yellow-50 { background-color: #1f1a0f !important; }
+[data-theme="dark"] .border-amber-100 { border-color: #3d2e0a !important; }
+[data-theme="dark"] .border-amber-200 { border-color: #3d2e0a !important; }
+[data-theme="dark"] .border-amber-300 { border-color: #5a4010 !important; }
+[data-theme="dark"] .text-amber-700 { color: #fbbf24 !important; }
+[data-theme="dark"] .text-amber-600 { color: #f59e0b !important; }
 
-[data-theme="dark"] .text-purple-700,
-[data-theme="dark"] .text-purple-600 {
-  color: #b794f4 !important;
-}
+[data-theme="dark"] .bg-indigo-50 { background-color: #0f1230 !important; }
+[data-theme="dark"] .border-indigo-100 { border-color: #1e2560 !important; }
+[data-theme="dark"] .text-indigo-700 { color: #a5b4fc !important; }
+
+[data-theme="dark"] .bg-violet-50 { background-color: #160d2a !important; }
+[data-theme="dark"] .border-violet-300 { border-color: #4c1d95 !important; }
+[data-theme="dark"] .text-violet-700 { color: #c4b5fd !important; }
+[data-theme="dark"] .hover\:bg-violet-100:hover { background-color: #1e1040 !important; }
+
+[data-theme="dark"] .bg-green-50 { background-color: #0a1f12 !important; }
+[data-theme="dark"] .border-green-100 { border-color: #14401e !important; }
+[data-theme="dark"] .text-green-700 { color: #4ade80 !important; }
+
+[data-theme="dark"] .bg-white\/90 { background-color: rgba(26,34,53,0.92) !important; }
+[data-theme="dark"] .bg-white\/95 { background-color: rgba(26,34,53,0.96) !important; }
+[data-theme="dark"] .bg-red-50 { background-color: #1f0a0a !important; }
+[data-theme="dark"] .border-red-100 { border-color: #3d1414 !important; }
+[data-theme="dark"] .text-red-400 { color: #f87171 !important; }
+[data-theme="dark"] .text-red-500 { color: #ef4444 !important; }
 
 /* ── Dark mode: option input bg warna lain ───────────────────── */
 [data-theme="dark"] .bg-\[\#eef2f6\] {
@@ -194,23 +229,45 @@ body {
 }
 
 /* ── Dark mode: teks di dalam card/soal ─────────────────────── */
-[data-theme="dark"] .text-\[\#364a6e\],
-[data-theme="dark"] .text-\[\#1a4fa0\] {
-  color: #7ab3ef !important;
+[data-theme="dark"] .text-\[\#364a6e\] { color: #a8c4e0 !important; }
+[data-theme="dark"] .text-\[\#1a4fa0\] { color: #7ab3ef !important; }
+[data-theme="dark"] .text-\[\#102f56\] { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-\[\#102f68\] { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-\[\#142d63\] { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-\[\#17366d\] { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-\[\#103b86\] { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-\[\#183056\] { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-\[\#1b3d6e\] { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-gray-900 { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-gray-800 { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-gray-700 { color: #d0dff0 !important; }
+[data-theme="dark"] .text-gray-600 { color: #b0c4d8 !important; }
+[data-theme="dark"] .text-gray-500 { color: #8fa8c8 !important; }
+[data-theme="dark"] .text-gray-400 { color: #7090b0 !important; }
+[data-theme="dark"] .text-\[\#64779d\] { color: #8fa8c8 !important; }
+[data-theme="dark"] .text-\[\#7284a3\] { color: #8fa8c8 !important; }
+[data-theme="dark"] .text-\[\#7384a4\] { color: #8fa8c8 !important; }
+[data-theme="dark"] .text-\[\#8195b2\] { color: #8fa8c8 !important; }
+[data-theme="dark"] .text-\[\#8ca0ba\] { color: #8fa8c8 !important; }
+[data-theme="dark"] .text-\[\#7088a8\] { color: #8fa8c8 !important; }
+[data-theme="dark"] .text-\[\#879bb5\] { color: #7090b0 !important; }
+[data-theme="dark"] .text-\[\#7290a9\] { color: #8fa8c8 !important; }
+
+/* ── Dark mode: semua p/span/h yang tidak punya class teks ────── */
+[data-theme="dark"] body { color: var(--fm-text); }
+[data-theme="dark"] button:not([class*="text-white"]):not([class*="text-blue"]):not([class*="text-red"]):not([class*="text-green"]):not([class*="text-amber"]):not([class*="text-violet"]):not([class*="text-purple"]):not([class*="text-indigo"]) {
+  color: var(--fm-text);
 }
 
-[data-theme="dark"] .text-\[\#102f56\],
-[data-theme="dark"] .text-gray-700,
-[data-theme="dark"] .text-gray-800,
-[data-theme="dark"] .text-gray-900 {
-  color: var(--fm-text) !important;
-}
+/* ── Dark mode: strong/b tag ─────────────────────────────────── */
+[data-theme="dark"] strong, [data-theme="dark"] b { color: var(--fm-text) !important; }
 
-[data-theme="dark"] .text-gray-500,
-[data-theme="dark"] .text-gray-600,
-[data-theme="dark"] .text-gray-400 {
-  color: var(--fm-text-2) !important;
-}
+/* ── Dark mode: placeholder ──────────────────────────────────── */
+[data-theme="dark"] ::placeholder { color: #4a6080 !important; }
+
+/* ── Dark mode: hr dan divider ───────────────────────────────── */
+[data-theme="dark"] .h-px { background-color: var(--fm-border) !important; }
+[data-theme="dark"] .divide-gray-100 > * + * { border-color: var(--fm-border) !important; }
 
 
 @layer utilities {
@@ -224,6 +281,70 @@ body {
   .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+}
+
+/* ── Option Quill (compact WYSIWYG untuk opsi jawaban) ───────────────────── */
+.option-quill-wrapper .ql-toolbar.ql-snow {
+  border: none;
+  border-bottom: 1px solid #e5eef7;
+  background-color: #f8fafc;
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+  padding: 4px 8px;
+}
+
+.option-quill-wrapper .ql-container.ql-snow {
+  border: none;
+  font-family: inherit;
+  font-size: 14px;
+  min-height: 36px;
+}
+
+.option-quill-wrapper .ql-editor {
+  min-height: 36px;
+  max-height: 120px;
+  overflow-y: auto;
+  padding: 6px 10px;
+  color: #374151;
+  line-height: 1.5;
+}
+
+.option-quill-wrapper .ql-editor.ql-blank::before {
+  color: #9ca3af;
+  font-style: normal;
+  left: 10px;
+}
+
+.option-quill-wrapper .ql-toolbar.ql-snow .ql-formats {
+  margin-right: 6px;
+}
+
+/* Dark mode */
+[data-theme="dark"] .option-quill-wrapper {
+  border-color: var(--fm-card-border) !important;
+}
+
+[data-theme="dark"] .option-quill-wrapper .ql-toolbar.ql-snow {
+  background-color: #1a2538 !important;
+  border-color: var(--fm-card-border) !important;
+}
+
+[data-theme="dark"] .option-quill-wrapper .ql-container.ql-snow,
+[data-theme="dark"] .option-quill-wrapper .ql-editor {
+  background-color: var(--fm-input-bg) !important;
+  color: var(--fm-text) !important;
+}
+
+[data-theme="dark"] .option-quill-wrapper .ql-editor.ql-blank::before {
+  color: var(--fm-text-3) !important;
+}
+
+[data-theme="dark"] .option-quill-wrapper .ql-stroke {
+  stroke: #8fa8cc !important;
+}
+
+[data-theme="dark"] .option-quill-wrapper .ql-fill {
+  fill: #8fa8cc !important;
 }
 
 /* Quill Custom Styling */
@@ -318,22 +439,23 @@ code.inline-code {
 .katex-display-wrap {
   display: block;
   text-align: center;
-  margin: 8px 0;
+  margin: 12px 0;
   overflow-x: auto;
+  /* KaTeX pakai em, jadi perbesar font-size di wrapper = KaTeX ikut membesar */
+  font-size: 1.5rem;
 }
 
-.katex-display-wrap .katex {
-  font-size: 1.1em;
+.katex-inline-wrap {
+  display: inline;
+  /* font-size di wrapper akan di-inherit oleh .katex yang pakai em */
+  font-size: 1.35rem;
+  line-height: 1.8;
 }
 
 /* ── RichTextDisplay container ────────────────────────────────────────────── */
 .rich-display {
   line-height: 1.6;
   word-break: break-word;
-}
-
-.rich-display .katex {
-  font-size: 1em;
 }
 
 /* ── Quill code-block toolbar icon hint ──────────────────────────────────── */

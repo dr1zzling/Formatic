@@ -124,14 +124,14 @@ function AnimatedContent({ children }) {
   const isAuth = AUTH_PATHS.some(p => location.pathname === p || location.pathname.startsWith(p));
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
+    <div style={{ display: "flex", minHeight: "100dvh", width: "100%" }}>
       {/* Sidebar tetap diam — tidak ikut animasi */}
       {!isAuth && <Sidebar />}
 
       {/* Hanya konten yang slide */}
       <div
         ref={containerRef}
-        style={{ flex: 1, minWidth: 0, position: "relative", overflow: "hidden" }}
+        style={{ flex: 1, minWidth: 0, width: "100%", position: "relative", overflow: "hidden" }}
       >
         {displayLoc.prev && (
           <div style={{ position: "absolute", inset: 0, zIndex: 1, willChange: "transform, opacity" }}>

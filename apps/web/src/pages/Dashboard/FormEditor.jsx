@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
+import AlertModal from "../../components/AlertModal";
 import { socket } from "../../utils/socket";
 import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical, ImagePlus, X, QrCode, Download } from "lucide-react";
+import QRCode from "qrcode";
 import QuillEditor from "../../components/QuillEditor";
+import OptionQuillEditor from "../../components/OptionQuillEditor";
 import RichTextDisplay from "../../components/RichTextDisplay";
 import Toast, { useToast } from "../../components/Toast";
 
@@ -140,7 +143,16 @@ export default function FormEditor() {
     }]);
   }
   function updateQ(idx, field, val) {
-    setQuestions((prev) => prev.map((q, i) => i === idx ? { ...q, [field]: val } : q));
+    setQuestions((prev) => {
+      const updated = prev.map((q, i) => i === idx ? { ...q, [field]: val } : q);
+      // Simpan required state per soal ke localStorage supaya FillForm bisa baca
+      if (field === "required") {
+        const reqMap = {};
+        updated.forEach(q => { if (q.id) reqMap[q.id] = q.required !== false; });
+        localStorage.setItem(`soal_required_${slug}`, JSON.stringify(reqMap));
+      }
+      return updated;
+    });
   }
   function updateOpt(qIdx, oIdx, val) {
     setQuestions((prev) => prev.map((q, i) => {
@@ -385,7 +397,8 @@ export default function FormEditor() {
   }
 
   function copyLink() {
-    navigator.clipboard.writeText(`${window.location.origin}/fill/${slug}`);
+    const baseUrl = import.meta.env.VITE_APP_URL ?? window.location.origin;
+    navigator.clipboard.writeText(`${baseUrl}/fill/${slug}`);
     showToast("Link berhasil disalin!");
   }
 
@@ -441,7 +454,8 @@ export default function FormEditor() {
             {userRole !== "Collaborator" && (
               <button
                 onClick={() => {
-                  const collabLink = `${window.location.origin}/form/${slug}/collaborate?token=${form?.token_collab ?? ""}`;
+                  const baseUrl = import.meta.env.VITE_APP_URL ?? window.location.origin;
+                  const collabLink = `${baseUrl}/form/${slug}/collaborate?token=${form?.token_collab ?? ""}`;
                   navigator.clipboard.writeText(collabLink);
                   showToast("Link collaborator berhasil disalin!");
                 }}
@@ -615,7 +629,7 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ,
           className="w-full text-[15px] text-gray-500 resize-none outline-none border-b border-dashed border-gray-200 pb-2 bg-transparent focus:border-[#1a4fa0] transition-colors"
         />
         <div className="mt-4 flex items-center gap-3 bg-[#eef5fb] rounded-xl px-4 py-3">
-          <span className="text-[13.5px] text-[#1a4fa0] font-medium truncate flex-1">{window.location.origin}/fill/{slug}</span>
+          <span className="text-[13.5px] text-[#1a4fa0] font-medium truncate flex-1">{import.meta.env.VITE_APP_URL ?? window.location.origin}/fill/{slug}</span>
           <button onClick={onCopyLink} className="text-[13px] text-white font-semibold px-3.5 py-2 rounded-lg hover:opacity-90 transition-all shrink-0 flex items-center gap-1.5" style={{ backgroundColor: "#1a4fa0" }}>
             <Share2 size={14} /> Salin
           </button>
@@ -686,6 +700,7 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ,
 /* ── Question Card ──────────────────────────────────────────── */
 function QuestionCard({ question, index, onUpdate, onUpdateOpt, onUpdateOptField, onAddOpt, onRemoveOpt, onToggleCorrect, onRemove, onDuplicate, onDragHandleStart, onDragHandleEnd, onShowToast, scoreType, totalSoal, isLocked, onToggleLock }) {
   const hasOptions = ["radio", "checkbox"].includes(question.type);
+  const [showPreview, setShowPreview] = useState(false);
   // Semua soal bisa diedit (tidak hanya yang baru)
   const editable = true;
   return (
@@ -725,14 +740,39 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onUpdateOptField
       </div>
 
       <div className="mb-5">
-        <label className="block text-[12px] font-extrabold text-[#1a4fa0] uppercase tracking-wider mb-2 flex items-center gap-1.5">
-         Pertanyaan:
-        </label>
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-[12px] font-extrabold text-[#1a4fa0] uppercase tracking-wider flex items-center gap-1.5">
+            Pertanyaan:
+          </label>
+          <button
+            type="button"
+            onClick={() => setShowPreview(v => !v)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all ${
+              showPreview
+                ? "bg-[#eef5fb] border-[#1a4fa0] text-[#1a4fa0]"
+                : "bg-white border-gray-200 text-gray-400 hover:border-[#1a4fa0] hover:text-[#1a4fa0]"
+            }`}
+          >
+            <span>{showPreview ? "👁️" : "👁️"}</span>
+            {showPreview ? "Sembunyikan Preview" : "Live Preview"}
+          </button>
+        </div>
         <QuillEditor
           value={question.question}
           onChange={(val) => onUpdate("question", val)}
           placeholder="Ketik pertanyaan di sini"
         />
+        {/* Live Preview */}
+        {showPreview && (
+          <div className="mt-3 rounded-xl border border-[#d4e5fa] bg-[#f7fafd] px-5 py-4">
+            <p className="text-[10.5px] font-bold text-[#1a4fa0] uppercase tracking-wider mb-2 opacity-60">Preview tampilan responden</p>
+            {question.question && question.question.replace(/<[^>]*>/g, '').trim() ? (
+              <RichTextDisplay content={question.question} className="text-[16px] font-semibold text-[#102f56] leading-snug" />
+            ) : (
+              <p className="text-[14px] text-gray-300 italic">Ketik pertanyaan untuk melihat preview...</p>
+            )}
+          </div>
+        )}
       </div>
 
       {hasOptions && (
@@ -766,12 +806,10 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onUpdateOptField
                         : <span className="block w-3 h-3 rounded-full bg-white" />
                     )}
                   </button>
-                  <input
-                    type="text"
+                  <OptionQuillEditor
                     value={opt.value}
-                    onChange={(e) => onUpdateOpt(oIdx, e.target.value)}
+                    onChange={(v) => onUpdateOpt(oIdx, v)}
                     placeholder={`Opsi ${oIdx + 1}`}
-                    className="flex-1 text-[15px] text-gray-700 outline-none border-b border-dashed border-gray-100 focus:border-[#1a4fa0] transition-colors bg-transparent py-1"
                   />
                   {/* Tombol upload gambar opsi */}
                   <label
@@ -983,6 +1021,7 @@ function ResponsesTab({ formId, form }) {
   const [loading, setLoading]           = useState(true);
   const [activeSubTab, setActiveSubTab] = useState("Ringkasan");
   const [exporting, setExporting]       = useState(false);
+  const [exportAlert, setExportAlert]   = useState(null);
 
   useEffect(() => {
     if (!formSlug) { setLoading(false); return; }
@@ -1004,7 +1043,7 @@ function ResponsesTab({ formId, form }) {
 
   // ── Export Excel — pakai endpoint backend ────────────────────
   async function handleExport() {
-    if (total === 0) { alert("Belum ada data untuk diekspor."); return; }
+    if (total === 0) { setExportAlert({ type: "alert", title: "Tidak Ada Data", message: "Belum ada data untuk diekspor." }); return; }
     setExporting(true);
     try {
       const res = await fetch(`${FORM_API_URL}/form/submit/export-excel?form_slug=${formSlug}`, {
@@ -1012,11 +1051,11 @@ function ResponsesTab({ formId, form }) {
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        alert("Gagal mengekspor: " + (errData?.message || `Error ${res.status}`));
+        setExportAlert({ type: "error", title: "Gagal Ekspor", message: errData?.message || `Error ${res.status}` });
         return;
       }
       const blob = await res.blob();
-      if (blob.size === 0) { alert("File kosong, tidak ada data."); return; }
+      if (blob.size === 0) { setExportAlert({ type: "alert", title: "File Kosong", message: "Tidak ada data untuk diekspor." }); return; }
       const url = URL.createObjectURL(blob);
       const a   = document.createElement("a");
       a.href    = url;
@@ -1026,7 +1065,7 @@ function ResponsesTab({ formId, form }) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e) {
-      alert("Gagal mengekspor: " + (e.message || "Error tidak diketahui"));
+      setExportAlert({ type: "error", title: "Gagal Ekspor", message: e.message || "Error tidak diketahui" });
     } finally { setExporting(false); }
   }
 
@@ -1182,6 +1221,13 @@ function ResponsesTab({ formId, form }) {
         )}
       </div>
     </div>
+    <AlertModal
+      open={!!exportAlert}
+      type={exportAlert?.type ?? "alert"}
+      title={exportAlert?.title}
+      message={exportAlert?.message}
+      onConfirm={() => setExportAlert(null)}
+    />
   );
 }
 
@@ -1745,14 +1791,15 @@ function QrModal({ slug, formTitle, onClose }) {
 
   useEffect(() => {
     setLoading(true);
-    const fillUrl = `${window.location.origin}/fill/${slug}`;
-    fetch(`${FORM_API_URL}/qrcode/image?slug=${encodeURIComponent(fillUrl)}`)
-      .then(res => {
-        if (!res.ok) throw new Error("Gagal generate QR Code");
-        return res.blob();
-      })
-      .then(blob => setQrSrc(URL.createObjectURL(blob)))
-      .catch(() => setError("Gagal memuat QR Code."))
+    const baseUrl = import.meta.env.VITE_APP_URL ?? window.location.origin;
+    const fillUrl = `${baseUrl}/fill/${slug}`;
+    QRCode.toDataURL(fillUrl, {
+      width: 300,
+      margin: 2,
+      color: { dark: "#102f56", light: "#ffffff" },
+    })
+      .then(url => setQrSrc(url))
+      .catch(() => setError("Gagal membuat QR Code."))
       .finally(() => setLoading(false));
   }, [slug]);
 
@@ -1761,7 +1808,9 @@ function QrModal({ slug, formTitle, onClose }) {
     const a = document.createElement("a");
     a.href = qrSrc;
     a.download = `qrcode-${slug}.png`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
   }
 
   return (

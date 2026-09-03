@@ -52,6 +52,11 @@ export default function FillForm() {
   const [tokenLoading, setTokenLoading]   = useState(false);
   const [tokenError, setTokenError]       = useState("");
 
+  // ── Timer hooks — harus di atas semua early returns ──
+  const [timeLeft, setTimeLeft]   = useState(null); // detik tersisa
+  const [timedOut, setTimedOut]   = useState(false);
+  const timerRef                  = useRef(null);
+
   useEffect(() => {
     (async () => {
       try {
@@ -107,6 +112,52 @@ export default function FillForm() {
     }
   }, [form]);
 
+  // ── Timer: mulai countdown setelah form load + token verified ──
+  useEffect(() => {
+    if (!form || !tokenVerified) return;
+
+    const duration = form?.duration; // menit
+    const startAt  = form?.start_at; // timestamp ms
+
+    if (!duration || duration <= 0) return; // tidak ada timer
+
+    // Hitung sisa waktu
+    const totalSecs = duration * 60;
+
+    let startSecs = totalSecs;
+    if (startAt && Number(startAt) > 0) {
+      const elapsed = Math.floor((Date.now() - Number(startAt)) / 1000);
+      startSecs = Math.max(0, totalSecs - elapsed);
+    }
+
+    if (startSecs <= 0) { setTimedOut(true); return; }
+
+    setTimeLeft(startSecs);
+
+    timerRef.current = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev === null) return null;
+        if (prev <= 1) {
+          clearInterval(timerRef.current);
+          // Auto-submit saat waktu habis — paksa kirim semua jawaban
+          setTimedOut(true);
+          setAutoSubmitting(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timerRef.current);
+  }, [form?.duration, form?.start_at, tokenVerified]);
+
+  // ── Auto-submit saat timer habis ──
+  const [autoSubmitting, setAutoSubmitting] = useState(false);
+  useEffect(() => {
+    if (!autoSubmitting) return;
+    submitForced();
+  }, [autoSubmitting]);
+
   function setAnswer(soalId, value) {
     setAnswers((prev) => ({ ...prev, [soalId]: value }));
     if (errorSoalId === soalId) setErrorSoalId(null);
@@ -144,7 +195,15 @@ export default function FillForm() {
   }
 
   async function submit() {
-    const empty = (allSoal ?? []).find((s) => !hasAnswer(s));
+    // Baca required map dari localStorage (disimpan creator)
+    let reqMap = {};
+    try {
+      const saved = localStorage.getItem(`soal_required_${slug}`);
+      if (saved) reqMap = JSON.parse(saved);
+    } catch { /* ignore */ }
+    const isRequired = (s) => reqMap[s.id] !== undefined ? reqMap[s.id] : true; // default wajib
+
+    const empty = (allSoal ?? []).find((s) => isRequired(s) && !hasAnswer(s));
     if (empty) {
       setErrorSoalId(empty.id);
       setSubmitError("");
@@ -156,8 +215,7 @@ export default function FillForm() {
     if (doubtfulIds.size > 0) {
       setSubmitError(`Masih ada ${doubtfulIds.size} soal yang ditandai ragu-ragu. Periksa kembali sebelum submit.`);
       return;
-    }
-    setErrorSoalId(null);
+    }    setErrorSoalId(null);
 
     setSubmitting(true); setSubmitError("");
     try {
@@ -218,6 +276,41 @@ export default function FillForm() {
       }
     } finally { setSubmitting(false); }
   }
+
+  // ── submitForced: auto-submit saat timer habis, skip validasi ──
+  async function submitForced() {
+    clearInterval(timerRef.current);
+    setSubmitting(true);
+    try {
+      const fd = new FormData();
+      const payload = [];
+      for (const soal of allSoal ?? []) {
+        const a = answers[soal.id];
+        const jawaban = { soal_id: soal.id };
+        if (soal.type === "radio") { jawaban.soal_option_id = a ?? null; }
+        else if (soal.type === "checkbox") { jawaban.soal_option_id = Array.isArray(a) ? a : null; }
+        else if (soal.type === "text") { jawaban.answer_text = a ?? ""; }
+        else if (soal.type === "file" && a?.file) { jawaban.file_name = a.file.name; fd.append("files", a.file); }
+        payload.push({ jawaban });
+      }
+      fd.append("data", JSON.stringify(payload));
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${FORM_API_URL}/form/submit?form_slug=${slug}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      saveToHistory(slug, form?.title ?? form?.form_title, form?.category);
+      localStorage.removeItem(STORAGE_KEY);
+      setDone(true);
+    } catch {
+      // Tetap anggap selesai meski error
+      setDone(true);
+    } finally {
+      setSubmitting(false);
+      setAutoSubmitting(false);
+    }
+  }  }
 
   const title = form?.title ?? form?.form_title ?? "Form";
   const isQuiz = form?.category === "ujian";
@@ -316,6 +409,32 @@ export default function FillForm() {
     </div>
   );
 
+  /* ── Timed out — tampil layar waktu habis, submit di background ── */
+  if (autoSubmitting || (timedOut && !done)) return (
+    <div className="min-h-screen grid place-items-center px-4" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
+      <div className="rounded-3xl shadow-[0_16px_50px_rgba(23,64,120,0.12)] p-10 max-w-sm w-full text-center border"
+        style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}>
+        <div className="text-5xl mb-4">⏰</div>
+        <h2 className="text-[20px] font-extrabold mb-2" style={{ color: "var(--fm-text)" }}>Waktu Habis!</h2>
+        <p className="text-[14px] mb-6" style={{ color: "var(--fm-text-2)" }}>
+          Waktu pengerjaan telah habis. Jawaban kamu sedang dikirim secara otomatis.
+        </p>
+        {/* Status submit */}
+        {submitting && (
+          <div className="flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-blue-50 border border-blue-100">
+            <div className="w-5 h-5 border-2 border-[#1a4fa0] border-t-transparent rounded-full animate-spin shrink-0" />
+            <span className="text-[13px] font-semibold text-[#1a4fa0]">Mengirim jawaban...</span>
+          </div>
+        )}
+        {!submitting && !done && (
+          <div className="flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200">
+            <span className="text-[13px] font-semibold text-amber-700">Menunggu koneksi...</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   /* ── Success ────────────────────────────────────────── */
   if (done) return (
     <div className="min-h-screen grid place-items-center px-4" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
@@ -393,7 +512,10 @@ export default function FillForm() {
     const pageNum     = currPage.page ?? (currentIdx + 1);
 
     function goNext() {
-      const unanswered = (currPage.soal ?? []).find(s => !hasAnswer(s));
+      let reqMap = {};
+      try { const s = localStorage.getItem(`soal_required_${slug}`); if (s) reqMap = JSON.parse(s); } catch {}
+      const isReq = (s) => reqMap[s.id] !== undefined ? reqMap[s.id] : true;
+      const unanswered = (currPage.soal ?? []).find(s => isReq(s) && !hasAnswer(s));
       if (unanswered) {
         const clean = (unanswered.question || "Wajib").replace(/<[^>]*>/g, "").trim();
         setSubmitError(`Pertanyaan "${clean}" belum dijawab.`);
@@ -424,18 +546,24 @@ export default function FillForm() {
               <span className="text-[13px] font-semibold text-gray-500">
                 Halaman {currentIdx + 1} / {totalPages}
               </span>
-              {/* Tombol Soal */}
-              <SoalIndicatorBtn
-                allSoal={allSoal}
-                answers={answers}
-                hasAnswer={hasAnswer}
-                doubtfulIds={doubtfulIds}
-                pageGroups={pageGroups}
-                currentIdx={currentIdx}
-                setCurrentIdx={setCurrentIdx}
-                answeredCount={answeredCount}
-                doubtCount={doubtCount}
-              />
+              <div className="flex items-center gap-2">
+                {/* Timer */}
+                {timeLeft !== null && (
+                  <TimerBadge timeLeft={timeLeft} />
+                )}
+                {/* Tombol Soal */}
+                <SoalIndicatorBtn
+                  allSoal={allSoal}
+                  answers={answers}
+                  hasAnswer={hasAnswer}
+                  doubtfulIds={doubtfulIds}
+                  pageGroups={pageGroups}
+                  currentIdx={currentIdx}
+                  setCurrentIdx={setCurrentIdx}
+                  answeredCount={answeredCount}
+                  doubtCount={doubtCount}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -526,7 +654,10 @@ export default function FillForm() {
   const progressS    = totalPagesS > 0 ? ((currentIdx + 1) / totalPagesS) * 100 : 0;
 
   function goNextS() {
-    const unanswered = (currPageS.soal ?? []).find(s => !hasAnswer(s));
+    let reqMap = {};
+    try { const s = localStorage.getItem(`soal_required_${slug}`); if (s) reqMap = JSON.parse(s); } catch {}
+    const isReq = (s) => reqMap[s.id] !== undefined ? reqMap[s.id] : true;
+    const unanswered = (currPageS.soal ?? []).find(s => isReq(s) && !hasAnswer(s));
     if (unanswered) {
       setErrorSoalId(unanswered.id);
       const el = soalRefs.current[unanswered.id];
@@ -555,6 +686,7 @@ export default function FillForm() {
             <span className="text-[13px] font-semibold text-gray-500">
               {totalPagesS > 1 ? `Halaman ${currentIdx + 1} / ${totalPagesS}` : title}
             </span>
+            {timeLeft !== null && <TimerBadge timeLeft={timeLeft} />}
           </div>
           {totalPagesS > 1 && (
             <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -642,7 +774,7 @@ export default function FillForm() {
                             : <span className="w-3 h-3 rounded-full bg-white" />)}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <span className="text-[15px] font-medium block">{fallbackLabel(opt, oi)}</span>
+                          <RichTextDisplay content={opt.value?.trim() || opt.option_value?.trim() || `Opsi ${oi + 1}`} className="text-[15px] font-medium" />
                           {optImage && (
                             <img src={optImage} alt={fallbackLabel(opt, oi)}
                               className="mt-2.5 w-full max-h-52 object-contain rounded-xl border border-[#d4e5fa]" />
@@ -768,7 +900,7 @@ function SoalItem({ soal, idx, answers, setAnswer, toggleOption, errorSoalId, so
                     : <span className="w-3 h-3 rounded-full bg-white" />)}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <span className="text-[15px] font-medium text-gray-700 block">{fallbackLabel(opt, oi)}</span>
+                  <RichTextDisplay content={opt.value?.trim() || opt.option_value?.trim() || `Opsi ${oi + 1}`} className="text-[15px] font-medium text-gray-700" />
                   {optImage && (
                     <img src={optImage} alt={fallbackLabel(opt, oi)}
                       className="mt-2.5 w-full max-h-55 object-contain rounded-xl border border-[#d4e5fa]" />
@@ -796,6 +928,25 @@ function SoalItem({ soal, idx, answers, setAnswer, toggleOption, errorSoalId, so
           <input type="file" className="hidden" onChange={e => setAnswer(soal.id, { file: e.target.files?.[0] })} />
         </label>
       )}
+    </div>
+  );
+}
+
+/* ── Timer Badge ─────────────────────────────────────────────── */
+function TimerBadge({ timeLeft }) {
+  const mins = Math.floor(timeLeft / 60);
+  const secs = timeLeft % 60;
+  const str  = `${String(mins).padStart(2,"0")}:${String(secs).padStart(2,"0")}`;
+  const urgent = timeLeft <= 60; // merah jika ≤ 1 menit
+  const warn   = timeLeft <= 300 && timeLeft > 60; // kuning jika ≤ 5 menit
+
+  return (
+    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[13px] font-bold tabular-nums transition-colors ${
+      urgent ? "bg-red-50 text-red-600 border border-red-200 animate-pulse" :
+      warn   ? "bg-amber-50 text-amber-600 border border-amber-200" :
+               "bg-[#eef5fb] text-[#1a4fa0] border border-[#d4e5fa]"
+    }`}>
+      <span>⏱</span> {str}
     </div>
   );
 }
