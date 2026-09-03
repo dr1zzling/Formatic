@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
+import AlertModal from "../../components/AlertModal";
 import { socket } from "../../utils/socket";
 import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical, ImagePlus, X, QrCode, Download } from "lucide-react";
 import QRCode from "qrcode";
@@ -993,6 +994,7 @@ function ResponsesTab({ formId, form }) {
   const [loading, setLoading]           = useState(true);
   const [activeSubTab, setActiveSubTab] = useState("Ringkasan");
   const [exporting, setExporting]       = useState(false);
+  const [exportAlert, setExportAlert]   = useState(null);
 
   useEffect(() => {
     if (!formSlug) { setLoading(false); return; }
@@ -1014,7 +1016,7 @@ function ResponsesTab({ formId, form }) {
 
   // ── Export Excel — pakai endpoint backend ────────────────────
   async function handleExport() {
-    if (total === 0) { alert("Belum ada data untuk diekspor."); return; }
+    if (total === 0) { setExportAlert({ type: "alert", title: "Tidak Ada Data", message: "Belum ada data untuk diekspor." }); return; }
     setExporting(true);
     try {
       const res = await fetch(`${FORM_API_URL}/form/submit/export-excel?form_slug=${formSlug}`, {
@@ -1022,11 +1024,11 @@ function ResponsesTab({ formId, form }) {
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        alert("Gagal mengekspor: " + (errData?.message || `Error ${res.status}`));
+        setExportAlert({ type: "error", title: "Gagal Ekspor", message: errData?.message || `Error ${res.status}` });
         return;
       }
       const blob = await res.blob();
-      if (blob.size === 0) { alert("File kosong, tidak ada data."); return; }
+      if (blob.size === 0) { setExportAlert({ type: "alert", title: "File Kosong", message: "Tidak ada data untuk diekspor." }); return; }
       const url = URL.createObjectURL(blob);
       const a   = document.createElement("a");
       a.href    = url;
@@ -1036,7 +1038,7 @@ function ResponsesTab({ formId, form }) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e) {
-      alert("Gagal mengekspor: " + (e.message || "Error tidak diketahui"));
+      setExportAlert({ type: "error", title: "Gagal Ekspor", message: e.message || "Error tidak diketahui" });
     } finally { setExporting(false); }
   }
 
@@ -1192,6 +1194,13 @@ function ResponsesTab({ formId, form }) {
         )}
       </div>
     </div>
+    <AlertModal
+      open={!!exportAlert}
+      type={exportAlert?.type ?? "alert"}
+      title={exportAlert?.title}
+      message={exportAlert?.message}
+      onConfirm={() => setExportAlert(null)}
+    />
   );
 }
 

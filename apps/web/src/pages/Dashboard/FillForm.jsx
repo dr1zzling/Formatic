@@ -139,7 +139,9 @@ export default function FillForm() {
         if (prev === null) return null;
         if (prev <= 1) {
           clearInterval(timerRef.current);
+          // Auto-submit saat waktu habis — paksa kirim semua jawaban
           setTimedOut(true);
+          setAutoSubmitting(true);
           return 0;
         }
         return prev - 1;
@@ -148,6 +150,13 @@ export default function FillForm() {
 
     return () => clearInterval(timerRef.current);
   }, [form?.duration, form?.start_at, tokenVerified]);
+
+  // ── Auto-submit saat timer habis ──
+  const [autoSubmitting, setAutoSubmitting] = useState(false);
+  useEffect(() => {
+    if (!autoSubmitting) return;
+    submitForced();
+  }, [autoSubmitting]);
 
   function setAnswer(soalId, value) {
     setAnswers((prev) => ({ ...prev, [soalId]: value }));
@@ -206,8 +215,7 @@ export default function FillForm() {
     if (doubtfulIds.size > 0) {
       setSubmitError(`Masih ada ${doubtfulIds.size} soal yang ditandai ragu-ragu. Periksa kembali sebelum submit.`);
       return;
-    }
-    setErrorSoalId(null);
+    }    setErrorSoalId(null);
 
     setSubmitting(true); setSubmitError("");
     try {
@@ -268,6 +276,41 @@ export default function FillForm() {
       }
     } finally { setSubmitting(false); }
   }
+
+  // ── submitForced: auto-submit saat timer habis, skip validasi ──
+  async function submitForced() {
+    clearInterval(timerRef.current);
+    setSubmitting(true);
+    try {
+      const fd = new FormData();
+      const payload = [];
+      for (const soal of allSoal ?? []) {
+        const a = answers[soal.id];
+        const jawaban = { soal_id: soal.id };
+        if (soal.type === "radio") { jawaban.soal_option_id = a ?? null; }
+        else if (soal.type === "checkbox") { jawaban.soal_option_id = Array.isArray(a) ? a : null; }
+        else if (soal.type === "text") { jawaban.answer_text = a ?? ""; }
+        else if (soal.type === "file" && a?.file) { jawaban.file_name = a.file.name; fd.append("files", a.file); }
+        payload.push({ jawaban });
+      }
+      fd.append("data", JSON.stringify(payload));
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${FORM_API_URL}/form/submit?form_slug=${slug}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      saveToHistory(slug, form?.title ?? form?.form_title, form?.category);
+      localStorage.removeItem(STORAGE_KEY);
+      setDone(true);
+    } catch {
+      // Tetap anggap selesai meski error
+      setDone(true);
+    } finally {
+      setSubmitting(false);
+      setAutoSubmitting(false);
+    }
+  }  }
 
   const title = form?.title ?? form?.form_title ?? "Form";
   const isQuiz = form?.category === "ujian";
@@ -366,17 +409,28 @@ export default function FillForm() {
     </div>
   );
 
-  /* ── Timed out ──────────────────────────────────────── */
-  if (timedOut && !done) return (
+  /* ── Timed out — tampil layar waktu habis, submit di background ── */
+  if (autoSubmitting || (timedOut && !done)) return (
     <div className="min-h-screen grid place-items-center px-4" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
-      <div className="rounded-3xl shadow-[0_16px_50px_rgba(23,64,120,0.12)] p-10 max-w-sm text-center border"
+      <div className="rounded-3xl shadow-[0_16px_50px_rgba(23,64,120,0.12)] p-10 max-w-sm w-full text-center border"
         style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}>
-        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-50 text-red-500 grid place-items-center text-3xl">⏰</div>
-        <h2 className="text-[19px] font-extrabold mb-1" style={{ color: "var(--fm-text)" }}>Waktu Habis!</h2>
-        <p className="text-[14px] mb-6" style={{ color: "var(--fm-text-2)" }}>Maaf, waktu pengerjaan telah habis. Jawaban tidak dapat dikirim.</p>
-        <button onClick={() => navigate("/")} className="w-full py-3 rounded-xl text-white text-[14px] font-semibold" style={{ backgroundColor: "#1a4fa0" }}>
-          Kembali ke Beranda
-        </button>
+        <div className="text-5xl mb-4">⏰</div>
+        <h2 className="text-[20px] font-extrabold mb-2" style={{ color: "var(--fm-text)" }}>Waktu Habis!</h2>
+        <p className="text-[14px] mb-6" style={{ color: "var(--fm-text-2)" }}>
+          Waktu pengerjaan telah habis. Jawaban kamu sedang dikirim secara otomatis.
+        </p>
+        {/* Status submit */}
+        {submitting && (
+          <div className="flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-blue-50 border border-blue-100">
+            <div className="w-5 h-5 border-2 border-[#1a4fa0] border-t-transparent rounded-full animate-spin shrink-0" />
+            <span className="text-[13px] font-semibold text-[#1a4fa0]">Mengirim jawaban...</span>
+          </div>
+        )}
+        {!submitting && !done && (
+          <div className="flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200">
+            <span className="text-[13px] font-semibold text-amber-700">Menunggu koneksi...</span>
+          </div>
+        )}
       </div>
     </div>
   );

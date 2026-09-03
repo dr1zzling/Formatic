@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
 import { addToTrash } from "./Trash";
+import AlertModal from "../../components/AlertModal";
 const CATEGORIES = ["All", "Survey", "Quiz / Ujian"];
 
 function getUsername() {
@@ -164,6 +165,8 @@ export default function MyForms() {
   const [search, setSearch]         = useState("");
   const [showModal, setShowModal]   = useState(false);
   const [showJoin, setShowJoin]     = useState(false);
+  const [alertModal, setAlertModal] = useState(null); // { type, title, message, onConfirm }
+  const [confirmDelete, setConfirmDelete] = useState(null); // form to delete
 
   useEffect(() => { load(); }, []);
 
@@ -177,26 +180,24 @@ export default function MyForms() {
   }
 
   const handleDeleteForm = async (form) => {
-    const isConfirmed = window.confirm(`Yakin ingin menghapus form "${form.form_title}"?`);
-    if (!isConfirmed) return;
+    setConfirmDelete(form);
+  };
+
+  const doDeleteForm = async (form) => {
+    setConfirmDelete(null);
     try {
-      // Soft delete — ubah status ke private, simpan ke trash localStorage
-      // Form tetap ada di DB, bisa dipulihkan dari Trash
       const response = await fetch(`${FORM_API_URL}/form?form_slug=${form.form_slug}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: JSON.stringify({ status: "private" }),
       });
       if (!response.ok) throw new Error("Gagal memindahkan ke trash");
       addToTrash(form);
       setForms(prev => prev.filter(f => f.form_slug !== form.form_slug));
-      alert("Form dipindahkan ke Trash!");
+      setAlertModal({ type: "success", title: "Berhasil", message: "Form dipindahkan ke Trash!" });
     } catch (error) {
       console.error("Error delete:", error);
-      alert("Gagal menghapus form.");
+      setAlertModal({ type: "error", title: "Gagal", message: "Gagal menghapus form." });
     }
   };
 
@@ -214,10 +215,9 @@ export default function MyForms() {
 
   return (
     <div className="flex min-h-screen">
-
-      <main className="flex-1 min-w-0" style={{ width: "calc(100% - 366px)" }}>
+      <main className="flex-1 min-w-0 overflow-x-hidden">
         <div
-          className="min-h-screen px-[42px] py-[34px] pb-[60px] max-[1050px]:px-[25px] max-[800px]:px-4 max-[800px]:py-[28px] box-border"
+          className="min-h-screen px-4 sm:px-6 md:px-8 xl:px-[42px] py-6 md:py-[34px] pb-[80px] md:pb-[60px] box-border"
           style={{ background: "linear-gradient(135deg, var(--fm-bg) 0%, var(--fm-bg-2) 55%, var(--fm-bg-3) 100%)", color: "var(--fm-text)" }}
         >
           {/* ── Header ─────────────────────────────── */}
@@ -381,6 +381,25 @@ export default function MyForms() {
       {showJoin && (
         <JoinModal onClose={() => setShowJoin(false)} onJoined={() => { setShowJoin(false); load(); }} />
       )}
+
+      {/* AlertModal — ganti browser alert/confirm */}
+      <AlertModal
+        open={!!confirmDelete}
+        type="trash"
+        title="Hapus Form?"
+        message={`Form "${confirmDelete?.form_title}" akan dipindahkan ke Trash.`}
+        confirmLabel="Hapus"
+        cancelLabel="Batal"
+        onConfirm={() => doDeleteForm(confirmDelete)}
+        onCancel={() => setConfirmDelete(null)}
+      />
+      <AlertModal
+        open={!!alertModal}
+        type={alertModal?.type ?? "alert"}
+        title={alertModal?.title}
+        message={alertModal?.message}
+        onConfirm={() => setAlertModal(null)}
+      />
     </div>
   );
 }
