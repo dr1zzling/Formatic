@@ -516,14 +516,15 @@ export default function FormEditor() {
               onCopyLink={copyLink}
               onShowToast={showToast}
               onImported={loadForm}
-              onImportedSilent={() => loadForm(true)}
+              onImportedSilent={async () => { await loadForm(true); setTimeout(() => { isSavingRef.current = false; }, 1000); }}
+              onImportGuard={(v) => { isSavingRef.current = v; }}
             />
           )}
           {activeTab === "Jawaban" && (
             <ResponsesTab formId={form?.id ?? form?.form_id} form={form} />
           )}
           {activeTab === "Setelan" && (
-            <SettingsTab form={form} onUpdateStatus={updateStatus} slug={slug} />
+            <SettingsTab form={form} onUpdateStatus={updateStatus} slug={slug} onSaved={(patch) => setForm(prev => (prev ? { ...prev, ...patch } : prev))} />
           )}
         </div>
       </div>
@@ -568,7 +569,7 @@ export default function FormEditor() {
 }
 
 /* ── Pertanyaan Tab ─────────────────────────────────────────── */
-function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ, onUpdateOpt, onUpdateOptField, onAddOpt, onRemoveOpt, onRemoveQ, onDuplicateQ, onToggleCorrect, onReorder, onCopyLink, onShowToast, onImported, onImportedSilent }) {
+function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ, onUpdateOpt, onUpdateOptField, onAddOpt, onRemoveOpt, onRemoveQ, onDuplicateQ, onToggleCorrect, onReorder, onCopyLink, onShowToast, onImported, onImportedSilent, onImportGuard }) {
   const [dragFrom, setDragFrom] = useState(null);
   const [dragOver, setDragOver] = useState(null);
   // Baca scoreType dari localStorage supaya badge score realtime ikut berubah
@@ -682,7 +683,7 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ,
       </button>
 
       {/* Import dari Word */}
-      <ImportDocxButton slug={slug} onImported={onImported} onImportedSilent={onImportedSilent} />
+      <ImportDocxButton slug={slug} onImported={onImported} onImportedSilent={onImportedSilent} onImportGuard={onImportGuard} />
     </div>
   );
 }
@@ -1363,7 +1364,7 @@ function buildQuestionStats(responses) {
 }
 
 /* ── Settings Tab ───────────────────────────────────────────── */
-function SettingsTab({ form, onUpdateStatus, slug }) {
+function SettingsTab({ form, onUpdateStatus, slug, onSaved }) {
   const isPublic   = form?.status === "public" || form?.form_status === "public";
   const isQuiz     = form?.category === "ujian";
 
@@ -1431,6 +1432,12 @@ function SettingsTab({ form, onUpdateStatus, slug }) {
       if (res.ok) {
         setTokenMsg("✅ Token berhasil disimpan!");
         setTokenActive(active);
+        onSaved?.({
+          duration: duration ? Number(duration) : null,
+          start_at: startAt ? new Date(startAt).getTime() : null,
+          is_random: isRandom,
+          token_respon: active ? (value || null) : null,
+        });
         if (active) {
           localStorage.setItem(tokenStorageKey, "true");
         } else {
@@ -1445,7 +1452,7 @@ function SettingsTab({ form, onUpdateStatus, slug }) {
   }
 
   async function saveTimer() {
-    if (!duration && !startAt) { setTimerMsg("Isi durasi atau waktu mulai."); return; }
+    // Kedua kolom kosong = hapus timer (kirim null ke BE)
     setTimerSaving(true); setTimerMsg("");
     try {
       const res = await fetch(`${FORM_API_URL}/form/setting?form_slug=${form?.slug ?? slug}`, {
@@ -1460,6 +1467,11 @@ function SettingsTab({ form, onUpdateStatus, slug }) {
       });
       const data = await res.json().catch(() => ({}));
       setTimerMsg(res.ok ? "✅ Berhasil disimpan!" : (data?.message || "Gagal menyimpan."));
+      if (res.ok) onSaved?.({
+        duration: duration ? Number(duration) : null,
+        start_at: startAt ? new Date(startAt).getTime() : null,
+        is_random: isRandom,
+      });
     } catch { setTimerMsg("Gagal menyimpan."); }
     finally { setTimerSaving(false); setTimeout(() => setTimerMsg(""), 3000); }
   }
@@ -1480,6 +1492,7 @@ function SettingsTab({ form, onUpdateStatus, slug }) {
       });
       const data = await res.json().catch(() => ({}));
       setShuffleMsg(res.ok ? `✅ Shuffle ${val ? "diaktifkan" : "dinonaktifkan"}` : (data?.message || "Gagal."));
+      if (res.ok) onSaved?.({ is_random: val });
     } catch { setShuffleMsg("Gagal menyimpan."); }
     finally { setShuffleSaving(false); setTimeout(() => setShuffleMsg(""), 3000); }
   }
@@ -1688,7 +1701,7 @@ function Toggle({ value, onChange }) {
 }
 
 /* ── Import Docx Button ─────────────────────────────────────── */
-function ImportDocxButton({ slug, onImported, onImportedSilent }) {
+function ImportDocxButton({ slug, onImported, onImportedSilent, onImportGuard }) {
   const [importing, setImporting] = useState(false);
   const [toast, setToast]         = useState("");
   const [error, setError]         = useState("");
@@ -1707,6 +1720,7 @@ function ImportDocxButton({ slug, onImported, onImportedSilent }) {
       showMsg("File harus berformat .docx", true); return;
     }
     setImporting(true);
+    onImportGuard?.(true);
     try {
       const fd = new FormData();
       fd.append("file", file);
@@ -1722,6 +1736,7 @@ function ImportDocxButton({ slug, onImported, onImportedSilent }) {
       setTimeout(() => { onImportedSilent?.(); }, 500);
     } catch (e) {
       showMsg(e.message || "Gagal import.", true);
+      onImportGuard?.(false);
     } finally {
       setImporting(false);
     }

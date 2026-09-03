@@ -217,8 +217,6 @@ function looksLikeMath(text) {
          /[a-zA-Z]_[0-9a-zA-Z]/.test(text) || // x_n, a_1
          /\^[{0-9a-zA-Z]/.test(text);    // ^2, ^{...}
 }
-
-// ── Konversi satu segmen teks HTML (dalam satu blok) yang mengandung <sup>/<sub> ──
 function convertSupSubToKatex(segment) {
   // Ambil teks plain dari segmen (dengan konversi sup/sub ke LaTeX)
   const latexExpr = stripHtmlFromMath(segment);
@@ -308,14 +306,6 @@ export default function RichTextDisplay({ content, className = '' }) {
 
   useEffect(() => {
     if (!containerRef.current) return;
-
-    // Syntax highlight code blocks
-    containerRef.current.querySelectorAll('pre code.hljs').forEach((block) => {
-      hljs.highlightElement(block);
-    });
-
-    // Auto-render LaTeX: scan semua $...$ dan $$...$$ di dalam elemen,
-    // termasuk yang ada di dalam tag HTML dari Quill (span, p, dll)
     try {
       renderMathInElement(containerRef.current, {
         delimiters: [
@@ -324,7 +314,6 @@ export default function RichTextDisplay({ content, className = '' }) {
         ],
         throwOnError: false,
         output: 'html',
-        // Jangan masuk ke dalam elemen yang sudah dirender katex
         ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
         ignoredClasses: ['katex', 'katex-display'],
       });

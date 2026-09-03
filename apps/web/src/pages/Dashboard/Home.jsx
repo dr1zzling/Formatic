@@ -303,7 +303,7 @@ function FetchFormsGrid({ search, category }) {
                   style={{ background: `linear-gradient(135deg,${clr.from},${clr.to})` }}>
                   {banner && (
                     <img src={`${FORM_API}${banner}`} alt={title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="w-full h-full object-contain transition-transform duration-500 hover:scale-105"
                       onError={e => { e.target.style.display = "none"; }} />
                   )}
                   <span className={`absolute top-2 left-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
