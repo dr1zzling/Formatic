@@ -131,7 +131,7 @@ function AnimatedContent({ children }) {
       {/* Hanya konten yang slide */}
       <div
         ref={containerRef}
-        style={{ flex: 1, minWidth: 0, width: "100%", position: "relative", overflow: "hidden" }}
+        style={{ flex: 1, minWidth: 0, width: "100%", position: "relative", overflow: "clip" }}
       >
         {displayLoc.prev && (
           <div style={{ position: "absolute", inset: 0, zIndex: 1, willChange: "transform, opacity" }}>

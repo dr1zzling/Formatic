@@ -307,7 +307,7 @@ export default function MyForms() {
                     <div className={`relative w-full overflow-hidden bg-[#dcecf4] ${large ? "h-[178px]" : "h-[145px]"}`}>
                       {banner ? (
                         <img src={`${FORM_API_URL}${banner}`} alt={form.form_title}
-                          className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                          className="w-full h-full object-contain group-hover:scale-[1.03] transition-transform duration-300"
                           onError={e => { e.target.style.display = "none"; }} />
                       ) : form.image ? (
                         <img src={form.image} alt={form.form_title}

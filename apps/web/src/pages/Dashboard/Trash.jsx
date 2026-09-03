@@ -206,7 +206,7 @@ export default function Trash() {
                 <div className="w-16 sm:w-20 h-16 sm:h-[72px] shrink-0 overflow-hidden"
                   style={{ background: SCHEMES[i % SCHEMES.length] }}>
                   {banner
-                    ? <img src={`${FORM_API_URL}${banner}`} className="w-full h-full object-cover" onError={e => { e.target.style.display = "none"; }} alt="" />
+                    ? <img src={`${FORM_API_URL}${banner}`} className="w-full h-full object-contain" onError={e => { e.target.style.display = "none"; }} alt="" />
                     : <div className="w-full h-full flex items-center justify-center"><FileText size={18} className="opacity-25 text-gray-600" /></div>
                   }
                 </div>

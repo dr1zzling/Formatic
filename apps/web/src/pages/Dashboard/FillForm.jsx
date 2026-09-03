@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
 import { socket } from "../../utils/socket";
-import { ArrowLeft, Send, Check, CheckCircle2, UploadCloud, FileText, Bell, ArrowRight } from "lucide-react";
+import { ArrowLeft, Send, Check, CheckCircle2, UploadCloud, FileText, Bell, ArrowRight, ZoomIn, ZoomOut, RefreshCw } from "lucide-react";
 import { saveToHistory } from "./History";
 import RichTextDisplay from "../../components/RichTextDisplay";
 
@@ -25,10 +25,13 @@ export default function FillForm() {
   const { slug }        = useParams();
   const navigate        = useNavigate();
 
+  const [zoomLevel, setZoomLevel] = useState(1);
+
   const STORAGE_KEY = `fillform_answers_${slug}`;
 
   const [form, setForm]           = useState(null);
   const [loading, setLoading]     = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError]         = useState("");
   const [answers, setAnswers]     = useState(() => {
     // Restore jawaban dari localStorage saat pertama load
@@ -47,15 +50,38 @@ export default function FillForm() {
   const soalRefs = useRef({});
 
   // ── Token gate hooks — harus di atas semua early returns ──
-  const [tokenInput, setTokenInput]       = useState("");
-  const [tokenVerified, setTokenVerified] = useState(false);
-  const [tokenLoading, setTokenLoading]   = useState(false);
-  const [tokenError, setTokenError]       = useState("");
+   const [tokenInput, setTokenInput]       = useState("");
+   const [tokenVerified, setTokenVerified] = useState(() => {
+     // Restore token verification state from localStorage on first load
+     const saved = localStorage.getItem(`token_verified_${slug}`);
+     return saved === "true";
+   });
+   const [tokenLoading, setTokenLoading]   = useState(false);
+   const [tokenError, setTokenError]       = useState("");
+
+  // Save tokenVerified state to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem(`token_verified_${slug}`, tokenVerified.toString());
+  }, [tokenVerified, slug]);
 
   // ── Timer hooks — harus di atas semua early returns ──
   const [timeLeft, setTimeLeft]   = useState(null); // detik tersisa
   const [timedOut, setTimedOut]   = useState(false);
   const timerRef                  = useRef(null);
+
+  useEffect(() => {
+    // Restore timeLeft from sessionStorage if it exists to prevent timer reset on refresh
+    const savedTime = sessionStorage.getItem(`timer_${slug}`);
+    if (savedTime && !isNaN(parseInt(savedTime))) {
+      setTimeLeft(parseInt(savedTime));
+    }
+  }, [slug]);
+
+  useEffect(() => {
+    if (timeLeft !== null) {
+      sessionStorage.setItem(`timer_${slug}`, timeLeft.toString());
+    }
+  }, [timeLeft, slug]);
 
   useEffect(() => {
     (async () => {
@@ -117,7 +143,6 @@ export default function FillForm() {
     if (!form || !tokenVerified) return;
 
     const duration = form?.duration; // menit
-    const startAt  = form?.start_at; // timestamp ms
 
     if (!duration || duration <= 0) return; // tidak ada timer
 
@@ -125,9 +150,18 @@ export default function FillForm() {
     const totalSecs = duration * 60;
 
     let startSecs = totalSecs;
-    if (startAt && Number(startAt) > 0) {
-      const elapsed = Math.floor((Date.now() - Number(startAt)) / 1000);
+    const savedTime = sessionStorage.getItem(`timer_${slug}`);
+    
+    // Gunakan sisa waktu dari sessionStorage jika ada (lanjutkan timer)
+    if (savedTime && !isNaN(parseInt(savedTime))) {
+      startSecs = parseInt(savedTime);
+    } else if (form?.start_at && Number(form?.start_at) > 0) {
+      // Fallback ke server start_at jika tidak ada di session (misal device lain)
+      const elapsed = Math.floor((Date.now() - Number(form.start_at)) / 1000);
       startSecs = Math.max(0, totalSecs - elapsed);
+    } else {
+      // Pertama kali buka, catat waktu mulai di session untuk device ini (opsional)
+      sessionStorage.setItem(`timer_start_${slug}`, Date.now().toString());
     }
 
     if (startSecs <= 0) { setTimedOut(true); return; }
@@ -139,6 +173,7 @@ export default function FillForm() {
         if (prev === null) return null;
         if (prev <= 1) {
           clearInterval(timerRef.current);
+          sessionStorage.removeItem(`timer_${slug}`);
           // Auto-submit saat waktu habis — paksa kirim semua jawaban
           setTimedOut(true);
           setAutoSubmitting(true);
@@ -149,7 +184,7 @@ export default function FillForm() {
     }, 1000);
 
     return () => clearInterval(timerRef.current);
-  }, [form?.duration, form?.start_at, tokenVerified]);
+  }, [form?.duration, form?.start_at, tokenVerified, slug]);
 
   // ── Auto-submit saat timer habis ──
   const [autoSubmitting, setAutoSubmitting] = useState(false);
@@ -310,7 +345,7 @@ export default function FillForm() {
       setSubmitting(false);
       setAutoSubmitting(false);
     }
-  }  }
+  }
 
   const title = form?.title ?? form?.form_title ?? "Form";
   const isQuiz = form?.category === "ujian";
@@ -386,6 +421,34 @@ export default function FillForm() {
   }, [form?.soal, form?.is_random, form?.slug, form?.category]);
 
   const allSoal = soalList;
+
+  // ── Manual Zoom Handlers ──
+  function zoomIn()  { setZoomLevel(prev => Math.min(prev + 0.1, 1.5)); }
+  function zoomOut() { setZoomLevel(prev => Math.max(prev - 0.1, 0.7)); }
+  function resetZoom() { setZoomLevel(1); }
+
+  // Get banner image with auto-resize (object-fit: contain)
+  const banner = form?.banner ?? form?.form_banner;
+  const bannerUrl = banner ? `${FORM_API_URL}${banner.startsWith('/') ? banner : '/uploads/form/' + banner}` : null;
+
+  // ── Soft refresh: ambil ulang data form tanpa hapus jawaban/timer/token ──
+  // ponytail: pakai endpoint GET /form/slug yang sudah ada, tanpa ubah BE
+  async function refreshForm() {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      const res = await api.get("/form/slug", { params: { slug } });
+      setForm(res.data?.data);
+      setError("");
+      setLiveNotice("Form berhasil diperbarui!");
+      setTimeout(() => setLiveNotice(""), 3000);
+    } catch {
+      setLiveNotice("Gagal memperbarui form. Coba lagi.");
+      setTimeout(() => setLiveNotice(""), 3000);
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   /* ── Loading ────────────────────────────────────────── */
   if (loading) return (
@@ -509,8 +572,7 @@ export default function FillForm() {
     const isFirst     = currentIdx === 0;
     const isLast      = currentIdx === totalPages - 1;
     const progress    = totalPages > 0 ? ((currentIdx + 1) / totalPages) * 100 : 0;
-    const pageNum     = currPage.page ?? (currentIdx + 1);
-
+     const pageNum     = currPage.page ?? (currentIdx + 1);
     function goNext() {
       let reqMap = {};
       try { const s = localStorage.getItem(`soal_required_${slug}`); if (s) reqMap = JSON.parse(s); } catch {}
@@ -547,28 +609,47 @@ export default function FillForm() {
                 Halaman {currentIdx + 1} / {totalPages}
               </span>
               <div className="flex items-center gap-2">
-                {/* Timer */}
-                {timeLeft !== null && (
-                  <TimerBadge timeLeft={timeLeft} />
-                )}
-                {/* Tombol Soal */}
-                <SoalIndicatorBtn
-                  allSoal={allSoal}
-                  answers={answers}
-                  hasAnswer={hasAnswer}
-                  doubtfulIds={doubtfulIds}
-                  pageGroups={pageGroups}
-                  currentIdx={currentIdx}
-                  setCurrentIdx={setCurrentIdx}
-                  answeredCount={answeredCount}
-                  doubtCount={doubtCount}
-                />
+                <div className="flex items-center gap-1.5">
+                  <button onClick={zoomOut} className="p-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all" title="Zoom Out">
+                    <ZoomOut size={14} />
+                  </button>
+                  <button onClick={resetZoom} title="Reset zoom ke 100%" className="px-2 py-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all text-[11px] font-bold text-[#1a4fa0] tabular-nums min-w-[44px]">
+                    {Math.round(zoomLevel * 100)}%
+                  </button>
+                  <button onClick={zoomIn} className="p-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all" title="Zoom In">
+                    <ZoomIn size={14} />
+                  </button>
+                  <button onClick={refreshForm} disabled={refreshing} className="p-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all disabled:opacity-60" title="Muat ulang soal">
+                    <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+                  </button>
+                </div>
               </div>
+              {/* Timer */}
+              {timeLeft !== null && (
+                <TimerBadge timeLeft={timeLeft} />
+              )}
+              {/* Tombol Soal */}
+              <SoalIndicatorBtn
+                allSoal={allSoal}
+                answers={answers}
+                hasAnswer={hasAnswer}
+                doubtfulIds={doubtfulIds}
+                pageGroups={pageGroups}
+                currentIdx={currentIdx}
+                setCurrentIdx={setCurrentIdx}
+                answeredCount={answeredCount}
+                doubtCount={doubtCount}
+              />
             </div>
           </div>
         </div>
 
-        <div className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full">
+        <div className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full transition-transform duration-200 origin-top" style={{ transform: `scale(${zoomLevel})` }}>
+          {bannerUrl && (
+            <div className="mb-4 w-full">
+              <img src={bannerUrl} alt="Banner" className="w-full max-h-72 object-contain rounded-2xl border border-[#e5eef7] shadow-sm bg-white" />
+            </div>
+          )}
           {liveNotice && (
             <div className="mb-4 px-4 py-3 rounded-xl bg-blue-600 text-white text-[14px] font-semibold flex items-center gap-3 shadow-lg">
               <Bell size={18} /><span>{liveNotice}</span>
@@ -686,6 +767,22 @@ export default function FillForm() {
             <span className="text-[13px] font-semibold text-gray-500">
               {totalPagesS > 1 ? `Halaman ${currentIdx + 1} / ${totalPagesS}` : title}
             </span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <button onClick={zoomOut} className="p-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all" title="Zoom Out">
+                  <ZoomOut size={14} />
+                </button>
+                <button onClick={resetZoom} title="Reset zoom ke 100%" className="px-2 py-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all text-[11px] font-bold text-[#1a4fa0] tabular-nums min-w-[44px]">
+                  {Math.round(zoomLevel * 100)}%
+                </button>
+                <button onClick={zoomIn} className="p-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all" title="Zoom In">
+                  <ZoomIn size={14} />
+                </button>
+                <button onClick={refreshForm} disabled={refreshing} className="p-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all disabled:opacity-60" title="Muat ulang soal">
+                  <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+                </button>
+              </div>
+            </div>
             {timeLeft !== null && <TimerBadge timeLeft={timeLeft} />}
           </div>
           {totalPagesS > 1 && (
@@ -696,7 +793,12 @@ export default function FillForm() {
         </div>
       </div>
 
-      <div className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full">
+      <div className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full transition-transform duration-200 origin-top" style={{ transform: `scale(${zoomLevel})` }}>
+        {bannerUrl && (
+          <div className="mb-4 w-full">
+            <img src={bannerUrl} alt="Banner" className="w-full max-h-72 object-contain rounded-2xl border border-[#e5eef7] shadow-sm bg-white" />
+          </div>
+        )}
         {liveNotice && (
           <div className="mb-4 px-4 py-3 rounded-xl bg-blue-600 text-white text-[14px] font-semibold flex items-center gap-3 shadow-lg">
             <Bell size={18} /><span>{liveNotice}</span>
@@ -713,19 +815,20 @@ export default function FillForm() {
 
         {/* Soal di halaman ini */}
         {(currPageS.soal ?? []).map((soal, qi) => {
-          // Nomor soal = posisi halaman dalam pageGroups (sudah di-shuffle kalau is_random)
-          const pgIdx   = pageGroups.findIndex(pg => (pg.soal ?? []).some(s => s.id === soal.id));
-          const displayNum = pgIdx >= 0 ? pgIdx : qi;
+          // Calculate cumulative question number for survey mode - ensure unique numbers
+          const prevPagesSoalCount = pageGroups.slice(0, currentIdx).reduce((sum, pg) => sum + (pg.soal?.length || 0), 0);
+          const displayNum = prevPagesSoalCount + qi;
+          
           const isError = errorSoalId === soal.id;
           const isDoubt = doubtfulIds.has(soal.id);
           return (
             <div key={soal.id ?? qi} ref={el => { if (el) soalRefs.current[soal.id] = el; }}
               className={`rounded-2xl border shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-6 mb-4 transition-all ${isError ? "border-red-400 ring-2 ring-red-100" : ""}`}
               style={{ backgroundColor: "var(--fm-card)", borderColor: isError ? undefined : "var(--fm-card-border)" }}>
-              <div className="flex items-start gap-3 mb-4">
-                <span className="w-9 h-9 rounded-xl bg-[#eef5fb] text-[#1a4fa0] text-[14px] font-extrabold grid place-items-center shrink-0 mt-0.5">
-                  {displayNum + 1}
-                </span>
+                <div className="flex items-start gap-3 mb-4">
+                  <span className="w-9 h-9 rounded-xl bg-[#eef5fb] text-[#1a4fa0] text-[14px] font-extrabold grid place-items-center shrink-0 mt-0.5">
+                    {displayNum + 1}
+                  </span>
                 <div className="flex-1 min-w-0">
                   <RichTextDisplay content={soal.question} className="text-[16px] font-bold text-[#102f56] leading-snug" />
                   <span className="text-[12px] font-medium text-[#1a4fa0] block mt-1">{TYPE_LABEL[soal.type] ?? soal.type}</span>
@@ -828,8 +931,8 @@ export default function FillForm() {
             <button onClick={goNextS}
               className="flex-1 py-3 rounded-xl text-white text-[14px] font-bold flex items-center justify-center gap-2 hover:opacity-90 transition"
               style={{ backgroundColor: "#1a4fa0" }}>
-              Selanjutnya <ArrowRight size={16} />
-            </button>
+            Selanjutnya <ArrowRight size={16} />
+          </button>
           ) : (
             <button onClick={submit} disabled={submitting}
               className="w-full py-3.5 rounded-xl text-white text-[15px] font-bold flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-60 transition"

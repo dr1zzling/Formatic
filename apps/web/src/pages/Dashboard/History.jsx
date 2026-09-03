@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../utils/api";
-import { Clock, CheckCircle2, FileText, RefreshCw, Bell, ArrowUpRight, Search } from "lucide-react";
+import { Clock, CheckCircle2, FileText, RefreshCw, Bell, ArrowUpRight, Search, Trash2, Info, X } from "lucide-react";
 
 const HISTORY_KEY = "formatic_history";
 
@@ -65,6 +65,7 @@ export default function History() {
   const [search, setSearch]     = useState("");
   const [loading, setLoading]   = useState(true);
   const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [showInfo, setShowInfo]   = useState(false);
   const intervalRef = useRef(null);
 
   useEffect(() => {
@@ -92,6 +93,16 @@ export default function History() {
   function refresh() {
     loadHistory();
     setLastUpdate(new Date());
+  }
+
+  // Hapus satu entri dari riwayat lokal (tidak menyentuh data server)
+  function removeEntry(formSlug) {
+    try {
+      const local = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]");
+      const next = local.filter(e => e.form_slug !== formSlug);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+      setHistory(next);
+    } catch { /* abaikan */ }
   }
 
   // Group history by date
@@ -122,6 +133,10 @@ export default function History() {
             <span className="hidden sm:flex items-center gap-1 text-[11px] text-gray-400">
               <Clock size={11} /> Update: {formatTime(lastUpdate.toISOString())}
             </span>
+            <button onClick={() => setShowInfo(true)} title="Tentang halaman ini"
+              className="w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition">
+              <Info size={14} />
+            </button>
             <button onClick={refresh}
               className="w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition">
               <RefreshCw size={14} />
@@ -236,6 +251,12 @@ export default function History() {
                           <CheckCircle2 size={11} /> Selesai
                         </span>
                         <button
+                          title="Hapus dari riwayat"
+                          onClick={e => { e.stopPropagation(); removeEntry(item.form_slug); }}
+                          className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 transition">
+                          <Trash2 size={13} />
+                        </button>
+                        <button
                           onClick={e => { e.stopPropagation(); navigate(`/fill/${item.form_slug}`); }}
                           className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-[#1a4fa0] hover:text-white transition opacity-0 group-hover:opacity-100">
                           <ArrowUpRight size={13} />
@@ -249,6 +270,39 @@ export default function History() {
           ))}
         </div>
       </div>
+
+      {/* ── Modal info ─────────────────────────────────── */}
+      {showInfo && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          style={{ background: "rgba(5,20,50,0.55)", backdropFilter: "blur(6px)" }}
+          onClick={() => setShowInfo(false)}
+        >
+          <div
+            className="bg-white w-full max-w-sm rounded-2xl shadow-xl p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-3">
+              <h3 className="font-extrabold text-gray-900 text-[16px]">Tentang History</h3>
+              <button onClick={() => setShowInfo(false)}
+                className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition"
+                aria-label="Tutup">
+                <X size={14} />
+              </button>
+            </div>
+            <div className="text-[13px] text-gray-500 leading-relaxed space-y-2">
+              <p>Halaman ini menampilkan form yang pernah kamu kerjakan <strong>di browser ini</strong>. Daftarnya tersimpan lokal di perangkatmu, bukan di server.</p>
+              <p>Klik baris untuk membuka form itu lagi.</p>
+              <p>Tombol <Trash2 size={12} className="inline -mt-0.5" /> menghapus catatan dari daftar ini saja — <strong>form dan jawaban yang sudah terkirim tidak ikut terhapus</strong>.</p>
+            </div>
+            <button onClick={() => setShowInfo(false)}
+              className="mt-5 w-full py-2.5 rounded-xl text-white text-[13px] font-bold hover:opacity-90 transition"
+              style={{ background: "linear-gradient(135deg,#1a4fa0,#1e6fc7)" }}>
+              Mengerti
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
