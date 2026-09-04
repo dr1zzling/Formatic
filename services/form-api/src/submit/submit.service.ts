@@ -58,11 +58,12 @@ export class SubmitService {
     if (checkRole != false) throw new ForbiddenException("Anda Tidak Berhak Sebagai Responden")
 
     const isFormPublic = await this.knexService.connection("forms")
-      .select("status")
+      .select("status", "start_at")
       .where({ id: form.id })
       .first()
 
     if (isFormPublic.status == "private") throw new ForbiddenException("Maaf Form Masih Tertutup")
+    if (Number(isFormPublic.start_at) > Date.now()) throw new ForbiddenException("waktu Pengerjaan belom dimulai")
 
     const getStatus = await this.knexService.connection("form_submit")
       .select("status", "attemps")
@@ -397,7 +398,7 @@ export class SubmitService {
   }
 
   // Submit Form
-  async submitForm(req: { id: number }, form: any, data: string, files: Express.Multer.File[] = []) {
+  async submitForm(req: { id: number, username: string }, form: any, data: string, files: Express.Multer.File[] = []) {
     const checkRole = await this.isCreator.isCreator(req.id, form.id)
     if (checkRole != false) throw new ForbiddenException("Anda Tidak Berhak Sebagai Responden")
 
@@ -459,7 +460,7 @@ export class SubmitService {
         .first()
       if (existingSubmit.status == "completed") throw new ConflictException("Anda sudah mengisi form ini")
 
-      const updateToCompleted = await this.changeFormSubmit("update", req.id, form.id, this.knexService.connection.fn.now())
+      const updateToCompleted = await this.changeFormSubmit("update", req.id, form.id, 1, req.username, this.knexService.connection.fn.now())
 
       await trx('user_answer').insert(
         answers.map((answer) => ({ ...answer, submitted_id: updateToCompleted.id }))
