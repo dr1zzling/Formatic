@@ -13,24 +13,38 @@ export class SubmitService {
   ) { }
 
   // Insert/Update form_submit
-  async changeFormSubmit(event, user_id: number, form_id: number, status: string, submitted_at?: number){
-    if(event == "insert"){
+  async changeFormSubmit(event, user_id: number, form_id: number, attemps: number, user_username?: string, submitted_at?: number) {
+    if (event == "insert") {
       const [insertFormSubmit] = await this.knexService.connection("form_submit")
-      .insert({ user_id: user_id, form_id: form_id, status: status })
-      .returning("*")
+        .insert({ user_id: user_id, user_username: user_username, form_id: form_id, status: "progress" })
+        .returning("*")
 
       return insertFormSubmit
     }
 
-    if(event == "update"){
-      const [update] = await this.knexService.connection("form_submit")
-      .update({ status: status, submitted_at: submitted_at })
-      .where({user_id: user_id, form_id: form_id})
+    if (event == "reset") {
+      const newAttemps = attemps + 1
+      const update = await this.knexService.connection("form_submit")
+        .update({ status: "progress", attemps: newAttemps })
+        .where({ user_id: user_id, form_id: form_id })
 
-      const getUpdate = await this.knexService.connection("forms_submit")
-      .select("*")
-      .where({user_id: user_id, form_id: form_id})
-      .first("*")
+      const getUpdate = await this.knexService.connection("form_submit")
+        .select("*")
+        .where({ user_id: user_id, form_id: form_id })
+        .first()
+
+      return getUpdate
+    }
+
+    if (event == "submit") {
+      const update = await this.knexService.connection("form_submit")
+        .update({ status: "completed", submitted_at: submitted_at })
+        .where({ user_id: user_id, form_id: form_id })
+
+      const getUpdate = await this.knexService.connection("form_submit")
+        .select("*")
+        .where({ user_id: user_id, form_id: form_id })
+        .first()
 
       return getUpdate
     }
@@ -39,19 +53,35 @@ export class SubmitService {
   }
 
   // Check Token
-  async checkTokenResponden(req: { id: number }, form: any, token: string) {
+  async checkTokenResponden(req: { id: number, username: string }, form: any, token: string) {
     const checkRole = await this.isCreator.isCreator(req.id, form.id)
     if (checkRole != false) throw new ForbiddenException("Anda Tidak Berhak Sebagai Responden")
 
-    const isAlreadyProgress = await this.knexService.connection("form_submit")
-    .select("id")
-    .where({form_id: form.id, user_id: req.id})
-    .first()
+    const isFormPublic = await this.knexService.connection("forms")
+      .select("status")
+      .where({ id: form.id })
+      .first()
 
-    if(isAlreadyProgress) throw new ForbiddenException("Anda sedang mengerjakan, harap minta creator untuk mereset")
+    if (isFormPublic.status == "private") throw new ForbiddenException("Maaf Form Masih Tertutup")
 
-    if (form.token_respon == null) {
-      const insertFormSubmit = await this.changeFormSubmit("insert", req.id, form.id, "progress")
+    const getStatus = await this.knexService.connection("form_submit")
+      .select("status", "attemps")
+      .where({ form_id: form.id, user_id: req.id })
+      .first()
+
+    if (!getStatus) {
+
+      if (form.token_respon == null) {
+        const insertFormSubmit = await this.changeFormSubmit("insert", req.id, form.id, 1, req.username)
+        return {
+          message: "Berhasil",
+          data: insertFormSubmit
+        }
+      }
+
+      if (form.token_respon != token) throw new BadRequestException("Token Salah")
+
+      const insertFormSubmit = await this.changeFormSubmit("insert", req.id, form.id, 1, req.username)
 
       return {
         message: "Berhasil",
@@ -59,22 +89,22 @@ export class SubmitService {
       }
     }
 
-    if (form.token_respon != token) throw new BadRequestException("Token Salah")
-
-    const insertFormSubmit = await this.changeFormSubmit("insert", req.id, form.id, "progress")
-
-    return {
-      message: "Berhasil",
-      data: insertFormSubmit
+    if (getStatus.status == "progress") throw new ForbiddenException("Anda sedang mengerjakan, harap minta creator untuk mereset")
+    if (getStatus.status == "reset") {
+      const updateFormSubmit = await this.changeFormSubmit("reset", req.id, form.id, getStatus.attemps)
+      return {
+        message: "Berhasil",
+        data: updateFormSubmit
+      }
     }
   }
 
   // Get All Submit By Form
   async getAllSubmitByForm(req: { id: number }, form: any) {
     const checkRole = await this.isCreator.isCreator(req.id, form.id)
-    if(checkRole == false) throw new ForbiddenException("Anda Tidak Berhak")
+    if (checkRole == false) throw new ForbiddenException("Anda Tidak Berhak")
 
-    const getSoal: any[] = await this.soalService.getSoalByForm(form.id, form.is_random)
+    const getSoal: any[] = await this.soalService.getSoalByForm(form.id)
 
     const totalSubmit = await this.knexService.connection('form_submit')
       .count('* as total')
@@ -143,7 +173,7 @@ export class SubmitService {
     const checkRole = await this.isCreator.isCreator(req.id, form.id)
     if (checkRole === false) throw new ForbiddenException("Anda Tidak Berhak")
 
-    const getSoal: any[] = await this.soalService.getSoalByForm(form.id, form.is_random)
+    const getSoal: any[] = await this.soalService.getSoalByForm(form.id)
 
     const getAllSubmit = await this.knexService.connection("form_submit")
       .select("*")
@@ -230,24 +260,10 @@ export class SubmitService {
     }
   }
 
-  // Monitoring 
-  async monitoringSubmit(req: { id: number}, form: any){
-    const checkRole = await this.isCreator.isCreator(req.id, form.id)
-    if(checkRole === false) throw new ForbiddenException("Anda Tidak Berhak")
-
-    const getAllStatusSubmit = await this.knexService.connection("form_submit")
-    .select("user_id", "start_at", "submitted_at", "status")
-
-    return {
-      message: "Berhasil mendapatkan status submit",
-      status: getAllStatusSubmit
-    }
-  }
-
   // Export Excel
   async exportSubmitResponseToExcel(req: { id: number }, form: any): Promise<Buffer> {
     const checkRole = await this.isCreator.isCreator(req.id, form.id)
-    if(checkRole == false) throw new ForbiddenException("Anda Tidak Berhak")
+    if (checkRole == false) throw new ForbiddenException("Anda Tidak Berhak")
 
     const response = await this.getAllSubmitResponseByForm(req, form)
     const pageData = response.data || []
@@ -416,7 +432,7 @@ export class SubmitService {
         .first()
       if (existingSubmit.status == "completed") throw new ConflictException("Anda sudah mengisi form ini")
 
-      const updateToCompleted = await this.changeFormSubmit("update", req.id, form.id, "completed", this.knexService.connection.fn.now())
+      const updateToCompleted = await this.changeFormSubmit("update", req.id, form.id, this.knexService.connection.fn.now())
 
       await trx('user_answer').insert(
         answers.map((answer) => ({ ...answer, submitted_id: updateToCompleted.id }))
