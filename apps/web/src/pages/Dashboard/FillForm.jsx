@@ -69,19 +69,24 @@ export default function FillForm() {
   const [timedOut, setTimedOut]   = useState(false);
   const timerRef                  = useRef(null);
 
-  useEffect(() => {
-    // Restore timeLeft from sessionStorage if it exists to prevent timer reset on refresh
-    const savedTime = sessionStorage.getItem(`timer_${slug}`);
-    if (savedTime && !isNaN(parseInt(savedTime))) {
-      setTimeLeft(parseInt(savedTime));
-    }
-  }, [slug]);
+  // Helper untuk membersihkan storage timer
+  const cleanupTimerStorage = () => {
+    sessionStorage.removeItem(`timer_end_${slug}`);
+    sessionStorage.removeItem(`timer_${slug}`);
+    sessionStorage.removeItem(`timer_start_${slug}`);
+  };
 
   useEffect(() => {
-    if (timeLeft !== null) {
-      sessionStorage.setItem(`timer_${slug}`, timeLeft.toString());
+    // Restore timeLeft langsung saat mount jika end timestamp sudah ada
+    const endTimestamp = sessionStorage.getItem(`timer_end_${slug}`);
+    if (endTimestamp && !isNaN(parseInt(endTimestamp))) {
+      const remaining = Math.max(0, Math.ceil((parseInt(endTimestamp) - Date.now()) / 1000));
+      setTimeLeft(remaining);
+      if (remaining <= 0) {
+        setTimedOut(true);
+      }
     }
-  }, [timeLeft, slug]);
+  }, [slug]);
 
   useEffect(() => {
     (async () => {
@@ -143,44 +148,49 @@ export default function FillForm() {
     if (!form || !tokenVerified) return;
 
     const duration = form?.duration; // menit
-
     if (!duration || duration <= 0) return; // tidak ada timer
 
-    // Hitung sisa waktu
     const totalSecs = duration * 60;
+    let endTimestamp = sessionStorage.getItem(`timer_end_${slug}`);
 
-    let startSecs = totalSecs;
-    const savedTime = sessionStorage.getItem(`timer_${slug}`);
-    
-    // Gunakan sisa waktu dari sessionStorage jika ada (lanjutkan timer)
-    if (savedTime && !isNaN(parseInt(savedTime))) {
-      startSecs = parseInt(savedTime);
-    } else if (form?.start_at && Number(form?.start_at) > 0) {
-      // Fallback ke server start_at jika tidak ada di session (misal device lain)
-      const elapsed = Math.floor((Date.now() - Number(form.start_at)) / 1000);
-      startSecs = Math.max(0, totalSecs - elapsed);
+    if (!endTimestamp || isNaN(parseInt(endTimestamp))) {
+      // Belum ada end timestamp di session
+      if (form?.start_at && Number(form?.start_at) > 0) {
+        // Jika server punya start_at
+        endTimestamp = Number(form.start_at) + (totalSecs * 1000);
+      } else {
+        // Hitung target waktu selesai dari sekarang
+        endTimestamp = Date.now() + (totalSecs * 1000);
+      }
+      sessionStorage.setItem(`timer_end_${slug}`, endTimestamp.toString());
     } else {
-      // Pertama kali buka, catat waktu mulai di session untuk device ini (opsional)
-      sessionStorage.setItem(`timer_start_${slug}`, Date.now().toString());
+      endTimestamp = parseInt(endTimestamp);
     }
 
-    if (startSecs <= 0) { setTimedOut(true); return; }
+    const computeRemaining = () => Math.max(0, Math.ceil((endTimestamp - Date.now()) / 1000));
+    const initialSecs = computeRemaining();
 
-    setTimeLeft(startSecs);
+    setTimeLeft(initialSecs);
 
+    if (initialSecs <= 0) {
+      cleanupTimerStorage();
+      setTimedOut(true);
+      setAutoSubmitting(true);
+      return;
+    }
+
+    // Interval real-time: selalu bandingkan dengan target endTimestamp
     timerRef.current = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev === null) return null;
-        if (prev <= 1) {
-          clearInterval(timerRef.current);
-          sessionStorage.removeItem(`timer_${slug}`);
-          // Auto-submit saat waktu habis — paksa kirim semua jawaban
-          setTimedOut(true);
-          setAutoSubmitting(true);
-          return 0;
-        }
-        return prev - 1;
-      });
+      const remaining = computeRemaining();
+      setTimeLeft(remaining);
+
+      if (remaining <= 0) {
+        clearInterval(timerRef.current);
+        cleanupTimerStorage();
+        // Auto-submit saat waktu habis — paksa kirim semua jawaban
+        setTimedOut(true);
+        setAutoSubmitting(true);
+      }
     }, 1000);
 
     return () => clearInterval(timerRef.current);
@@ -241,16 +251,26 @@ export default function FillForm() {
     const empty = (allSoal ?? []).find((s) => isRequired(s) && !hasAnswer(s));
     if (empty) {
       setErrorSoalId(empty.id);
-      setSubmitError("");
-      const el = soalRefs.current[empty.id];
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      const clean = (empty.question || "Soal").replace(/<[^>]*>/g, "").trim();
+      setSubmitError(`Pertanyaan "${clean}" belum dijawab. Mohon lengkapi semua soal wajib sebelum mengirim.`);
+      
+      // Jika mode per-halaman/quiz, pindahkan currentIdx ke halaman yang berisi soal tersebut
+      const targetPageIdx = pageGroups.findIndex(pg => (pg.soal ?? []).some(s => s.id === empty.id));
+      if (targetPageIdx >= 0 && targetPageIdx !== currentIdx) {
+        setCurrentIdx(targetPageIdx);
+      }
+      setTimeout(() => {
+        const el = soalRefs.current[empty.id];
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
       return;
     }
     // Cek ragu-ragu
     if (doubtfulIds.size > 0) {
       setSubmitError(`Masih ada ${doubtfulIds.size} soal yang ditandai ragu-ragu. Periksa kembali sebelum submit.`);
       return;
-    }    setErrorSoalId(null);
+    }
+    setErrorSoalId(null);
 
     setSubmitting(true); setSubmitError("");
     try {
@@ -298,14 +318,16 @@ export default function FillForm() {
       }
       // Simpan ke history lokal
       saveToHistory(slug, form?.title ?? form?.form_title, form?.category);
-      // Hapus draft jawaban dari localStorage
+      // Hapus draft jawaban dari localStorage & timer storage
       localStorage.removeItem(STORAGE_KEY);
+      cleanupTimerStorage();
       setDone(true);
     } catch (e) {
       const msg = e.message || "";
       if (msg.toLowerCase().includes("sudah") || msg.includes("409")) {
         setSubmitError("Kamu sudah pernah mengisi form ini sebelumnya.");
         localStorage.removeItem(STORAGE_KEY); // hapus draft
+        cleanupTimerStorage();
       } else {
         setSubmitError(e.message || "Gagal mengirim jawaban.");
       }
@@ -574,21 +596,16 @@ export default function FillForm() {
     const progress    = totalPages > 0 ? ((currentIdx + 1) / totalPages) * 100 : 0;
      const pageNum     = currPage.page ?? (currentIdx + 1);
     function goNext() {
-      let reqMap = {};
-      try { const s = localStorage.getItem(`soal_required_${slug}`); if (s) reqMap = JSON.parse(s); } catch {}
-      const isReq = (s) => reqMap[s.id] !== undefined ? reqMap[s.id] : true;
-      const unanswered = (currPage.soal ?? []).find(s => isReq(s) && !hasAnswer(s));
-      if (unanswered) {
-        const clean = (unanswered.question || "Wajib").replace(/<[^>]*>/g, "").trim();
-        setSubmitError(`Pertanyaan "${clean}" belum dijawab.`);
-        return;
-      }
       setSubmitError("");
+      setErrorSoalId(null);
       setCurrentIdx(i => Math.min(i + 1, totalPages - 1));
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
     function goPrev() {
       setSubmitError("");
+      setErrorSoalId(null);
       setCurrentIdx(i => Math.max(i - 1, 0));
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
     // Hitung status ringkasan untuk badge tombol Soal
@@ -601,13 +618,10 @@ export default function FillForm() {
         <div className="sticky top-0 z-10 backdrop-blur border-b border-[#e5eef7] px-4 py-3 transition-colors"
           style={{ backgroundColor: "var(--fm-card)" }}>
           <div className="max-w-2xl mx-auto">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-2.5">
               <button onClick={() => navigate("/")} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#1a4fa0] hover:underline">
                 <ArrowLeft size={15} /> Kembali
               </button>
-              <span className="text-[13px] font-semibold text-gray-500">
-                Halaman {currentIdx + 1} / {totalPages}
-              </span>
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1.5">
                   <button onClick={zoomOut} className="p-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all" title="Zoom Out">
@@ -640,6 +654,32 @@ export default function FillForm() {
                 answeredCount={answeredCount}
                 doubtCount={doubtCount}
               />
+            </div>
+
+            {/* Progress Section */}
+            <div className="pt-1">
+              <div className="flex items-center justify-between text-[12px] font-semibold mb-1.5">
+                <div className="flex items-center gap-1.5 text-[#102f56]">
+                  <span className="inline-block w-2 h-2 rounded-full bg-[#1a4fa0] animate-pulse"></span>
+                  <span>Soal {currentIdx + 1} dari {totalPages}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-400 font-normal">{answeredCount} dijawab</span>
+                  <span className="px-2 py-0.5 rounded-full bg-[#eef5fb] text-[#1a4fa0] font-bold text-[11px] border border-[#d4e5fa]">
+                    {Math.round(progress)}%
+                  </span>
+                </div>
+              </div>
+              <div className="w-full h-2 bg-[#e8f1fa] rounded-full overflow-hidden p-[1px] shadow-inner">
+                <div
+                  className="h-full rounded-full transition-all duration-500 ease-out shadow-sm"
+                  style={{
+                    width: `${Math.min(100, Math.max(3, progress))}%`,
+                    background: "linear-gradient(90deg, #1a4fa0 0%, #2563eb 60%, #38bdf8 100%)",
+                    boxShadow: "0 1px 4px rgba(26, 79, 160, 0.35)"
+                  }}
+                />
+              </div>
             </div>
           </div>
         </div>
