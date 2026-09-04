@@ -168,10 +168,9 @@ export class SubmitService {
     }
   }
 
-  // Get All Submit Detail
   async getAllSubmitResponseByForm(req: { id: number }, form: any) {
     const checkRole = await this.isCreator.isCreator(req.id, form.id)
-    if (checkRole === false) throw new ForbiddenException("Anda Tidak Berhak")
+    if (checkRole == false) throw new ForbiddenException("Anda Tidak Berhak")
 
     const getSoal: any[] = await this.soalService.getSoalByForm(form.id)
 
@@ -197,7 +196,6 @@ export class SubmitService {
       .select("*")
       .whereIn("submitted_id", submitId)
 
-    // Grouping jawaban berdasarkan soal_id
     const answersBySoal = getSubmittedDetail.reduce((acc: any, item: any) => {
       const soalId = item.soal_id
 
@@ -235,7 +233,6 @@ export class SubmitService {
       return acc
     }, {})
 
-    // Map nested structure: Page -> Soal -> Responses
     const result = getSoal.map((pageGroup: any) => ({
       ...pageGroup,
       soal: Array.isArray(pageGroup.soal)
@@ -263,20 +260,24 @@ export class SubmitService {
   // Export Excel
   async exportSubmitResponseToExcel(req: { id: number }, form: any): Promise<Buffer> {
     const checkRole = await this.isCreator.isCreator(req.id, form.id)
-    if (checkRole == false) throw new ForbiddenException("Anda Tidak Berhak")
+    if (checkRole === false) throw new ForbiddenException("Anda Tidak Berhak")
 
     const response = await this.getAllSubmitResponseByForm(req, form)
     const pageData = response.data || []
 
-    const questionsList: { id: number, question: string }[] = []
-    const optionsMap = new Map<number, string>()
+    const questionsList: { id: number; question: string; score: number }[] = []
+    const optionsMap = new Map<number, { value: string; is_correct: boolean }>()
 
     pageData.forEach((page: any) => {
       (page.soal || []).forEach((soal: any) => {
-        questionsList.push({ id: soal.id, question: soal.question });
+        questionsList.push({
+          id: soal.id,
+          question: soal.question,
+          score: soal.score || "-"
+        });
 
         (soal.options || []).forEach((opt: any) => {
-          optionsMap.set(opt.id, opt.value)
+          optionsMap.set(opt.id, { value: opt.value, is_correct: opt.is_correct })
         })
       })
     })
@@ -285,30 +286,52 @@ export class SubmitService {
 
     pageData.forEach((page: any) => {
       (page.soal || []).forEach((soal: any) => {
+        const defaultQuestionScore = soal.score || 10;
+
         (soal.responses || []).forEach((resp: any) => {
           const { submitted_id, answer } = resp
 
           if (!respondentMap.has(submitted_id)) {
-            respondentMap.set(submitted_id, { submitted_id })
+            respondentMap.set(submitted_id, {
+              submitted_id,
+              total_score: 0
+            })
           }
 
+          const respondentData = respondentMap.get(submitted_id)!
           let formattedAnswer = answer
+          let isCorrectAnswer = false
+
           if (typeof answer === 'number' && optionsMap.has(answer)) {
-            formattedAnswer = optionsMap.get(answer)
-          } else if (typeof answer === 'string' && answer.includes(',')) {
-            formattedAnswer = answer
-              .split(',')
-              .map((idStr) => {
-                const idNum = parseInt(idStr.trim(), 10)
-                return optionsMap.has(idNum) ? optionsMap.get(idNum) : idStr.trim()
-              })
-              .join(', ')
+            const opt = optionsMap.get(answer)!
+            formattedAnswer = opt.value
+            if (opt.is_correct) isCorrectAnswer = true
+          }
+          else if (typeof answer === 'string' && answer.includes(',')) {
+            const idList = answer.split(',').map((idStr) => parseInt(idStr.trim(), 10))
+
+            const optionTexts: string[] = []
+            let allCorrect = true
+
+            idList.forEach((idNum) => {
+              if (optionsMap.has(idNum)) {
+                const opt = optionsMap.get(idNum)!
+                optionTexts.push(opt.value)
+                if (!opt.is_correct) allCorrect = false
+              } else {
+                optionTexts.push(idNum.toString())
+              }
+            })
+
+            formattedAnswer = optionTexts.join(', ')
+            if (allCorrect && idList.length > 0) isCorrectAnswer = true
           }
 
-          const respondentData = respondentMap.get(submitted_id)
-          if (respondentData) {
-            respondentData[`soal_${soal.id}`] = formattedAnswer ?? '-'
+          if (isCorrectAnswer) {
+            respondentData.total_score += defaultQuestionScore
           }
+
+          respondentData[`soal_${soal.id}`] = formattedAnswer ?? '-'
         })
       })
     })
@@ -318,6 +341,7 @@ export class SubmitService {
 
     const columns = [
       { header: 'No / Submitted ID', key: 'submitted_id', width: 20 },
+      { header: 'Total Score', key: 'total_score', width: 15 },
       ...questionsList.map((q) => ({
         header: q.question,
         key: `soal_${q.id}`,
@@ -335,7 +359,10 @@ export class SubmitService {
     }
     headerRow.alignment = { vertical: 'middle', horizontal: 'center' }
 
-    const rows = Array.from(respondentMap.values())
+    const rows = Array.from(respondentMap.values()).sort(
+      (a, b) => b.total_score - a.total_score
+    )
+
     worksheet.addRows(rows)
 
     const baseUrl = process.env.APP_URL || 'http://localhost:4000'
@@ -349,9 +376,9 @@ export class SubmitService {
             const fullUrl = `${baseUrl}${val}`
 
             cell.value = {
-              text: 'Lihat Gambar',
+              text: 'Lihat File / Gambar',
               hyperlink: fullUrl,
-              tooltip: 'Klik untuk membuka gambar',
+              tooltip: 'Klik untuk membuka file',
             }
 
             cell.font = {
