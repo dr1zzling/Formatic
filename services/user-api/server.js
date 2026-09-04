@@ -32,7 +32,7 @@ async function userExist(username){
         return get.rows[0]
     } catch(err) {
         console.error('userExist error:', err.message)
-        return null  // fix: return null bukan object saat error
+        return null
     }
 }
 

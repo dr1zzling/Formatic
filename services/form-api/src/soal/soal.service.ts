@@ -17,7 +17,7 @@ export class SoalService {
         try {
             const form = await this.knexService.connection('forms').where('id', formId).first()
             if (form) {
-                const updatedSoal = await this.getSoalByForm(form.id, form.is_random)
+                const updatedSoal = await this.getSoalByForm(form.id)
                 this.formEventsGateway.notifyFormUpdated(form.id, form.slug, updatedSoal)
             }
         } catch (error) {
@@ -25,6 +25,7 @@ export class SoalService {
         }
     }
 
+    // Import Word
     async importDocx(form_slug: any, buffer: Buffer) {
         const zip = await JSZip.loadAsync(buffer)
         const documentXml = await zip.file('word/document.xml')?.async('text')
@@ -356,19 +357,10 @@ export class SoalService {
     }
 
     // Get Soal From Form
-    async getSoalByForm(id: number, is_random: boolean) {
+    async getSoalByForm(id: number) {
         const getSoal = await this.knexService.connection("soal")
             .select("*")
             .where("form_id", id)
-
-        function shuffleArray(array) {
-            const arr = [...array]
-            for (let i = arr.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [arr[i], arr[j]] = [arr[j], arr[i]]
-            }
-            return arr
-        }
 
         const soalId = getSoal.map((soal) => soal.id)
         const getOption = await this.knexService.connection("soal_option")
@@ -383,7 +375,6 @@ export class SoalService {
                 }
             }
 
-            // Opsi TIDAK diacak — hanya urutan soal/halaman yang diacak
             const options = getOption.filter((option) => option.soal_id == row.id)
             acc[row.page].soal.push({
                 id: row.id,
@@ -400,7 +391,6 @@ export class SoalService {
 
         const result = Object.values(grouped) as Array<{ page: number, soal: any[] }>
 
-        // Selalu return urutan normal — shuffle ditangani di frontend
         return result.sort((a, b) => (a.page ?? 1) - (b.page ?? 1))
     }
 
@@ -428,9 +418,10 @@ export class SoalService {
                             score: soal.score,
                             image: soal.image ?? null,
                             audio: soal.audio ?? null,
-                            page: soal.page
+                            page: soal.page,
+                            is_required: soal.is_required
                         })
-                        .returning(['id', 'question', 'type', 'image', 'audio', 'page'])
+                        .returning(['id', 'question', 'type', 'image', 'audio', 'page', 'score', 'is_required'])
 
                     if (!optionTypes.includes(soal.type)) return insertSoal
 
@@ -443,8 +434,6 @@ export class SoalService {
                         is_correct: optionList[idx]?.is_correct ?? false
                     }))
 
-                    // PENCEGAHAN ERROR "The query is empty":
-                    // Jika array payload kosong, kembalikan objek tanpa query insert
                     if (payloadSoalOption.length === 0) {
                         return {
                             soal: insertSoal,

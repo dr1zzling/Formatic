@@ -70,7 +70,7 @@ export class FormService {
       const isCreator = await this.isCreator.isCreator(req.id, getForm.id)
       if(isCreator == false && getForm.status == 'private') throw new ForbiddenException("Maaf tapi form belum dibuka, silahkan hubungi creator") 
       
-      const listSoal = await this.soalService.getSoalByForm(getForm.id, getForm.is_random)
+      const listSoal = await this.soalService.getSoalByForm(getForm.id)
 
       return {
         message: "Berhasil Mendapatkan Form",
@@ -111,11 +111,15 @@ export class FormService {
   }
 
   // Create Form
-  async create(user: { id: number, username: string }, body: { title: string, category: string, token_respon: string }, banner: Express.Multer.File) {
+  async create(
+    user: { id: number, username: string }, 
+    body: { title: string, category: string, token_respon: string, theme_color: string }, 
+    banner: Express.Multer.File
+  ){
     const slug = slugify(body.title, { lower: true, strict: true })
     const finalSlug = `${slug}-${Date.now()}`
     const bannerPath = `/uploads/banner/${banner.filename}`
-    const tokenCollab = await crypto.randomBytes(64).toString('hex')
+    const tokenCollab = await crypto.randomBytes(8).toString('hex')
 
     const formResult = await this.knexService.connection.transaction(async (trx) => {
 
@@ -167,7 +171,8 @@ export class FormService {
   // Post Form to Public or Private
   async postPublic(req: {id: number }, form_id, status: string ){
     const isCreator = await this.isCreator.isCreator(req.id, form_id.id)
-    if(isCreator != 'Creator') throw new UnauthorizedException("Anda Tidak Berhak Menghapus Form Ini")
+    if(isCreator != 'Creator') throw new ForbiddenException("Anda Tidak Berhak Menghapus Form Ini")
+
     const validateStatus = ['public', 'private']
 
     if(!validateStatus.includes(status)) throw new BadRequestException("Isi Yang Benar")
@@ -180,7 +185,12 @@ export class FormService {
     }
   }
 
-  async updateForm(req: {id: number }, form, body: { duration: number, start_at: number, is_random: boolean}){
+  // Update Form
+  async updateFormSetting(
+    req: {id: number }, 
+    form, 
+    body: { token_respon: string, duration: number, start_at: number, is_random: boolean, theme_color: string}
+  ){
     const isCreator = await this.isCreator.isCreator(req.id, form.id)
     if(isCreator == false) throw new UnauthorizedException("Anda Tidak Berhak Update Form Ini")
 
@@ -188,20 +198,26 @@ export class FormService {
     const updateForm = await this.knexService.connection("forms")
     .update({
       duration: body.duration,
+      token_respon: body.token_respon,
       start_at: body.start_at ? new Date(body.start_at) : null,
-      is_random: body.is_random
+      is_random: body.is_random,
+      theme_color: body.theme_color
     })
     .where("id", form.id)
 
+    const getUpdate = await this.knexService.connection("forms").select("*").where("id", form.id).first()
+
     return {
-      message: "Berhasil Mengubah Waktu Pengerjaan"
+      message: "Berhasil Update",
+      data: getUpdate
     }
   }
 
   // Delete Form
   async deleteForm(req: { id: number}, form_id) {
     const isCreator = await this.isCreator.isCreator(req.id, form_id.id)
-    if(isCreator != 'Creator') throw new UnauthorizedException("Anda Tidak Berhak Menghapus Form Ini")
+    if(isCreator != 'Creator') throw new ForbiddenException("Anda Tidak Berhak Menghapus Form Ini")
+
     const deleteForm = await this.knexService.connection("forms")
     .delete()
     .where("id", form_id.id)
@@ -214,7 +230,7 @@ export class FormService {
   // Jadi collaborator
   async changeRole(req: { id: number, username: string}, form_id, token_collab: string){
     const isCreator = await this.isCreator.isCreator(req.id, form_id.id)
-    if(isCreator == 'Collaborator' || isCreator == 'Creator') throw new UnauthorizedException("Anda sudah menjadi bagian dari form ini")
+    if(isCreator == 'Collaborator' || isCreator == 'Creator') throw new ForbiddenException("Anda sudah menjadi bagian dari form ini")
 
     // Get Form
     if(form_id.token_collab != token_collab) throw new BadRequestException("Token Salah")

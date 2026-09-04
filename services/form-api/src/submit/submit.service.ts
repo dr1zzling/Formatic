@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { KnexService } from "../database/knex.service"
 import { ValidateIsCreator } from "../Pipe/validate.is.creator"
 import { SoalService } from "../soal/soal.service"
@@ -12,23 +12,99 @@ export class SubmitService {
     private soalService: SoalService
   ) { }
 
+  // Insert/Update form_submit
+  async changeFormSubmit(event, user_id: number, form_id: number, attemps: number, user_username?: string, submitted_at?: number) {
+    if (event == "insert") {
+      const [insertFormSubmit] = await this.knexService.connection("form_submit")
+        .insert({ user_id: user_id, user_username: user_username, form_id: form_id, status: "progress" })
+        .returning("*")
+
+      return insertFormSubmit
+    }
+
+    if (event == "reset") {
+      const newAttemps = attemps + 1
+      const update = await this.knexService.connection("form_submit")
+        .update({ status: "progress", attemps: newAttemps })
+        .where({ user_id: user_id, form_id: form_id })
+
+      const getUpdate = await this.knexService.connection("form_submit")
+        .select("*")
+        .where({ user_id: user_id, form_id: form_id })
+        .first()
+
+      return getUpdate
+    }
+
+    if (event == "submit") {
+      const update = await this.knexService.connection("form_submit")
+        .update({ status: "completed", submitted_at: submitted_at })
+        .where({ user_id: user_id, form_id: form_id })
+
+      const getUpdate = await this.knexService.connection("form_submit")
+        .select("*")
+        .where({ user_id: user_id, form_id: form_id })
+        .first()
+
+      return getUpdate
+    }
+
+    return false
+  }
+
   // Check Token
-  async checkTokenResponden(req: { id: number }, form: any, token: string) {
+  async checkTokenResponden(req: { id: number, username: string }, form: any, token: string) {
     const checkRole = await this.isCreator.isCreator(req.id, form.id)
+    if (checkRole != false) throw new ForbiddenException("Anda Tidak Berhak Sebagai Responden")
 
-    if (checkRole != false) throw new UnauthorizedException("Anda Tidak Berhak Sebagai Responden")
+    const isFormPublic = await this.knexService.connection("forms")
+      .select("status")
+      .where({ id: form.id })
+      .first()
 
-    if (form.token_respon == null) return { message: "Berhasil" }
-    if (form.token_respon != token) throw new BadRequestException("Token Salah")
+    if (isFormPublic.status == "private") throw new ForbiddenException("Maaf Form Masih Tertutup")
 
-    return {
-      message: "Berhasil"
+    const getStatus = await this.knexService.connection("form_submit")
+      .select("status", "attemps")
+      .where({ form_id: form.id, user_id: req.id })
+      .first()
+
+    if (!getStatus) {
+
+      if (form.token_respon == null) {
+        const insertFormSubmit = await this.changeFormSubmit("insert", req.id, form.id, 1, req.username)
+        return {
+          message: "Berhasil",
+          data: insertFormSubmit
+        }
+      }
+
+      if (form.token_respon != token) throw new BadRequestException("Token Salah")
+
+      const insertFormSubmit = await this.changeFormSubmit("insert", req.id, form.id, 1, req.username)
+
+      return {
+        message: "Berhasil",
+        data: insertFormSubmit
+      }
+    }
+
+    if (getStatus.status == "progress") throw new ForbiddenException("Anda sedang mengerjakan, harap minta creator untuk mereset")
+    if (getStatus.status == "reset") {
+      const updateFormSubmit = await this.changeFormSubmit("reset", req.id, form.id, getStatus.attemps)
+      return {
+        message: "Berhasil",
+        data: updateFormSubmit
+      }
     }
   }
 
   // Get All Submit By Form
   async getAllSubmitByForm(req: { id: number }, form: any) {
-    const getSoal: any[] = await this.soalService.getSoalByForm(form.id, form.is_random)
+    const checkRole = await this.isCreator.isCreator(req.id, form.id)
+    if (checkRole == false) throw new ForbiddenException("Anda Tidak Berhak")
+
+    const getSoal: any[] = await this.soalService.getSoalByForm(form.id)
 
     const totalSubmit = await this.knexService.connection('form_submit')
       .count('* as total')
@@ -94,9 +170,9 @@ export class SubmitService {
 
   async getAllSubmitResponseByForm(req: { id: number }, form: any) {
     const checkRole = await this.isCreator.isCreator(req.id, form.id)
-    if (checkRole === false) throw new UnauthorizedException("Anda Tidak Berhak")
+    if (checkRole == false) throw new ForbiddenException("Anda Tidak Berhak")
 
-    const getSoal: any[] = await this.soalService.getSoalByForm(form.id, form.is_random)
+    const getSoal: any[] = await this.soalService.getSoalByForm(form.id)
 
     const getAllSubmit = await this.knexService.connection("form_submit")
       .select("*")
@@ -120,7 +196,6 @@ export class SubmitService {
       .select("*")
       .whereIn("submitted_id", submitId)
 
-    // Grouping jawaban berdasarkan soal_id
     const answersBySoal = getSubmittedDetail.reduce((acc: any, item: any) => {
       const soalId = item.soal_id
 
@@ -158,7 +233,6 @@ export class SubmitService {
       return acc
     }, {})
 
-    // Map nested structure: Page -> Soal -> Responses
     const result = getSoal.map((pageGroup: any) => ({
       ...pageGroup,
       soal: Array.isArray(pageGroup.soal)
@@ -183,19 +257,27 @@ export class SubmitService {
     }
   }
 
+  // Export Excel
   async exportSubmitResponseToExcel(req: { id: number }, form: any): Promise<Buffer> {
+    const checkRole = await this.isCreator.isCreator(req.id, form.id)
+    if (checkRole === false) throw new ForbiddenException("Anda Tidak Berhak")
+
     const response = await this.getAllSubmitResponseByForm(req, form)
     const pageData = response.data || []
 
-    const questionsList: { id: number, question: string }[] = []
-    const optionsMap = new Map<number, string>()
+    const questionsList: { id: number; question: string; score: number }[] = []
+    const optionsMap = new Map<number, { value: string; is_correct: boolean }>()
 
     pageData.forEach((page: any) => {
       (page.soal || []).forEach((soal: any) => {
-        questionsList.push({ id: soal.id, question: soal.question });
+        questionsList.push({
+          id: soal.id,
+          question: soal.question,
+          score: soal.score || "-"
+        });
 
         (soal.options || []).forEach((opt: any) => {
-          optionsMap.set(opt.id, opt.value)
+          optionsMap.set(opt.id, { value: opt.value, is_correct: opt.is_correct })
         })
       })
     })
@@ -204,30 +286,52 @@ export class SubmitService {
 
     pageData.forEach((page: any) => {
       (page.soal || []).forEach((soal: any) => {
+        const defaultQuestionScore = soal.score || 10;
+
         (soal.responses || []).forEach((resp: any) => {
           const { submitted_id, answer } = resp
 
           if (!respondentMap.has(submitted_id)) {
-            respondentMap.set(submitted_id, { submitted_id })
+            respondentMap.set(submitted_id, {
+              submitted_id,
+              total_score: 0
+            })
           }
 
+          const respondentData = respondentMap.get(submitted_id)!
           let formattedAnswer = answer
+          let isCorrectAnswer = false
+
           if (typeof answer === 'number' && optionsMap.has(answer)) {
-            formattedAnswer = optionsMap.get(answer)
-          } else if (typeof answer === 'string' && answer.includes(',')) {
-            formattedAnswer = answer
-              .split(',')
-              .map((idStr) => {
-                const idNum = parseInt(idStr.trim(), 10)
-                return optionsMap.has(idNum) ? optionsMap.get(idNum) : idStr.trim()
-              })
-              .join(', ')
+            const opt = optionsMap.get(answer)!
+            formattedAnswer = opt.value
+            if (opt.is_correct) isCorrectAnswer = true
+          }
+          else if (typeof answer === 'string' && answer.includes(',')) {
+            const idList = answer.split(',').map((idStr) => parseInt(idStr.trim(), 10))
+
+            const optionTexts: string[] = []
+            let allCorrect = true
+
+            idList.forEach((idNum) => {
+              if (optionsMap.has(idNum)) {
+                const opt = optionsMap.get(idNum)!
+                optionTexts.push(opt.value)
+                if (!opt.is_correct) allCorrect = false
+              } else {
+                optionTexts.push(idNum.toString())
+              }
+            })
+
+            formattedAnswer = optionTexts.join(', ')
+            if (allCorrect && idList.length > 0) isCorrectAnswer = true
           }
 
-          const respondentData = respondentMap.get(submitted_id)
-          if (respondentData) {
-            respondentData[`soal_${soal.id}`] = formattedAnswer ?? '-'
+          if (isCorrectAnswer) {
+            respondentData.total_score += defaultQuestionScore
           }
+
+          respondentData[`soal_${soal.id}`] = formattedAnswer ?? '-'
         })
       })
     })
@@ -237,6 +341,7 @@ export class SubmitService {
 
     const columns = [
       { header: 'No / Submitted ID', key: 'submitted_id', width: 20 },
+      { header: 'Total Score', key: 'total_score', width: 15 },
       ...questionsList.map((q) => ({
         header: q.question,
         key: `soal_${q.id}`,
@@ -254,7 +359,10 @@ export class SubmitService {
     }
     headerRow.alignment = { vertical: 'middle', horizontal: 'center' }
 
-    const rows = Array.from(respondentMap.values())
+    const rows = Array.from(respondentMap.values()).sort(
+      (a, b) => b.total_score - a.total_score
+    )
+
     worksheet.addRows(rows)
 
     const baseUrl = process.env.APP_URL || 'http://localhost:4000'
@@ -268,9 +376,9 @@ export class SubmitService {
             const fullUrl = `${baseUrl}${val}`
 
             cell.value = {
-              text: 'Lihat Gambar',
+              text: 'Lihat File / Gambar',
               hyperlink: fullUrl,
-              tooltip: 'Klik untuk membuka gambar',
+              tooltip: 'Klik untuk membuka file',
             }
 
             cell.font = {
@@ -288,9 +396,10 @@ export class SubmitService {
     return Buffer.from(buffer)
   }
 
+  // Submit Form
   async submitForm(req: { id: number }, form: any, data: string, files: Express.Multer.File[] = []) {
     const checkRole = await this.isCreator.isCreator(req.id, form.id)
-    if (checkRole != false) throw new UnauthorizedException("Anda Tidak Berhak Sebagai Responden")
+    if (checkRole != false) throw new ForbiddenException("Anda Tidak Berhak Sebagai Responden")
 
     let payload: any[]
     try {
@@ -348,17 +457,15 @@ export class SubmitService {
       const existingSubmit = await trx('form_submit')
         .where({ user_id: req.id, form_id: form.id })
         .first()
-      if (existingSubmit) throw new ConflictException("Anda sudah mengisi form ini")
+      if (existingSubmit.status == "completed") throw new ConflictException("Anda sudah mengisi form ini")
 
-      const [submitted] = await trx('form_submit')
-        .insert({ user_id: req.id, form_id: form.id, status: 'submitted' })
-        .returning(['id', 'submitted_at', 'status'])
+      const updateToCompleted = await this.changeFormSubmit("update", req.id, form.id, this.knexService.connection.fn.now())
 
       await trx('user_answer').insert(
-        answers.map((answer) => ({ ...answer, submitted_id: submitted.id }))
+        answers.map((answer) => ({ ...answer, submitted_id: updateToCompleted.id }))
       )
 
-      return submitted
+      return updateToCompleted
     })
 
     return {
