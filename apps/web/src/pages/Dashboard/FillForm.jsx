@@ -27,16 +27,25 @@ export default function FillForm() {
 
   const [zoomLevel, setZoomLevel] = useState(1);
 
-  const STORAGE_KEY = `fillform_answers_${slug}`;
+  // Ambil user ID dari token untuk isolasi draft per akun
+  const userId = (() => {
+    try { return JSON.parse(atob(localStorage.getItem("token").split(".")[1])).id ?? "guest"; }
+    catch { return "guest"; }
+  })();
+
+  const STORAGE_KEY = `fillform_answers_${slug}_${userId}`;
 
   const [form, setForm]           = useState(null);
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError]         = useState("");
   const [answers, setAnswers]     = useState(() => {
-    // Restore jawaban dari localStorage saat pertama load
     try {
-      const saved = localStorage.getItem(`fillform_answers_${slug}`);
+      const uid = (() => {
+        try { return JSON.parse(atob(localStorage.getItem("token").split(".")[1])).id ?? "guest"; }
+        catch { return "guest"; }
+      })();
+      const saved = localStorage.getItem(`fillform_answers_${slug}_${uid}`);
       return saved ? JSON.parse(saved) : {};
     } catch { return {}; }
   });
