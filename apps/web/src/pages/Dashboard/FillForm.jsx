@@ -464,34 +464,6 @@ export default function FillForm() {
     const restPages = pages.slice(1);
     return [...firstPage, ...shuffleArr(restPages)];
   }, [form?.soal, form?.is_random, form?.slug, form?.category]);
-        groups[p].push(s);
-      }
-      pages = Object.keys(groups).map(Number).sort((a,b) => a - b)
-        .map(p => ({ page: p, soal: groups[p] }));
-    }
-
-    if (!form?.is_random) return pages;
-
-    // Shuffle: locked tetap posisi, unlocked diacak
-    function shuffleArr(arr) {
-      const a = [...arr];
-      for (let i = a.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [a[i], a[j]] = [a[j], a[i]];
-      }
-      return a;
-    }
-
-    const unlockedPages = pages.filter(pg => !(pg.soal ?? []).some(s => lockedIds.has(Number(s.id))));
-    const shuffled = shuffleArr(unlockedPages);
-    const result = [...pages];
-    let ui = 0;
-    for (let i = 0; i < result.length; i++) {
-      const isLocked = (result[i].soal ?? []).some(s => lockedIds.has(Number(s.id)));
-      if (!isLocked) result[i] = shuffled[ui++];
-    }
-    return result;
-  }, [form?.soal, form?.is_random, form?.slug, form?.category]);
 
   const allSoal = soalList;
 
