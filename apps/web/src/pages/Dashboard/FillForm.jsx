@@ -432,14 +432,6 @@ export default function FillForm() {
     const raw = form?.soal ?? [];
     const rFlat = raw.length > 0 && raw[0]?.soal ? raw : null;
 
-    // Ambil locked IDs dari localStorage
-    let lockedIds = new Set();
-    try {
-      const slug = form?.slug ?? form?.form_slug ?? "";
-      const saved = localStorage.getItem(`locked_soal_${slug}`);
-      lockedIds = new Set(saved ? JSON.parse(saved).map(Number) : []);
-    } catch { /* ignore */ }
-
     // Bangun pages
     let pages = [];
     if (rFlat) {
@@ -451,6 +443,27 @@ export default function FillForm() {
       for (const s of raw) {
         const p = parseInt(s.page) || 1;
         if (!groups[p]) groups[p] = [];
+        groups[p].push(s);
+      }
+      pages = Object.keys(groups).map(Number).sort((a,b) => a - b)
+        .map(p => ({ page: p, soal: groups[p] }));
+    }
+
+    if (!form?.is_random) return pages;
+
+    // Shuffle: page pertama (identitas) TIDAK diacak, page 2+ diacak
+    function shuffleArr(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+    const firstPage = pages.slice(0, 1);
+    const restPages = pages.slice(1);
+    return [...firstPage, ...shuffleArr(restPages)];
+  }, [form?.soal, form?.is_random, form?.slug, form?.category]);
         groups[p].push(s);
       }
       pages = Object.keys(groups).map(Number).sort((a,b) => a - b)
@@ -756,8 +769,27 @@ export default function FillForm() {
             const shuffledIdx = pageGroups.findIndex(pg => (pg.soal ?? []).some(s => s.id === soal.id));
             const displayNum  = shuffledIdx >= 0 ? shuffledIdx : idx;
             const isDoubt = doubtfulIds.has(soal.id);
+            // Tampilkan group header jika soal ini punya group_text dan soal sebelumnya beda group
+            const prevSoal = idx > 0 ? (currPage.soal ?? [])[idx - 1] : null;
+            const showGroupHeader = soal.group_id != null && soal.group_text &&
+              (!prevSoal || prevSoal.group_id !== soal.group_id);
             return (
               <div key={soal.id ?? idx}>
+                {/* Group wacana header */}
+                {showGroupHeader && (
+                  <div className="mb-4 rounded-2xl border border-[#d4e5fa] overflow-hidden"
+                    style={{ backgroundColor: "var(--fm-card)" }}>
+                    <div className="px-4 py-2 bg-[#eef5fb] border-b border-[#d4e5fa] flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-[#1a4fa0] uppercase tracking-wider">📄 Wacana / Teks</span>
+                      <span className="text-[11px] text-gray-400">Group #{soal.group_id}</span>
+                    </div>
+                    <div className="px-5 py-4">
+                      <p className="text-[14px] leading-relaxed whitespace-pre-wrap" style={{ color: "var(--fm-text)" }}>
+                        {soal.group_text}
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <SoalItem
                   soal={soal}
                   idx={displayNum}
@@ -907,11 +939,31 @@ export default function FillForm() {
           // Calculate cumulative question number for survey mode - ensure unique numbers
           const prevPagesSoalCount = pageGroups.slice(0, currentIdx).reduce((sum, pg) => sum + (pg.soal?.length || 0), 0);
           const displayNum = prevPagesSoalCount + qi;
-          
+
           const isError = errorSoalId === soal.id;
           const isDoubt = doubtfulIds.has(soal.id);
+          // Group header
+          const prevSoalS = qi > 0 ? (currPageS.soal ?? [])[qi - 1] : null;
+          const showGroupHeaderS = soal.group_id != null && soal.group_text &&
+            (!prevSoalS || prevSoalS.group_id !== soal.group_id);
           return (
-            <div key={soal.id ?? qi} ref={el => { if (el) soalRefs.current[soal.id] = el; }}
+            <div key={soal.id ?? qi}>
+              {/* Group wacana header */}
+              {showGroupHeaderS && (
+                <div className="mb-4 rounded-2xl border border-[#d4e5fa] overflow-hidden"
+                  style={{ backgroundColor: "var(--fm-card)" }}>
+                  <div className="px-4 py-2 bg-[#eef5fb] border-b border-[#d4e5fa] flex items-center gap-2">
+                    <span className="text-[11px] font-bold text-[#1a4fa0] uppercase tracking-wider">📄 Wacana / Teks</span>
+                    <span className="text-[11px] text-gray-400">Group #{soal.group_id}</span>
+                  </div>
+                  <div className="px-5 py-4">
+                    <p className="text-[14px] leading-relaxed whitespace-pre-wrap" style={{ color: "var(--fm-text)" }}>
+                      {soal.group_text}
+                    </p>
+                  </div>
+                </div>
+              )}
+            <div ref={el => { if (el) soalRefs.current[soal.id] = el; }}
               className={`rounded-2xl border shadow-sm p-6 mb-4 transition-all ${isError ? "border-red-400 ring-2 ring-red-100" : ""}`}
               style={{ backgroundColor: theme.cardBg || "var(--fm-card)", borderColor: isError ? undefined : (theme.borderCard || "var(--fm-card-border)") }}>
                 <div className="flex items-start gap-3 mb-4">
@@ -1011,6 +1063,7 @@ export default function FillForm() {
                   <span>🚩</span> {isDoubt ? "Ragu-ragu" : "Tandai ragu-ragu"}
                 </button>
               </div>
+            </div>
             </div>
           );
         })}

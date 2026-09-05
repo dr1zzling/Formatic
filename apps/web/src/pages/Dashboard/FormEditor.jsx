@@ -86,6 +86,8 @@ export default function FormEditor() {
           id: s.id, question: s.question, type: s.type, required: true,
           page: s.page ?? 1,
           score: s.score ?? null,
+          group_id: s.group_id ?? null,
+          group_text: s.group_text ?? null,
           options: (s.options ?? []).map((o) => ({
             id: o.id, value: o.value ?? o.option_value, is_correct: o.is_correct,
             image: o.image ?? null,
@@ -133,6 +135,8 @@ export default function FormEditor() {
             page: s.page ?? 1,
             score: s.score ?? null,
             audio: s.audio ?? null,
+            group_id: s.group_id ?? null,
+            group_text: s.group_text ?? null,
             options: (s.options ?? []).map((o) => ({
               id: o.id, value: o.value ?? o.option_value, is_correct: o.is_correct,
               image: o.image ?? null,
@@ -285,6 +289,8 @@ export default function FormEditor() {
             const hasOpts = ["radio", "checkbox", "rating"].includes(q.type);
             const payload = {
               soal: { question: q.question, type: q.type, page: pageVal, score: q.score ?? null,
+                group_id: q.group_id ?? null,
+                group_text: q.group_text ?? null,
                 // audio baru
                 ...(q.audioFile instanceof File ? { audio_filename: q.audioFile.name } : {}),
                 // pertahankan audio lama dari DB
@@ -347,6 +353,8 @@ export default function FormEditor() {
               image: q.attachment instanceof File ? q.attachment.name : null,
               audio_filename: q.audioFile instanceof File ? q.audioFile.name : null,
               page: pageVal, score: q.score ?? null,
+              group_id: q.group_id ?? null,
+              group_text: q.group_text ?? null,
             },
             options: hasOpts
               ? q.options.map((o, oIdx) => {
@@ -795,6 +803,53 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onUpdateOptField
               <RichTextDisplay content={question.question} className="text-[16px] font-semibold text-[#102f56] leading-snug" />
             ) : (
               <p className="text-[14px] text-gray-300 italic">Ketik pertanyaan untuk melihat preview...</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Group Soal ─────────────────────────────────────────── */}
+      <div className="mb-4 ml-2">
+        <button
+          type="button"
+          onClick={() => onUpdate("showGroup", !question.showGroup)}
+          className="flex items-center gap-1.5 text-[12px] font-semibold text-gray-400 hover:text-[#1a4fa0] transition-colors mb-2"
+        >
+          <span className={`transition-transform ${question.showGroup || question.group_id ? "rotate-90" : ""}`}>▶</span>
+          {question.group_id ? `Group #${question.group_id}` : "Tambah ke Group Wacana"}
+        </button>
+
+        {(question.showGroup || question.group_id) && (
+          <div className="space-y-2 pl-3 border-l-2 border-[#d4e5fa]">
+            <div className="flex items-center gap-2">
+              <label className="text-[11px] font-bold text-[#1a4fa0] uppercase tracking-wide shrink-0">ID Group</label>
+              <input
+                type="number"
+                min="1"
+                value={question.group_id ?? ""}
+                onChange={e => onUpdate("group_id", e.target.value ? parseInt(e.target.value) : null)}
+                placeholder="mis: 1"
+                className="w-16 border border-[#d4e5fa] rounded-lg px-2 py-1 text-[13px] outline-none focus:border-[#1a4fa0] bg-transparent"
+              />
+              <span className="text-[11px] text-gray-400">Soal dengan ID group sama = ditampilkan bersama</span>
+              {question.group_id && (
+                <button onClick={() => { onUpdate("group_id", null); onUpdate("group_text", null); }}
+                  className="text-[11px] text-red-400 hover:text-red-600 transition ml-auto">✕ Hapus group</button>
+              )}
+            </div>
+            {question.group_id && (
+              <div>
+                <label className="text-[11px] font-bold text-[#1a4fa0] uppercase tracking-wide block mb-1">
+                  Teks Wacana / Header Group <span className="normal-case font-normal text-gray-400">(opsional, cukup isi di soal pertama group)</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={question.group_text ?? ""}
+                  onChange={e => onUpdate("group_text", e.target.value || null)}
+                  placeholder="Tulis wacana/teks yang dipakai bersama soal-soal dalam group ini..."
+                  className="w-full border border-[#d4e5fa] rounded-xl px-3 py-2 text-[13px] outline-none focus:border-[#1a4fa0] resize-none bg-transparent"
+                />
+              </div>
             )}
           </div>
         )}

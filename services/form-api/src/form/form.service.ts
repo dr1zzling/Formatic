@@ -70,7 +70,7 @@ export class FormService {
       const isCreator = await this.isCreator.isCreator(req.id, getForm.id)
       if(isCreator == false && getForm.status == 'private') throw new ForbiddenException("Maaf tapi form belum dibuka, silahkan hubungi creator") 
       
-      const listSoal = await this.soalService.getSoalByForm(getForm.id)
+      const listSoal = await this.soalService.getSoalByForm(getForm.id, getForm.is_random)
 
       return {
         message: "Berhasil Mendapatkan Form",

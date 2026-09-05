@@ -17,7 +17,7 @@ export class SoalService {
         try {
             const form = await this.knexService.connection('forms').where('id', formId).first()
             if (form) {
-                const updatedSoal = await this.getSoalByForm(form.id)
+                const updatedSoal = await this.getSoalByForm(form.id, form.is_random)
                 this.formEventsGateway.notifyFormUpdated(form.id, form.slug, updatedSoal)
             }
         } catch (error) {
@@ -357,7 +357,7 @@ export class SoalService {
     }
 
     // Get Soal From Form
-    async getSoalByForm(id: number) {
+    async getSoalByForm(id: number, is_random: boolean = false) {
         const getSoal = await this.knexService.connection("soal")
             .select("*")
             .where("form_id", id)
@@ -383,6 +383,9 @@ export class SoalService {
                 image: row.image,
                 audio: row.audio,
                 score: row.score,
+                is_required: row.is_required,
+                group_id: row.group_id ?? null,
+                group_text: row.group_text ?? null,
                 options: options
             })
 
@@ -390,8 +393,49 @@ export class SoalService {
         }, {})
 
         const result = Object.values(grouped) as Array<{ page: number, soal: any[] }>
+        const sorted = result.sort((a, b) => (a.page ?? 1) - (b.page ?? 1))
 
-        return result.sort((a, b) => (a.page ?? 1) - (b.page ?? 1))
+        if (!is_random) return sorted
+
+        // Shuffle per group unit — page 1 (identitas) tidak diacak
+        function shuffleArray(arr: any[]) {
+            const a = [...arr]
+            for (let i = a.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [a[i], a[j]] = [a[j], a[i]]
+            }
+            return a
+        }
+
+        const firstPage = sorted.slice(0, 1)
+        const restPages = sorted.slice(1)
+
+        // Dalam setiap page, shuffle berdasarkan group unit
+        const shuffledRest = restPages.map(pg => {
+            const soalList = pg.soal ?? []
+
+            // Kelompokkan soal berdasarkan group_id
+            const units: any[][] = []
+            const ungrouped: any[] = []
+            const groupMap = new Map<number, any[]>()
+
+            soalList.forEach(s => {
+                if (s.group_id != null) {
+                    if (!groupMap.has(s.group_id)) groupMap.set(s.group_id, [])
+                    groupMap.get(s.group_id)!.push(s)
+                } else {
+                    ungrouped.push(s)
+                }
+            })
+
+            groupMap.forEach(group => units.push(group))
+            ungrouped.forEach(s => units.push([s]))
+
+            const shuffledUnits = shuffleArray(units)
+            return { ...pg, soal: shuffledUnits.flat() }
+        })
+
+        return [...firstPage, ...shuffledRest]
     }
 
     // Create Soal And Option
@@ -419,9 +463,11 @@ export class SoalService {
                             image: soal.image ?? null,
                             audio: soal.audio ?? null,
                             page: soal.page,
-                            is_required: soal.is_required
+                            is_required: soal.is_required,
+                            group_id: soal.group_id ?? null,
+                            group_text: soal.group_text ?? null,
                         })
-                        .returning(['id', 'question', 'type', 'image', 'audio', 'page', 'score', 'is_required'])
+                        .returning(['id', 'question', 'type', 'image', 'audio', 'page', 'score', 'is_required', 'group_id', 'group_text'])
 
                     if (!optionTypes.includes(soal.type)) return insertSoal
 
