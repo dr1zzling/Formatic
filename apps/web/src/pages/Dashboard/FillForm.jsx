@@ -6,6 +6,7 @@ import { socket } from "../../utils/socket";
 import { ArrowLeft, Send, Check, CheckCircle2, UploadCloud, FileText, Bell, ArrowRight, ZoomIn, ZoomOut, RefreshCw } from "lucide-react";
 import { saveToHistory } from "./History";
 import RichTextDisplay from "../../components/RichTextDisplay";
+import { getStoredTheme, DEFAULT_FORM_THEME } from "../../utils/theme";
 
 const TYPE_LABEL = {
   radio: "Pilihan Ganda",
@@ -56,7 +57,35 @@ export default function FillForm() {
   const [currentIdx, setCurrentIdx]   = useState(0);
   const [errorSoalId, setErrorSoalId] = useState(null);
   const [doubtfulIds, setDoubtfulIds] = useState(new Set()); // soal yang ditandai ragu-ragu
+  const [theme, setTheme]             = useState(() => getStoredTheme(slug) || DEFAULT_FORM_THEME);
   const soalRefs = useRef({});
+
+  useEffect(() => {
+    const saved = getStoredTheme(slug);
+    if (saved) setTheme(saved);
+
+    const onThemeUpdated = (e) => {
+      if (e.detail?.slug === slug && e.detail?.theme) {
+        setTheme(e.detail.theme);
+      }
+    };
+
+    const onStorageChange = (e) => {
+      if (e.key === `form_theme_${slug}`) {
+        try {
+          const newT = e.newValue ? JSON.parse(e.newValue) : DEFAULT_FORM_THEME;
+          setTheme(newT);
+        } catch {}
+      }
+    };
+
+    window.addEventListener("form_theme_updated", onThemeUpdated);
+    window.addEventListener("storage", onStorageChange);
+    return () => {
+      window.removeEventListener("form_theme_updated", onThemeUpdated);
+      window.removeEventListener("storage", onStorageChange);
+    };
+  }, [slug]);
 
   // ── Token gate hooks — harus di atas semua early returns ──
    const [tokenInput, setTokenInput]       = useState("");
@@ -531,14 +560,21 @@ export default function FillForm() {
 
   /* ── Success ────────────────────────────────────────── */
   if (done) return (
-    <div className="min-h-screen grid place-items-center px-4" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
-      <div className="bg-white rounded-3xl shadow-[0_16px_50px_rgba(23,64,120,0.12)] p-10 max-w-sm text-center border border-[#e5eef7]">
+    <div className="min-h-screen grid place-items-center px-4" style={{ backgroundColor: theme.bg || "var(--fm-bg)" }}>
+      <div className="rounded-3xl shadow-[0_16px_50px_rgba(23,64,120,0.12)] p-10 max-w-sm text-center border"
+        style={{ backgroundColor: theme.cardBg || "#ffffff", borderColor: theme.borderCard || "#e5eef7" }}>
         <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-green-50 text-green-600 grid place-items-center">
           <CheckCircle2 size={36} />
         </div>
-        <h2 className="text-[19px] font-extrabold text-[#102f56] mb-1">Jawaban terkirim</h2>
-        <p className="text-[14px] text-gray-400 mb-6">Terima kasih, jawabanmu sudah tercatat.</p>
-        <button onClick={() => navigate("/")} className="w-full py-3 rounded-xl text-white text-[14px] font-semibold" style={{ backgroundColor: "#1a4fa0" }}>Kembali ke Beranda</button>
+        <h2 className="text-[19px] font-extrabold mb-1" style={{ color: theme.titleColor || "#102f56" }}>Jawaban terkirim</h2>
+        <p className="text-[14px] mb-6" style={{ color: theme.descColor || "#64779d" }}>Terima kasih, jawabanmu sudah tercatat.</p>
+        <button
+          onClick={() => navigate("/")}
+          className="w-full py-3 rounded-xl text-[14px] font-semibold shadow-md transition hover:opacity-90"
+          style={{ backgroundColor: theme.primaryColor || "#1a4fa0", color: theme.primaryText || "#ffffff" }}
+        >
+          Kembali ke Beranda
+        </button>
       </div>
     </div>
   );
@@ -622,13 +658,13 @@ export default function FillForm() {
     const doubtCount    = doubtfulIds.size;
 
     return (
-      <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
+      <div className="min-h-screen flex flex-col transition-colors duration-300" style={{ backgroundColor: theme.bg || "var(--fm-bg)" }}>
         {/* Top bar */}
-        <div className="sticky top-0 z-10 backdrop-blur border-b border-[#e5eef7] px-4 py-3 transition-colors"
-          style={{ backgroundColor: "var(--fm-card)" }}>
+        <div className="sticky top-0 z-10 backdrop-blur border-b px-4 py-3 transition-colors"
+          style={{ backgroundColor: theme.cardBg || "var(--fm-card)", borderColor: theme.borderCard || "#e5eef7" }}>
           <div className="max-w-2xl mx-auto">
             <div className="flex items-center justify-between mb-2.5">
-              <button onClick={() => navigate("/")} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#1a4fa0] hover:underline">
+              <button onClick={() => navigate("/")} className="inline-flex items-center gap-1.5 text-[13px] font-semibold hover:underline" style={{ color: theme.primaryColor || "#1a4fa0" }}>
                 <ArrowLeft size={15} /> Kembali
               </button>
               <div className="flex items-center gap-2">
@@ -636,7 +672,7 @@ export default function FillForm() {
                   <button onClick={zoomOut} className="p-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all" title="Zoom Out">
                     <ZoomOut size={14} />
                   </button>
-                  <button onClick={resetZoom} title="Reset zoom ke 100%" className="px-2 py-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all text-[11px] font-bold text-[#1a4fa0] tabular-nums min-w-[44px]">
+                  <button onClick={resetZoom} title="Reset zoom ke 100%" className="px-2 py-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all text-[11px] font-bold tabular-nums min-w-[44px]" style={{ color: theme.primaryColor || "#1a4fa0" }}>
                     {Math.round(zoomLevel * 100)}%
                   </button>
                   <button onClick={zoomIn} className="p-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all" title="Zoom In">
@@ -668,24 +704,25 @@ export default function FillForm() {
             {/* Progress Section */}
             <div className="pt-1">
               <div className="flex items-center justify-between text-[12px] font-semibold mb-1.5">
-                <div className="flex items-center gap-1.5 text-[#102f56]">
-                  <span className="inline-block w-2 h-2 rounded-full bg-[#1a4fa0] animate-pulse"></span>
+                <div className="flex items-center gap-1.5" style={{ color: theme.titleColor || "#102f56" }}>
+                  <span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: theme.accentColor || "#1a4fa0" }}></span>
                   <span>Soal {currentIdx + 1} dari {totalPages}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-gray-400 font-normal">{answeredCount} dijawab</span>
-                  <span className="px-2 py-0.5 rounded-full bg-[#eef5fb] text-[#1a4fa0] font-bold text-[11px] border border-[#d4e5fa]">
+                  <span className="px-2 py-0.5 rounded-full font-bold text-[11px] border"
+                    style={{ backgroundColor: `${theme.accentColor || "#1a4fa0"}15`, color: theme.accentColor || "#1a4fa0", borderColor: `${theme.accentColor || "#1a4fa0"}30` }}>
                     {Math.round(progress)}%
                   </span>
                 </div>
               </div>
-              <div className="w-full h-2 bg-[#e8f1fa] rounded-full overflow-hidden p-[1px] shadow-inner">
+              <div className="w-full h-2 bg-black/5 rounded-full overflow-hidden p-[1px] shadow-inner">
                 <div
                   className="h-full rounded-full transition-all duration-500 ease-out shadow-sm"
                   style={{
                     width: `${Math.min(100, Math.max(3, progress))}%`,
-                    background: "linear-gradient(90deg, #1a4fa0 0%, #2563eb 60%, #38bdf8 100%)",
-                    boxShadow: "0 1px 4px rgba(26, 79, 160, 0.35)"
+                    backgroundColor: theme.accentColor || "#1a4fa0",
+                    boxShadow: `0 1px 4px ${theme.accentColor || "#1a4fa0"}50`
                   }}
                 />
               </div>
@@ -696,20 +733,20 @@ export default function FillForm() {
         <div className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full transition-transform duration-200 origin-top" style={{ transform: `scale(${zoomLevel})` }}>
           {bannerUrl && (
             <div className="mb-4 w-full">
-              <img src={bannerUrl} alt="Banner" className="w-full max-h-72 object-contain rounded-2xl border border-[#e5eef7] shadow-sm bg-white" />
+              <img src={bannerUrl} alt="Banner" className="w-full max-h-72 object-contain rounded-2xl border shadow-sm bg-white" style={{ borderColor: theme.borderCard || "#e5eef7" }} />
             </div>
           )}
           {liveNotice && (
-            <div className="mb-4 px-4 py-3 rounded-xl bg-blue-600 text-white text-[14px] font-semibold flex items-center gap-3 shadow-lg">
+            <div className="mb-4 px-4 py-3 rounded-xl text-white text-[14px] font-semibold flex items-center gap-3 shadow-lg" style={{ backgroundColor: theme.primaryColor || "#1a4fa0" }}>
               <Bell size={18} /><span>{liveNotice}</span>
             </div>
           )}
 
           {/* Form title (halaman pertama saja) */}
           {currentIdx === 0 && (
-            <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-sm p-6 mb-4">
-              <h1 className="text-[20px] font-extrabold text-[#102f56] leading-snug">{title}</h1>
-              <p className="mt-1 text-[13px] text-gray-400">{form?.category}</p>
+            <div className="rounded-2xl border shadow-sm p-6 mb-4" style={{ backgroundColor: theme.cardBg || "#ffffff", borderColor: theme.borderCard || "#e5eef7" }}>
+              <h1 className="text-[20px] font-extrabold leading-snug" style={{ color: theme.titleColor || "#102f56" }}>{title}</h1>
+              <p className="mt-1 text-[13px]" style={{ color: theme.descColor || "#64779d" }}>{form?.category}</p>
             </div>
           )}
 
@@ -729,6 +766,7 @@ export default function FillForm() {
                   toggleOption={toggleOption}
                   errorSoalId={errorSoalId}
                   soalRefs={soalRefs}
+                  theme={theme}
                 />
                 {/* Tombol ragu-ragu */}
                 <div className="flex justify-end mb-4 -mt-2 pr-1">
@@ -753,20 +791,21 @@ export default function FillForm() {
           <div className="flex items-center gap-3">
             {!isFirst && (
               <button onClick={goPrev}
-                className="flex-1 py-3 rounded-xl border border-gray-200 text-[14px] font-semibold text-gray-600 hover:bg-gray-50 transition flex items-center justify-center gap-2">
+                className="flex-1 py-3 rounded-xl border text-[14px] font-semibold hover:bg-black/5 transition flex items-center justify-center gap-2"
+                style={{ borderColor: theme.borderCard || "#e5eef7", color: theme.descColor || "#64779d", backgroundColor: theme.cardBg || "#ffffff" }}>
                 <ArrowLeft size={16} /> Sebelumnya
               </button>
             )}
             {!isLast ? (
               <button onClick={goNext}
-                className="flex-1 py-3 rounded-xl text-white text-[14px] font-bold flex items-center justify-center gap-2 hover:opacity-90 transition"
-                style={{ backgroundColor: "#1a4fa0" }}>
+                className="flex-1 py-3 rounded-xl text-[14px] font-bold flex items-center justify-center gap-2 hover:opacity-90 transition shadow-md"
+                style={{ backgroundColor: theme.primaryColor || "#1a4fa0", color: theme.primaryText || "#ffffff" }}>
                 Selanjutnya <ArrowRight size={16} />
               </button>
             ) : (
               <button onClick={submit} disabled={submitting}
-                className="flex-1 py-3 rounded-xl text-white text-[15px] font-bold flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-60 transition"
-                style={{ backgroundColor: "#1a4fa0" }}>
+                className="flex-1 py-3 rounded-xl text-[15px] font-bold flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-60 transition shadow-md"
+                style={{ backgroundColor: theme.primaryColor || "#1a4fa0", color: theme.primaryText || "#ffffff" }}>
                 <Send size={17} /> {submitting ? "Mengirim..." : "Kirim Jawaban"}
               </button>
             )}
@@ -805,15 +844,16 @@ export default function FillForm() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
+    <div className="min-h-screen flex flex-col transition-colors duration-300" style={{ backgroundColor: theme.bg || "var(--fm-bg)" }}>
       {/* Top bar */}
-      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-[#e5eef7] px-4 py-3">
+      <div className="sticky top-0 z-10 backdrop-blur border-b px-4 py-3"
+        style={{ backgroundColor: theme.cardBg || "white", borderColor: theme.borderCard || "#e5eef7" }}>
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center justify-between mb-2">
-            <button onClick={() => navigate("/")} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#1a4fa0] hover:underline">
+            <button onClick={() => navigate("/")} className="inline-flex items-center gap-1.5 text-[13px] font-semibold hover:underline" style={{ color: theme.primaryColor || "#1a4fa0" }}>
               <ArrowLeft size={15} /> Kembali
             </button>
-            <span className="text-[13px] font-semibold text-gray-500">
+            <span className="text-[13px] font-semibold" style={{ color: theme.descColor || "#64779d" }}>
               {totalPagesS > 1 ? `Halaman ${currentIdx + 1} / ${totalPagesS}` : title}
             </span>
             <div className="flex items-center gap-2">
@@ -821,7 +861,7 @@ export default function FillForm() {
                 <button onClick={zoomOut} className="p-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all" title="Zoom Out">
                   <ZoomOut size={14} />
                 </button>
-                <button onClick={resetZoom} title="Reset zoom ke 100%" className="px-2 py-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all text-[11px] font-bold text-[#1a4fa0] tabular-nums min-w-[44px]">
+                <button onClick={resetZoom} title="Reset zoom ke 100%" className="px-2 py-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all text-[11px] font-bold tabular-nums min-w-[44px]" style={{ color: theme.primaryColor || "#1a4fa0" }}>
                   {Math.round(zoomLevel * 100)}%
                 </button>
                 <button onClick={zoomIn} className="p-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all" title="Zoom In">
@@ -835,8 +875,8 @@ export default function FillForm() {
             {timeLeft !== null && <TimerBadge timeLeft={timeLeft} />}
           </div>
           {totalPagesS > 1 && (
-            <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full rounded-full transition-all duration-300" style={{ width: `${progressS}%`, background: "linear-gradient(90deg,#1a4fa0,#1e6fc7)" }} />
+            <div className="w-full h-1.5 bg-black/5 rounded-full overflow-hidden">
+              <div className="h-full rounded-full transition-all duration-300" style={{ width: `${progressS}%`, backgroundColor: theme.accentColor || "#1a4fa0" }} />
             </div>
           )}
         </div>
@@ -845,20 +885,20 @@ export default function FillForm() {
       <div className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full transition-transform duration-200 origin-top" style={{ transform: `scale(${zoomLevel})` }}>
         {bannerUrl && (
           <div className="mb-4 w-full">
-            <img src={bannerUrl} alt="Banner" className="w-full max-h-72 object-contain rounded-2xl border border-[#e5eef7] shadow-sm bg-white" />
+            <img src={bannerUrl} alt="Banner" className="w-full max-h-72 object-contain rounded-2xl border shadow-sm bg-white" style={{ borderColor: theme.borderCard || "#e5eef7" }} />
           </div>
         )}
         {liveNotice && (
-          <div className="mb-4 px-4 py-3 rounded-xl bg-blue-600 text-white text-[14px] font-semibold flex items-center gap-3 shadow-lg">
+          <div className="mb-4 px-4 py-3 rounded-xl text-white text-[14px] font-semibold flex items-center gap-3 shadow-lg" style={{ backgroundColor: theme.primaryColor || "#1a4fa0" }}>
             <Bell size={18} /><span>{liveNotice}</span>
           </div>
         )}
 
         {/* Form header (halaman pertama) */}
         {currentIdx === 0 && (
-          <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-7 mb-5">
-            <h1 className="text-[24px] font-extrabold tracking-tight text-[#102f56] leading-snug">{title}</h1>
-            <p className="mt-1 text-[13.5px] text-gray-400">{form?.category}</p>
+          <div className="rounded-2xl border shadow-sm p-7 mb-5" style={{ backgroundColor: theme.cardBg || "#ffffff", borderColor: theme.borderCard || "#e5eef7" }}>
+            <h1 className="text-[24px] font-extrabold tracking-tight leading-snug" style={{ color: theme.titleColor || "#102f56" }}>{title}</h1>
+            <p className="mt-1 text-[13.5px]" style={{ color: theme.descColor || "#64779d" }}>{form?.category}</p>
           </div>
         )}
 
@@ -872,15 +912,16 @@ export default function FillForm() {
           const isDoubt = doubtfulIds.has(soal.id);
           return (
             <div key={soal.id ?? qi} ref={el => { if (el) soalRefs.current[soal.id] = el; }}
-              className={`rounded-2xl border shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-6 mb-4 transition-all ${isError ? "border-red-400 ring-2 ring-red-100" : ""}`}
-              style={{ backgroundColor: "var(--fm-card)", borderColor: isError ? undefined : "var(--fm-card-border)" }}>
+              className={`rounded-2xl border shadow-sm p-6 mb-4 transition-all ${isError ? "border-red-400 ring-2 ring-red-100" : ""}`}
+              style={{ backgroundColor: theme.cardBg || "var(--fm-card)", borderColor: isError ? undefined : (theme.borderCard || "var(--fm-card-border)") }}>
                 <div className="flex items-start gap-3 mb-4">
-                  <span className="w-9 h-9 rounded-xl bg-[#eef5fb] text-[#1a4fa0] text-[14px] font-extrabold grid place-items-center shrink-0 mt-0.5">
+                  <span className="w-9 h-9 rounded-xl text-[14px] font-extrabold grid place-items-center shrink-0 mt-0.5"
+                    style={{ backgroundColor: `${theme.accentColor || "#1a4fa0"}15`, color: theme.accentColor || "#1a4fa0" }}>
                     {displayNum + 1}
                   </span>
                 <div className="flex-1 min-w-0">
-                  <RichTextDisplay content={soal.question} className="text-[16px] font-bold text-[#102f56] leading-snug" />
-                  <span className="text-[12px] font-medium text-[#1a4fa0] block mt-1">{TYPE_LABEL[soal.type] ?? soal.type}</span>
+                  <RichTextDisplay content={soal.question} className="text-[16px] font-bold leading-snug" style={{ color: theme.titleColor || "#102f56" }} />
+                  <span className="text-[12px] font-medium block mt-1" style={{ color: theme.accentColor || "#1a4fa0" }}>{TYPE_LABEL[soal.type] ?? soal.type}</span>
                 </div>
                 <span className="text-[11px] font-semibold text-[#c9393f] shrink-0">*</span>
               </div>
@@ -918,15 +959,25 @@ export default function FillForm() {
                     return (
                       <button key={opt.id ?? oi} onClick={() => toggleOption(soal, opt)}
                         className={`w-full flex items-start gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
-                          selected ? "border-[#1a4fa0] bg-[#f0f6fe] text-[#102f56]" : "border-[#e2e9f1] text-gray-600 hover:border-[#1a4fa0]/40 hover:bg-[#f7fafd]"
-                        }`}>
-                        <span className={`inline-grid place-items-center shrink-0 border-2 transition-all mt-0.5 ${soal.type === "checkbox" ? "w-6 h-6 rounded-[8px]" : "w-6 h-6 rounded-full"} ${selected ? "border-[#1a4fa0] bg-[#1a4fa0]" : "border-[#5b6c7e] bg-[#eef2f6]"}`}>
+                          selected ? "shadow-xs" : "hover:border-black/20"
+                        }`}
+                        style={{
+                          borderColor: selected ? (theme.accentColor || "#1a4fa0") : (theme.borderCard || "#e2e9f1"),
+                          backgroundColor: selected ? `${theme.accentColor || "#1a4fa0"}10` : (theme.cardBg || "#ffffff")
+                        }}
+                      >
+                        <span className={`inline-grid place-items-center shrink-0 border-2 transition-all mt-0.5 ${soal.type === "checkbox" ? "w-6 h-6 rounded-[8px]" : "w-6 h-6 rounded-full"}`}
+                          style={{
+                            borderColor: selected ? (theme.accentColor || "#1a4fa0") : "#94a3b8",
+                            backgroundColor: selected ? (theme.accentColor || "#1a4fa0") : "#f1f5f9"
+                          }}
+                        >
                           {selected && (soal.type === "checkbox"
                             ? <Check size={15} strokeWidth={3} className="text-white" />
                             : <span className="w-3 h-3 rounded-full bg-white" />)}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <RichTextDisplay content={opt.value?.trim() || opt.option_value?.trim() || `Opsi ${oi + 1}`} className="text-[15px] font-medium" />
+                          <RichTextDisplay content={opt.value?.trim() || opt.option_value?.trim() || `Opsi ${oi + 1}`} className="text-[15px] font-medium" style={{ color: theme.titleColor || "#102f56" }} />
                           {optImage && (
                             <img src={optImage} alt={fallbackLabel(opt, oi)}
                               className="mt-2.5 w-full max-h-52 object-contain rounded-xl border border-[#d4e5fa]" />
@@ -972,20 +1023,21 @@ export default function FillForm() {
         <div className="flex items-center gap-3">
           {!isFirstS && (
             <button onClick={goPrevS}
-              className="flex-1 py-3 rounded-xl border border-gray-200 text-[14px] font-semibold text-gray-600 hover:bg-gray-50 transition flex items-center justify-center gap-2">
+              className="flex-1 py-3 rounded-xl border text-[14px] font-semibold hover:bg-black/5 transition flex items-center justify-center gap-2"
+              style={{ borderColor: theme.borderCard || "#e5eef7", color: theme.descColor || "#64779d", backgroundColor: theme.cardBg || "#ffffff" }}>
               <ArrowLeft size={16} /> Sebelumnya
             </button>
           )}
           {!isLastS ? (
             <button onClick={goNextS}
-              className="flex-1 py-3 rounded-xl text-white text-[14px] font-bold flex items-center justify-center gap-2 hover:opacity-90 transition"
-              style={{ backgroundColor: "#1a4fa0" }}>
+              className="flex-1 py-3 rounded-xl text-[14px] font-bold flex items-center justify-center gap-2 hover:opacity-90 transition shadow-md"
+              style={{ backgroundColor: theme.primaryColor || "#1a4fa0", color: theme.primaryText || "#ffffff" }}>
             Selanjutnya <ArrowRight size={16} />
           </button>
           ) : (
             <button onClick={submit} disabled={submitting}
-              className="w-full py-3.5 rounded-xl text-white text-[15px] font-bold flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-60 transition"
-              style={{ backgroundColor: "#1a4fa0" }}>
+              className="w-full py-3.5 rounded-xl text-[15px] font-bold flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-60 transition shadow-md"
+              style={{ backgroundColor: theme.primaryColor || "#1a4fa0", color: theme.primaryText || "#ffffff" }}>
               <Send size={17} /> {submitting ? "Mengirim..." : "Kirim Jawaban"}
             </button>
           )}
@@ -996,17 +1048,20 @@ export default function FillForm() {
 }
 
 /* ── SoalItem — komponen soal untuk quiz mode ───────────────── */
-function SoalItem({ soal, idx, answers, setAnswer, toggleOption, errorSoalId, soalRefs }) {
+function SoalItem({ soal, idx, answers, setAnswer, toggleOption, errorSoalId, soalRefs, theme = DEFAULT_FORM_THEME }) {
   const isError = errorSoalId === soal.id;
   return (
     <div ref={el => { if (el) soalRefs.current[soal.id] = el; }}
       className={`rounded-2xl border shadow-sm p-6 mb-4 transition-all ${isError ? "border-red-400 ring-2 ring-red-100" : ""}`}
-      style={{ backgroundColor: "var(--fm-card)", borderColor: isError ? undefined : "var(--fm-card-border)" }}>
+      style={{ backgroundColor: theme.cardBg || "var(--fm-card)", borderColor: isError ? undefined : (theme.borderCard || "var(--fm-card-border)") }}>
       <div className="flex items-start gap-3 mb-5">
-        <span className="w-9 h-9 rounded-xl bg-[#eef5fb] text-[#1a4fa0] text-[14px] font-extrabold grid place-items-center shrink-0 mt-0.5">{idx + 1}</span>
+        <span className="w-9 h-9 rounded-xl text-[14px] font-extrabold grid place-items-center shrink-0 mt-0.5"
+          style={{ backgroundColor: `${theme.accentColor || "#1a4fa0"}15`, color: theme.accentColor || "#1a4fa0" }}>
+          {idx + 1}
+        </span>
         <div className="flex-1">
-          <RichTextDisplay content={soal.question} className="text-[16px] font-bold text-[#102f56] leading-snug" />
-          <span className="text-[12px] font-medium text-[#1a4fa0] block mt-1">{TYPE_LABEL[soal.type] ?? soal.type}</span>
+          <RichTextDisplay content={soal.question} className="text-[16px] font-bold leading-snug" style={{ color: theme.titleColor || "#102f56" }} />
+          <span className="text-[12px] font-medium block mt-1" style={{ color: theme.accentColor || "#1a4fa0" }}>{TYPE_LABEL[soal.type] ?? soal.type}</span>
         </div>
         <span className="text-[#c9393f] font-bold shrink-0">*</span>
       </div>
@@ -1042,17 +1097,27 @@ function SoalItem({ soal, idx, answers, setAnswer, toggleOption, errorSoalId, so
             return (
               <button key={opt.id ?? oi} onClick={() => toggleOption(soal, opt)}
                 className={`w-full flex items-start gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
-                  selected ? "border-[#1a4fa0] bg-[#f0f6fe]" : "border-[#e2e9f1] hover:border-[#1a4fa0]/40 hover:bg-[#f7fafd]"
-                }`}>
+                  selected ? "shadow-xs" : "hover:border-black/20"
+                }`}
+                style={{
+                  borderColor: selected ? (theme.accentColor || "#1a4fa0") : (theme.borderCard || "#e2e9f1"),
+                  backgroundColor: selected ? `${theme.accentColor || "#1a4fa0"}10` : (theme.cardBg || "#ffffff")
+                }}
+              >
                 <span className={`inline-grid place-items-center shrink-0 border-2 transition-all mt-0.5 ${
                   soal.type === "checkbox" ? "w-6 h-6 rounded-[8px]" : "w-6 h-6 rounded-full"
-                } ${selected ? "border-[#1a4fa0] bg-[#1a4fa0]" : "border-[#5b6c7e] bg-[#eef2f6]"}`}>
+                }`}
+                  style={{
+                    borderColor: selected ? (theme.accentColor || "#1a4fa0") : "#94a3b8",
+                    backgroundColor: selected ? (theme.accentColor || "#1a4fa0") : "#f1f5f9"
+                  }}
+                >
                   {selected && (soal.type === "checkbox"
                     ? <Check size={15} strokeWidth={3} className="text-white" />
                     : <span className="w-3 h-3 rounded-full bg-white" />)}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <RichTextDisplay content={opt.value?.trim() || opt.option_value?.trim() || `Opsi ${oi + 1}`} className="text-[15px] font-medium text-gray-700" />
+                  <RichTextDisplay content={opt.value?.trim() || opt.option_value?.trim() || `Opsi ${oi + 1}`} className="text-[15px] font-medium" style={{ color: theme.titleColor || "#102f56" }} />
                   {optImage && (
                     <img src={optImage} alt={fallbackLabel(opt, oi)}
                       className="mt-2.5 w-full max-h-55 object-contain rounded-xl border border-[#d4e5fa]" />

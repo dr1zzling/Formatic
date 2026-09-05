@@ -1,14 +1,17 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
 import AlertModal from "../../components/AlertModal";
 import { socket } from "../../utils/socket";
-import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical, ImagePlus, X, QrCode, Download } from "lucide-react";
+import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical, ImagePlus, X, QrCode, Download, Palette, Info, BookOpen, ChevronRight } from "lucide-react";
 import QRCode from "qrcode";
 import QuillEditor from "../../components/QuillEditor";
 import OptionQuillEditor from "../../components/OptionQuillEditor";
 import RichTextDisplay from "../../components/RichTextDisplay";
 import Toast, { useToast } from "../../components/Toast";
+import ThemeSettingsTab from "./ThemeSettingsTab";
+import { getStoredTheme, setStoredTheme, DEFAULT_FORM_THEME } from "../../utils/theme";
 
 const QUESTION_TYPES = [
   { value: "radio",    label: "Pilihan Ganda" },
@@ -16,7 +19,7 @@ const QUESTION_TYPES = [
   { value: "text",     label: "Jawaban Singkat" },
   { value: "file",     label: "Unggah File" },
 ];
-const TABS = ["Pertanyaan", "Jawaban", "Setelan"];
+const TABS = ["Pertanyaan", "Jawaban", "Tema", "Setelan"];
 
 export default function FormEditor() {
   const { slug } = useParams();
@@ -34,7 +37,25 @@ export default function FormEditor() {
   const [collabNotice, setCollabNotice]     = useState("");
   const [userRole, setUserRole]             = useState(null); // "Creator" | "Collaborator"
   const [showQr, setShowQr]                 = useState(false);
+  const [theme, setTheme]                   = useState(() => getStoredTheme(slug) || DEFAULT_FORM_THEME);
   const isSavingRef = useRef(false);
+
+  useEffect(() => {
+    const savedTheme = getStoredTheme(slug);
+    if (savedTheme) setTheme(savedTheme);
+  }, [slug]);
+
+  const handleThemeChange = (newTheme) => {
+    setTheme(newTheme);
+    setStoredTheme(slug, newTheme);
+    showToast("Tema formulir diperbarui!");
+  };
+
+  const handleResetTheme = () => {
+    setTheme(DEFAULT_FORM_THEME);
+    setStoredTheme(slug, DEFAULT_FORM_THEME);
+    showToast("Tema dikembalikan ke standar.");
+  };
 
   useEffect(() => { loadForm(); }, [slug]);
 
@@ -533,6 +554,13 @@ export default function FormEditor() {
           {activeTab === "Jawaban" && (
             <ResponsesTab formId={form?.id ?? form?.form_id} form={form} />
           )}
+          {activeTab === "Tema" && (
+            <ThemeSettingsTab
+              theme={theme}
+              onThemeChange={handleThemeChange}
+              onResetTheme={handleResetTheme}
+            />
+          )}
           {activeTab === "Setelan" && (
             <SettingsTab form={form} onUpdateStatus={updateStatus} slug={slug} onSaved={(patch) => setForm(prev => (prev ? { ...prev, ...patch } : prev))} />
           )}
@@ -549,22 +577,17 @@ export default function FormEditor() {
         </div>
       )}
 
-      {/* Delete modal */}
-      {showDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
-            <p className="text-4xl mb-3">🗑️</p>
-            <h3 className="font-bold text-gray-800 mb-1">Hapus Form?</h3>
-            <p className="text-sm text-gray-500 mb-5">
-              Form "<strong>{form?.title ?? form?.form_title}</strong>" akan dihapus permanen.
-            </p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowDelete(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Batal</button>
-              <button onClick={deleteForm} className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold bg-red-500 hover:bg-red-600">Hapus</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Delete modal with Custom AlertModal */}
+      <AlertModal
+        open={showDelete}
+        type="trash"
+        title="Hapus Form?"
+        message={`Form "${form?.title ?? form?.form_title}" akan dihapus permanen dan tidak dapat dikembalikan.`}
+        confirmText="Hapus Form"
+        cancelText="Batal"
+        onConfirm={deleteForm}
+        onCancel={() => setShowDelete(false)}
+      />
 
       {/* QR Code modal */}
       {showQr && (
@@ -1720,25 +1743,45 @@ function Toggle({ value, onChange }) {
   );
 }
 
-/* ── Import Docx Button ─────────────────────────────────────── */
+/* ── Import Docx Button & Template Download ─────────────────────────────────────── */
 function ImportDocxButton({ slug, onImported, onImportedSilent, onImportGuard }) {
   const [importing, setImporting] = useState(false);
-  const [toast, setToast]         = useState("");
-  const [error, setError]         = useState("");
+  const [alertState, setAlertState] = useState({ open: false, type: "info", title: "", message: "" });
+  const [toast, setToast] = useState("");
 
-  function showMsg(msg, isErr = false) {
-    if (isErr) setError(msg);
-    else setToast(msg);
-    setTimeout(() => { setToast(""); setError(""); }, 4000);
+  function showMsg(msg) {
+    setToast(msg);
+    setTimeout(() => { setToast(""); }, 4000);
   }
 
   async function handleFile(e) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    if (!file.name.endsWith(".docx")) {
-      showMsg("File harus berformat .docx", true); return;
+
+    // Validasi Ekstensi & MIME
+    if (!file.name.toLowerCase().endsWith(".docx")) {
+      setAlertState({
+        open: true,
+        type: "error",
+        title: "Format File Tidak Valid",
+        message: "Hanya file berekstensi .docx yang diperbolehkan untuk impor soal.",
+      });
+      return;
     }
+
+    // Validasi Ukuran File (Maksimal 5MB)
+    const MAX_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      setAlertState({
+        open: true,
+        type: "warning",
+        title: "Ukuran File Terlalu Besar",
+        message: `Ukuran file ${(file.size / (1024 * 1024)).toFixed(2)} MB melebihi batas maksimal 5 MB.`,
+      });
+      return;
+    }
+
     setImporting(true);
     onImportGuard?.(true);
     try {
@@ -1750,53 +1793,242 @@ function ImportDocxButton({ slug, onImported, onImportedSilent, onImportGuard })
         body: fd,
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.message || "Gagal import.");
+      if (!res.ok) throw new Error(data?.message || "Gagal mengimpor file.");
       const count = data?.data?.list_soal?.length ?? 0;
-      showMsg(`✅ ${count} soal berhasil diimport dari Word!`);
+      setAlertState({
+        open: true,
+        type: "success",
+        title: "Impor Soal Berhasil",
+        message: `Berhasil mengimpor ${count} butir soal dari dokumen Word ke dalam formulir.`,
+      });
       setTimeout(() => { onImportedSilent?.(); }, 500);
     } catch (e) {
-      showMsg(e.message || "Gagal import.", true);
+      setAlertState({
+        open: true,
+        type: "error",
+        title: "Gagal Impor Soal",
+        message: e.message || "Terjadi kesalahan saat memproses file .docx.",
+      });
       onImportGuard?.(false);
     } finally {
       setImporting(false);
     }
   }
 
+  const [showGuide, setShowGuide] = useState(false);
+
   return (
-    <div className="space-y-2">
-      <label className={`w-full py-3.5 rounded-2xl border-2 border-dashed flex items-center justify-center gap-2 text-[14px] font-semibold transition-all cursor-pointer ${
-        importing
-          ? "border-gray-200 text-gray-400 cursor-not-allowed"
-          : "border-[#c7d8e8] text-gray-500 hover:border-[#1a4fa0] hover:text-[#1a4fa0] hover:bg-white"
-      }`}>
-        {importing ? (
-          <>
-            <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-            Mengimport soal...
-          </>
-        ) : (
-          <>
-            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-              <line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/>
-            </svg>
-            Import Soal dari Word (.docx)
-          </>
-        )}
-        <input type="file" accept=".docx" onChange={handleFile} disabled={importing} className="hidden" />
-      </label>
+    <div className="space-y-3 pt-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Tombol Unduh Template */}
+        <a
+          href="/soal.docx"
+          download="Template_Soal_FormMaker.docx"
+          className="py-3 px-4 rounded-2xl border border-[#c7d8e8] bg-[#f8fbfe] hover:bg-[#eef5fb] text-[#1a4fa0] text-[13.5px] font-semibold flex items-center justify-center gap-2 transition-all shadow-xs"
+        >
+          <Download size={17} /> Unduh Template Soal (.docx)
+        </a>
+
+        {/* Tombol Upload File Docx */}
+        <div className="relative">
+          <label className={`w-full py-3 pl-4 pr-12 rounded-2xl border-2 border-dashed flex items-center justify-center gap-2 text-[13.5px] font-semibold transition-all cursor-pointer shadow-xs ${
+            importing
+              ? "border-gray-200 text-gray-400 cursor-not-allowed bg-gray-50"
+              : "border-[#c7d8e8] bg-white text-gray-600 hover:border-[#1a4fa0] hover:text-[#1a4fa0]"
+          }`}>
+            {importing ? (
+              <>
+                <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                Mengimpor soal...
+              </>
+            ) : (
+              <>
+                <UploadCloud size={17} /> Impor Soal dari Word (.docx)
+              </>
+            )}
+            <input type="file" accept=".docx" onChange={handleFile} disabled={importing} className="hidden" />
+          </label>
+          {/* Info button — panduan struktur template */}
+          <button
+            type="button"
+            onClick={() => setShowGuide(true)}
+            title="Lihat panduan struktur template"
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center text-[#1a4fa0] bg-[#eef5fb] hover:bg-[#daeaf7] transition-colors"
+          >
+            <Info size={15} />
+          </button>
+        </div>
+      </div>
 
       {toast && (
         <div className="px-4 py-3 rounded-xl bg-green-50 border border-green-200 text-green-700 text-[13px] text-center">
           {toast}
         </div>
       )}
-      {error && (
-        <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-[13px] text-center">
-          {error}
-        </div>
-      )}
+
+      {/* Alert Modal untuk Hasil Import / Error Validasi */}
+      <AlertModal
+        open={alertState.open}
+        type={alertState.type}
+        title={alertState.title}
+        message={alertState.message}
+        onConfirm={() => setAlertState({ ...alertState, open: false })}
+      />
+
+      {/* Modal Panduan Struktur Template */}
+      {showGuide && <TemplateGuideModal onClose={() => setShowGuide(false)} />}
     </div>
+  );
+}
+
+/* ── Template Guide Modal ───────────────────────────────────── */
+function TemplateGuideModal({ onClose }) {
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const sections = [
+    {
+      type: "Pilihan Ganda",
+      tipe: "Tipe: radio",
+      tag: "bg-blue-50 text-blue-700 border-blue-200",
+      example: `1. Berapakah nilai dari √x + 16 jika x = 9?
+   A. 17
+   B. 19
+   C. 21
+   D. 25
+Kunci: B Tipe: radio`,
+      notes: [
+        "Nomor soal diakhiri titik (1.) atau kurung (1))",
+        "Pilihan pakai huruf kapital diakhiri titik (A.) atau kurung (A))",
+        "Kunci: diisi huruf jawaban yang benar",
+        "Tipe: radio untuk pilihan ganda satu jawaban",
+      ],
+    },
+    {
+      type: "Kotak Centang",
+      tipe: "Tipe: checkbox",
+      tag: "bg-violet-50 text-violet-700 border-violet-200",
+      example: `2. Manakah bilangan prima di bawah ini?
+   A. 2
+   B. 4
+   C. 5
+   D. 9
+Kunci: A, C Tipe: checkbox`,
+      notes: [
+        "Kunci bisa lebih dari satu, pisahkan dengan koma (A, C)",
+        "Tipe: checkbox untuk jawaban lebih dari satu",
+      ],
+    },
+    {
+      type: "Jawaban Singkat",
+      tipe: "Tipe: text",
+      tag: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      example: `3. Sebutkan ibu kota Indonesia!
+Kunci: - Tipe: text`,
+      notes: [
+        "Tidak perlu pilihan jawaban A/B/C/D",
+        "Tipe: text untuk jawaban isian bebas",
+      ],
+    },
+  ];
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[400] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(5px)" }}
+      onClick={onClose}
+    >
+      <div
+        className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-[#e5eef7]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="sticky top-0 bg-white rounded-t-3xl border-b border-[#e5eef7] px-6 py-4 flex items-center justify-between z-10">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-[#eef5fb] flex items-center justify-center text-[#1a4fa0]">
+              <BookOpen size={18} />
+            </div>
+            <div>
+              <h3 className="text-[15px] font-bold text-[#102f56]">Panduan Struktur Template</h3>
+              <p className="text-[12px] text-gray-400">Format penulisan soal di file .docx</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-5">
+          {/* Intro */}
+          <div className="bg-[#f0f7ff] rounded-2xl p-4 border border-[#d0e6f7] text-[13px] text-[#1a4fa0] leading-relaxed">
+            Tulis soal di file <span className="font-bold">.docx</span> mengikuti format di bawah, lalu unggah. Sistem akan otomatis membaca dan mengisi soal ke formulir.
+          </div>
+
+          {/* Format per tipe */}
+          {sections.map((s) => (
+            <div key={s.type} className="space-y-2.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <ChevronRight size={14} className="text-[#1a4fa0]" />
+                <span className={`text-[12px] font-bold px-2.5 py-0.5 rounded-full border ${s.tag}`}>{s.type}</span>
+                <code className="text-[11.5px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-lg font-mono">{s.tipe}</code>
+              </div>
+
+              {/* Contoh teks */}
+              <pre className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-[12.5px] font-mono text-gray-700 whitespace-pre-wrap leading-relaxed">
+                {s.example}
+              </pre>
+
+              {/* Keterangan */}
+              <ul className="space-y-1 pl-1">
+                {s.notes.map((n, i) => (
+                  <li key={i} className="text-[12px] text-gray-500 flex items-start gap-1.5">
+                    <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-gray-300 shrink-0" />
+                    {n}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+
+          {/* Aturan umum */}
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2">
+            <p className="text-[12.5px] font-bold text-amber-800">Aturan Umum</p>
+            <ul className="space-y-1.5">
+              {[
+                "Nomor soal diakhiri titik (1.) atau kurung tutup (1)).",
+                "Pilihan jawaban pakai huruf kapital diakhiri titik (A.) atau kurung (A)).",
+                "Kunci jawaban ditulis: Kunci: B — untuk checkbox multi jawaban: Kunci: A, C",
+                "Tipe soal ditulis: Tipe: radio / checkbox / text / file / rating",
+                "Kunci dan Tipe boleh di baris yang sama atau baris terpisah setelah pilihan terakhir.",
+                "Pisahkan antar soal dengan baris kosong.",
+                "Ukuran file maksimal 5 MB.",
+              ].map((r, i) => (
+                <li key={i} className="text-[12px] text-amber-700 flex items-start gap-1.5">
+                  <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                  {r}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* CTA unduh */}
+          <a
+            href="/soal.docx"
+            download="Template_Soal_FormMaker.docx"
+            className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-[#1a4fa0] text-white text-[13.5px] font-semibold hover:opacity-90 transition-all shadow-md"
+          >
+            <Download size={16} /> Unduh Template Siap Pakai
+          </a>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
