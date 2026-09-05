@@ -433,7 +433,7 @@ export default function FormEditor() {
   async function updateStatus(status) {
     try {
       const res = await fetch(`${FORM_API_URL}/form?form_slug=${slug}`, {
-        method: "PATCH",
+        method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: JSON.stringify({ status }),
       });
