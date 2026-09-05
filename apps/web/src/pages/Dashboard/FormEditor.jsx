@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
 import AlertModal from "../../components/AlertModal";
+import * as XLSX from "xlsx";
 import { socket } from "../../utils/socket";
 import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical, ImagePlus, X, QrCode, Download, Palette, Info, BookOpen, ChevronRight } from "lucide-react";
 import QRCode from "qrcode";
@@ -1070,25 +1071,149 @@ function ResponsesTab({ formId, form }) {
     if (total === 0) { setExportAlert({ type: "alert", title: "Tidak Ada Data", message: "Belum ada data untuk diekspor." }); return; }
     setExporting(true);
     try {
-      const res = await fetch(`${FORM_API_URL}/form/submit/export-excel?form_slug=${formSlug}`, {
+      const isQuiz = form?.category === "ujian";
+
+      // Fetch detail jawaban per responden
+      const res = await fetch(`${FORM_API_URL}/form/submit/detail?form_slug=${formSlug}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        setExportAlert({ type: "error", title: "Gagal Ekspor", message: errData?.message || `Error ${res.status}` });
-        return;
+      if (!res.ok) { setExportAlert({ type: "error", title: "Gagal", message: "Gagal mengambil data jawaban." }); return; }
+      const detailData = await res.json().catch(() => ({}));
+      const pageData = detailData?.data ?? [];
+
+      // Flatten soal dari semua pages
+      const soalList = pageData.flatMap((pg: any) => pg.soal ?? pg);
+
+      // Build optionsMap: option_id → { value, is_correct }
+      const optionsMap = new Map();
+      soalList.forEach((s: any) => {
+        (s.options ?? []).forEach((o: any) => {
+          optionsMap.set(o.id, { value: o.value ?? o.option_value, is_correct: o.is_correct });
+        });
+      });
+
+      // Detect soal "kelas" — question mengandung kata "kelas" (case-insensitive)
+      const kelasSoal = soalList.find((s: any) =>
+        (s.question ?? "").replace(/<[^>]*>/g, "").toLowerCase().includes("kelas")
+      );
+
+      // Build respondent rows: { submitted_id, kelas, total_score, soal_X: jawaban }
+      const respondentMap = new Map();
+
+      soalList.forEach((s: any) => {
+        const soalScore = s.score ?? 0;
+        (s.responses ?? []).forEach((resp: any) => {
+          const sid = resp.submitted_id;
+          if (!respondentMap.has(sid)) {
+            respondentMap.set(sid, { submitted_id: sid, kelas: "Tidak Diketahui", total_score: 0 });
+          }
+          const row = respondentMap.get(sid);
+          const raw = resp.answer;
+
+          // Format jawaban
+          let formatted = "-";
+          let isCorrect = false;
+
+          if (typeof raw === "number" && optionsMap.has(raw)) {
+            const opt = optionsMap.get(raw);
+            formatted = opt.value;
+            if (opt.is_correct) isCorrect = true;
+          } else if (typeof raw === "string" && raw.includes(",")) {
+            const ids = raw.split(",").map(x => parseInt(x.trim(), 10));
+            const texts = ids.map(id => optionsMap.has(id) ? optionsMap.get(id).value : String(id));
+            formatted = texts.join(", ");
+            isCorrect = ids.every(id => optionsMap.has(id) && optionsMap.get(id).is_correct);
+          } else if (raw != null) {
+            formatted = String(raw);
+          }
+
+          // Hitung score jika quiz
+          if (isQuiz && isCorrect && soalScore > 0) {
+            row.total_score += soalScore;
+          }
+
+          row[`soal_${s.id}`] = formatted;
+
+          // Ambil nilai kelas dari soal kelas
+          if (kelasSoal && s.id === kelasSoal.id) {
+            row.kelas = formatted !== "-" ? formatted : "Tidak Diketahui";
+          }
+        });
+      });
+
+      const allRows = Array.from(respondentMap.values());
+
+      // Helper: buat worksheet dari rows dengan header
+      function makeSheet(rows: any[]) {
+        const sorted = [...rows].sort((a, b) => b.total_score - a.total_score);
+        const headers = [
+          "No",
+          ...(kelasSoal ? ["Kelas"] : []),
+          ...(isQuiz ? ["Total Score"] : []),
+          ...soalList.map((s: any, i: number) => {
+            const q = (s.question ?? "").replace(/<[^>]*>/g, "").trim();
+            return `${i + 1}. ${q.slice(0, 60)}`;
+          }),
+        ];
+
+        const data = sorted.map((row, i) => [
+          i + 1,
+          ...(kelasSoal ? [row.kelas] : []),
+          ...(isQuiz ? [row.total_score] : []),
+          ...soalList.map((s: any) => row[`soal_${s.id}`] ?? "-"),
+        ]);
+
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+
+        // Style header row
+        const range = XLSX.utils.decode_range(ws["!ref"] ?? "A1");
+        for (let c = range.s.c; c <= range.e.c; c++) {
+          const cell = ws[XLSX.utils.encode_cell({ r: 0, c })];
+          if (cell) {
+            cell.s = {
+              font: { bold: true, color: { rgb: "FFFFFF" } },
+              fill: { fgColor: { rgb: "1F4E78" } },
+              alignment: { horizontal: "center", vertical: "center" },
+            };
+          }
+        }
+
+        // Lebar kolom
+        ws["!cols"] = headers.map((h, i) => ({
+          wch: i === 0 ? 5 : i <= (kelasSoal ? 1 : 0) + (isQuiz ? 1 : 0) ? 20 : 35
+        }));
+
+        return ws;
       }
-      const blob = await res.blob();
-      if (blob.size === 0) { setExportAlert({ type: "alert", title: "File Kosong", message: "Tidak ada data untuk diekspor." }); return; }
-      const url = URL.createObjectURL(blob);
-      const a   = document.createElement("a");
-      a.href    = url;
-      a.download = `${(title || "form").replace(/[^a-z0-9]/gi, "_")}_responses.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (e) {
+
+      const wb = XLSX.utils.book_new();
+
+      if (kelasSoal) {
+        // Group per kelas → sheet terpisah per kelas
+        const byKelas = new Map<string, any[]>();
+        allRows.forEach(r => {
+          const k = r.kelas || "Tidak Diketahui";
+          if (!byKelas.has(k)) byKelas.set(k, []);
+          byKelas.get(k)!.push(r);
+        });
+
+        // Sheet "Semua" dulu
+        XLSX.utils.book_append_sheet(wb, makeSheet(allRows), "Semua");
+
+        // Sheet per kelas
+        byKelas.forEach((rows, kelas) => {
+          const sheetName = kelas.slice(0, 31).replace(/[:\\/?*\[\]]/g, ""); // Excel sheet name limit
+          XLSX.utils.book_append_sheet(wb, makeSheet(rows), sheetName || "Kelas");
+        });
+      } else {
+        // Tidak ada soal kelas — 1 sheet saja
+        XLSX.utils.book_append_sheet(wb, makeSheet(allRows), "Hasil");
+      }
+
+      const titleClean = (title || "form").replace(/[^a-z0-9]/gi, "_");
+      XLSX.writeFile(wb, `${titleClean}_results.xlsx`);
+
+    } catch (e: any) {
       setExportAlert({ type: "error", title: "Gagal Ekspor", message: e.message || "Error tidak diketahui" });
     } finally { setExporting(false); }
   }
