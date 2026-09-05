@@ -1082,27 +1082,24 @@ function ResponsesTab({ formId, form }) {
       const pageData = detailData?.data ?? [];
 
       // Flatten soal dari semua pages
-      const soalList = pageData.flatMap((pg: any) => pg.soal ?? pg);
+      const soalList = pageData.flatMap((pg) => pg.soal ?? pg);
 
-      // Build optionsMap: option_id → { value, is_correct }
       const optionsMap = new Map();
-      soalList.forEach((s: any) => {
-        (s.options ?? []).forEach((o: any) => {
+      soalList.forEach((s) => {
+        (s.options ?? []).forEach((o) => {
           optionsMap.set(o.id, { value: o.value ?? o.option_value, is_correct: o.is_correct });
         });
       });
 
-      // Detect soal "kelas" — question mengandung kata "kelas" (case-insensitive)
-      const kelasSoal = soalList.find((s: any) =>
+      const kelasSoal = soalList.find((s) =>
         (s.question ?? "").replace(/<[^>]*>/g, "").toLowerCase().includes("kelas")
       );
 
-      // Build respondent rows: { submitted_id, kelas, total_score, soal_X: jawaban }
       const respondentMap = new Map();
 
-      soalList.forEach((s: any) => {
+      soalList.forEach((s) => {
         const soalScore = s.score ?? 0;
-        (s.responses ?? []).forEach((resp: any) => {
+        (s.responses ?? []).forEach((resp) => {
           const sid = resp.submitted_id;
           if (!respondentMap.has(sid)) {
             respondentMap.set(sid, { submitted_id: sid, kelas: "Tidak Diketahui", total_score: 0 });
@@ -1110,7 +1107,6 @@ function ResponsesTab({ formId, form }) {
           const row = respondentMap.get(sid);
           const raw = resp.answer;
 
-          // Format jawaban
           let formatted = "-";
           let isCorrect = false;
 
@@ -1127,14 +1123,12 @@ function ResponsesTab({ formId, form }) {
             formatted = String(raw);
           }
 
-          // Hitung score jika quiz
           if (isQuiz && isCorrect && soalScore > 0) {
             row.total_score += soalScore;
           }
 
           row[`soal_${s.id}`] = formatted;
 
-          // Ambil nilai kelas dari soal kelas
           if (kelasSoal && s.id === kelasSoal.id) {
             row.kelas = formatted !== "-" ? formatted : "Tidak Diketahui";
           }
@@ -1143,14 +1137,13 @@ function ResponsesTab({ formId, form }) {
 
       const allRows = Array.from(respondentMap.values());
 
-      // Helper: buat worksheet dari rows dengan header
-      function makeSheet(rows: any[]) {
+      function makeSheet(rows) {
         const sorted = [...rows].sort((a, b) => b.total_score - a.total_score);
         const headers = [
           "No",
           ...(kelasSoal ? ["Kelas"] : []),
           ...(isQuiz ? ["Total Score"] : []),
-          ...soalList.map((s: any, i: number) => {
+          ...soalList.map((s, i) => {
             const q = (s.question ?? "").replace(/<[^>]*>/g, "").trim();
             return `${i + 1}. ${q.slice(0, 60)}`;
           }),
@@ -1160,12 +1153,11 @@ function ResponsesTab({ formId, form }) {
           i + 1,
           ...(kelasSoal ? [row.kelas] : []),
           ...(isQuiz ? [row.total_score] : []),
-          ...soalList.map((s: any) => row[`soal_${s.id}`] ?? "-"),
+          ...soalList.map((s) => row[`soal_${s.id}`] ?? "-"),
         ]);
 
         const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
 
-        // Style header row
         const range = XLSX.utils.decode_range(ws["!ref"] ?? "A1");
         for (let c = range.s.c; c <= range.e.c; c++) {
           const cell = ws[XLSX.utils.encode_cell({ r: 0, c })];
@@ -1178,8 +1170,7 @@ function ResponsesTab({ formId, form }) {
           }
         }
 
-        // Lebar kolom
-        ws["!cols"] = headers.map((h, i) => ({
+        ws["!cols"] = headers.map((_h, i) => ({
           wch: i === 0 ? 5 : i <= (kelasSoal ? 1 : 0) + (isQuiz ? 1 : 0) ? 20 : 35
         }));
 
@@ -1189,31 +1180,27 @@ function ResponsesTab({ formId, form }) {
       const wb = XLSX.utils.book_new();
 
       if (kelasSoal) {
-        // Group per kelas → sheet terpisah per kelas
-        const byKelas = new Map<string, any[]>();
+        const byKelas = new Map();
         allRows.forEach(r => {
           const k = r.kelas || "Tidak Diketahui";
           if (!byKelas.has(k)) byKelas.set(k, []);
-          byKelas.get(k)!.push(r);
+          byKelas.get(k).push(r);
         });
 
-        // Sheet "Semua" dulu
         XLSX.utils.book_append_sheet(wb, makeSheet(allRows), "Semua");
 
-        // Sheet per kelas
         byKelas.forEach((rows, kelas) => {
-          const sheetName = kelas.slice(0, 31).replace(/[:\\/?*\[\]]/g, ""); // Excel sheet name limit
+          const sheetName = kelas.slice(0, 31).replace(/[:\\/?*[\]]/g, "");
           XLSX.utils.book_append_sheet(wb, makeSheet(rows), sheetName || "Kelas");
         });
       } else {
-        // Tidak ada soal kelas — 1 sheet saja
         XLSX.utils.book_append_sheet(wb, makeSheet(allRows), "Hasil");
       }
 
       const titleClean = (title || "form").replace(/[^a-z0-9]/gi, "_");
       XLSX.writeFile(wb, `${titleClean}_results.xlsx`);
 
-    } catch (e: any) {
+    } catch (e) {
       setExportAlert({ type: "error", title: "Gagal Ekspor", message: e.message || "Error tidak diketahui" });
     } finally { setExporting(false); }
   }
