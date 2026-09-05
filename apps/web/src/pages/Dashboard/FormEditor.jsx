@@ -168,6 +168,36 @@ export default function FormEditor() {
       options: [{ value: "" }, { value: "" }],
     }]);
   }
+
+  // Template soal identitas — diinsert di posisi AWAL (page 1)
+  function addIdentityPage() {
+    const templates = [
+      { question: "Nama Lengkap", type: "text", required: true },
+      { question: "Kelas", type: "text", required: true },
+      { question: "Nomor Absen", type: "text", required: false },
+    ];
+    setQuestions(prev => {
+      // Cek apakah sudah ada soal identitas (soal text di posisi awal)
+      const alreadyHas = prev.some(q =>
+        ["Nama Lengkap", "Kelas", "Nomor Absen"].includes(
+          (q.question ?? "").replace(/<[^>]*>/g, "").trim()
+        )
+      );
+      if (alreadyHas) {
+        showToast("⚠️ Halaman identitas sudah ada.");
+        return prev;
+      }
+      const newSoal = templates.map(t => ({
+        _new: true,
+        question: t.question,
+        type: "text",
+        required: t.required,
+        options: [],
+      }));
+      return [...newSoal, ...prev];
+    });
+    showToast("✅ Template identitas ditambahkan di halaman 1!");
+  }
   function updateQ(idx, field, val) {
     setQuestions((prev) => {
       const updated = prev.map((q, i) => i === idx ? { ...q, [field]: val } : q);
@@ -548,6 +578,7 @@ export default function FormEditor() {
             <PertanyaanTab
               form={form} slug={slug} questions={questions} error={error}
               onAddQuestion={addQuestion}
+              onAddIdentityPage={addIdentityPage}
               onUpdateQ={updateQ} onUpdateOpt={updateOpt} onUpdateOptField={updateOptField}
               onAddOpt={addOpt} onRemoveOpt={removeOpt}
               onRemoveQ={removeQ} onDuplicateQ={duplicateQ}
@@ -611,7 +642,7 @@ export default function FormEditor() {
 }
 
 /* ── Pertanyaan Tab ─────────────────────────────────────────── */
-function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ, onUpdateOpt, onUpdateOptField, onAddOpt, onRemoveOpt, onRemoveQ, onDuplicateQ, onToggleCorrect, onReorder, onCopyLink, onShowToast, onImported, onImportedSilent, onImportGuard }) {
+function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onAddIdentityPage, onUpdateQ, onUpdateOpt, onUpdateOptField, onAddOpt, onRemoveOpt, onRemoveQ, onDuplicateQ, onToggleCorrect, onReorder, onCopyLink, onShowToast, onImported, onImportedSilent, onImportGuard }) {
   const [dragFrom, setDragFrom] = useState(null);
   const [dragOver, setDragOver] = useState(null);
   // Baca scoreType dari localStorage supaya badge score realtime ikut berubah
@@ -722,6 +753,14 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onUpdateQ,
         className="w-full py-4 rounded-2xl border-2 border-dashed border-[#c7d8e8] text-[#1a4fa0] hover:border-[#1a4fa0] hover:bg-white text-[15px] font-semibold transition-all flex items-center justify-center gap-2"
       >
         <ListPlus size={20} /> Tambah Pertanyaan
+      </button>
+
+      {/* Tombol template identitas */}
+      <button
+        onClick={onAddIdentityPage}
+        className="w-full py-4 rounded-2xl border-2 border-dashed border-emerald-200 text-emerald-600 hover:border-emerald-400 hover:bg-emerald-50 text-[14px] font-semibold transition-all flex items-center justify-center gap-2"
+      >
+        <span className="text-lg">🪪</span> Tambah Halaman Identitas (Nama, Kelas, dst.)
       </button>
 
       {/* Import dari Word */}
