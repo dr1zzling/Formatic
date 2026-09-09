@@ -48,16 +48,18 @@ class MyFormCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: role == 'CREATOR'
-                        ? AppColors.blueAccent.withOpacity(0.1)
-                        : AppColors.textSecondary.withOpacity(0.1),
+                        ? AppColors.primary.withOpacity(0.10)
+                        : AppColors.textSecondary.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     role,
                     style: TextStyle(
-                      color: role == 'CREATOR' ? AppColors.blueAccent : AppColors.textSecondary,
+                      color: role == 'CREATOR'
+                          ? AppColors.primary
+                          : AppColors.textSecondary,
                       fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       fontFamily: 'Plus Jakarta Sans',
                     ),
                   ),

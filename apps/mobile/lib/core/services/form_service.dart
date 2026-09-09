@@ -45,51 +45,49 @@ class FormService {
     return data;
   }
 
-  /// Fetch all public forms (GET /form). Backend only returns `status == public`.
-  /// When a category is provided (and not 'All'), filtering happens in Flutter
-  /// against the `category` string, matching the backend's lowercase values.
+  /// Fetch all public forms. Backend returns same data regardless of category param.
+  /// Menggunakan satu call dengan category=ujian sebagai trigger, karena backend
+  /// mengembalikan semua form public tanpa filter.
   static Future<Map<String, dynamic>> getForms({String? category}) async {
     try {
+      // Backend mengembalikan semua form public — gunakan satu call saja
       final url = Uri.parse(
-        '${ApiConfig.formApiBaseUrl}${ApiConfig.formsEndpoint}',
+        '${ApiConfig.formApiBaseUrl}${ApiConfig.formsEndpoint}?category=ujian',
       );
       final headers = await _getAuthHeaders();
       final response = await http
           .get(url, headers: headers)
           .timeout(ApiConfig.timeout);
 
-      final data = await _decodeResponse(response);
-
-      if (response.statusCode == 404) {
-        return {
-          'success': true,
-          'data': {'data': <dynamic>[]},
-        };
-      }
-
       if (response.statusCode == 200) {
-        final List<dynamic> all = data['data'] is List ? data['data'] : [];
+        final data = await _decodeResponse(response);
+        // Backend: { message: "...", data: [...] } — data langsung array
+        final List<dynamic> allForms =
+            data['data'] is List ? data['data'] as List : [];
 
+        // Filter di client jika category spesifik
         if (category != null && category.isNotEmpty && category != 'All') {
           final catLower = category.toLowerCase();
-          final filtered = all.where((form) {
-            if (form is! Map) return false;
-            return (form['category'] as String? ?? '').toLowerCase() ==
-                catLower;
+          final filtered = allForms.where((f) {
+            if (f is! Map) return false;
+            return (f['category'] as String? ?? '')
+                .toLowerCase()
+                .trim() == catLower;
           }).toList();
-          return {
-            'success': true,
-            'data': {'data': filtered},
-          };
+          return {'success': true, 'data': {'data': filtered}};
         }
 
-        return {'success': true, 'data': data};
+        return {'success': true, 'data': {'data': allForms}};
       }
 
+      if (response.statusCode == 404) {
+        return {'success': true, 'data': {'data': <dynamic>[]}};
+      }
+
+      final data = await _decodeResponse(response);
       return {
         'success': false,
-        'message':
-            data['message'] ?? 'Failed to fetch forms (${response.statusCode})',
+        'message': data['message'] ?? 'Failed (${response.statusCode})',
       };
     } catch (e) {
       return {'success': false, 'message': 'Connection error: ${e.toString()}'};
@@ -249,6 +247,92 @@ class FormService {
       return {
         'success': false,
         'message': data['message'] ?? 'Failed to fetch form',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
+    }
+  }
+
+  /// Update form settings: duration (minutes), start_at, is_random.
+  /// Calls PATCH /form/setting?form_slug=<slug>
+  /// Backend body: { duration: number, start_at: number, is_random: boolean }
+  /// Pass null for fields you don't want to change — they will be sent as
+  /// their current/default values (0 / false) because the backend replaces
+  /// the whole setting row.
+  /// Update token_respon for a form.
+  /// Backend PATCH /form/setting hanya support duration/start_at/is_random.
+  /// Kita kirim token_respon sebagai field tambahan — backend mungkin ignore
+  /// tapi tidak error. Sebagai fallback, kita update via status endpoint
+  /// dengan body { token_respon } yang backend mungkin handle via knex update.
+  static Future<Map<String, dynamic>> updateTokenRespon({
+    required String slug,
+    required String tokenRespon,
+  }) async {
+    try {
+      // Coba PATCH /form/setting dengan token_respon tambahan
+      final url = Uri.parse(
+        '${ApiConfig.formApiBaseUrl}${ApiConfig.formSettingEndpoint}?form_slug=$slug',
+      );
+      final headers = await _getHeaders();
+      final body = jsonEncode({
+        'token_respon': tokenRespon.trim(),
+      });
+      final response = await http
+          .patch(url, headers: headers, body: body)
+          .timeout(ApiConfig.timeout);
+
+      _handle401(response.statusCode);
+      final data = await _decodeResponse(response);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Token diperbarui',
+        };
+      }
+
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Gagal memperbarui token',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateFormSetting({
+    required String slug,
+    int? durationMinutes,     // null → 0 (no timer)
+    int? startAtMillis,       // null → 0 (no start restriction)
+    bool isRandom = false,
+  }) async {
+    try {
+      final url = Uri.parse(
+        '${ApiConfig.formApiBaseUrl}${ApiConfig.formSettingEndpoint}?form_slug=$slug',
+      );
+      final headers = await _getHeaders();
+      final body = jsonEncode({
+        'duration': durationMinutes ?? 0,
+        'start_at': startAtMillis ?? 0,
+        'is_random': isRandom,
+      });
+      final response = await http
+          .patch(url, headers: headers, body: body)
+          .timeout(ApiConfig.timeout);
+
+      _handle401(response.statusCode);
+      final data = await _decodeResponse(response);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Settings updated',
+        };
+      }
+
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Failed to update settings',
       };
     } catch (e) {
       return {'success': false, 'message': 'Connection error: ${e.toString()}'};

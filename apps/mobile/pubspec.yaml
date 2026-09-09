@@ -54,9 +54,13 @@ dependencies:
   # DOCX template preview parsing
   xml: ^7.0.1
 
-  # WYSIWYG rich text editor — local fork patched for file_picker 12.x
-  quill_html_editor:
-    path: packages/quill_html_editor
+  # WYSIWYG rich text editor — pure Flutter, no WebView, support all platforms
+  flutter_quill: ^11.5.1
+  flutter_localizations:
+    sdk: flutter
+
+  # QR Code Scanner — CameraX/MLKit for Android
+  mobile_scanner: ^6.0.0
 
 dev_dependencies:
   flutter_test:

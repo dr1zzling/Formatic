@@ -6,6 +6,7 @@ import '../../../core/utils/download_utils.dart';
 import '../../../core/services/form_service.dart';
 import 'add_question_screen.dart';
 import 'form_viewer_screen.dart';
+import 'form_qr_screen.dart';
 import 'import_word_screen.dart';
 import '../../../core/utils/html_utils.dart';
 
@@ -35,6 +36,9 @@ class _FormEditorScreenState extends State<FormEditorScreen>
   String _errorMessage = '';
   bool _isPublic = false;
   int _totalSubmissions = 0;
+  int _durationMinutes = 0; // loaded from backend via getFormBySlug
+  bool _isRandom = false;   // loaded from backend via getFormBySlug
+  String _tokenRespon = ''; // loaded from backend via getFormBySlug
 
   @override
   void initState() {
@@ -74,6 +78,25 @@ class _FormEditorScreenState extends State<FormEditorScreen>
         setState(() {
           _isPublic =
               (data['form_status'] ?? data['status'] ?? 'private') == 'public';
+
+          // Parse duration from backend (integer minutes, nullable)
+          final rawDur = data['duration'];
+          _durationMinutes = rawDur == null
+              ? 0
+              : (rawDur is num
+                    ? rawDur.toInt()
+                    : int.tryParse(rawDur.toString()) ?? 0);
+
+          // Parse is_random from backend (bool/int, nullable)
+          final rawRandom = data['is_random'];
+          _isRandom = rawRandom == true ||
+              rawRandom == 1 ||
+              rawRandom?.toString() == 'true' ||
+              rawRandom?.toString() == '1';
+
+          // Parse token_respon
+          _tokenRespon = data['token_respon']?.toString() ?? '';
+
           _questions = listSoal.asMap().entries.map((entry) {
             final index = entry.key;
             final soal = entry.value;
@@ -223,55 +246,75 @@ class _FormEditorScreenState extends State<FormEditorScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: const Color(0xFFF0FCF9),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: AppColors.textPrimary, size: 20),
         ),
-        title: Text(
-          widget.formTitle,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              widget.formTitle,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            Row(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: _isPublic
+                        ? const Color(0xFFDFF7EE)
+                        : const Color(0xFFDFF7EE),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    _isPublic ? 'Public' : 'Draft',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: _isPublic
+                          ? const Color(0xFF1BAE75)
+                          : const Color(0xFF1BAE75),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '• ${_questions.length} Questions',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
         actions: [
           IconButton(
-            onPressed: _copyShareLink,
-            icon: const Icon(Icons.link, color: AppColors.primary),
-            tooltip: 'Copy share link',
-          ),
-          IconButton(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => FormViewerScreen(slug: widget.formSlug),
-                ),
-              );
-            },
-            icon: const Icon(Icons.preview, color: AppColors.primary),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => FormViewerScreen(slug: widget.formSlug),
+            )),
+            icon: const Icon(Icons.visibility_outlined,
+                color: AppColors.textSecondary, size: 22),
             tooltip: 'Preview form',
           ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.textSecondary,
-          indicatorColor: AppColors.primary,
-          indicatorWeight: 3,
-          labelStyle: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-          ),
-          tabs: const [
-            Tab(text: 'Questions'),
-            Tab(text: 'Responses'),
-            Tab(text: 'Settings'),
-          ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: const Color(0xFFEAF5F2), height: 1),
         ),
       ),
       body: _isLoading
@@ -280,27 +323,97 @@ class _FormEditorScreenState extends State<FormEditorScreen>
             )
           : _errorMessage.isNotEmpty
           ? _buildErrorState()
-          : TabBarView(
-              controller: _tabController,
+          : Column(
               children: [
-                _QuestionsTab(
-                  questions: _questions,
-                  formTitle: widget.formTitle,
-                  formSlug: widget.formSlug,
-                  onRefresh: _loadForm,
+                // ── Custom TabBar ──────────────────────────────
+                Container(
+                  color: Colors.white,
+                  child: TabBar(
+                    controller: _tabController,
+                    labelColor: AppColors.primary,
+                    unselectedLabelColor: AppColors.textSecondary,
+                    indicatorColor: AppColors.primary,
+                    indicatorWeight: 2.5,
+                    indicatorSize: TabBarIndicatorSize.label,
+                    dividerColor: const Color(0xFFEAF5F2),
+                    labelStyle: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                    unselectedLabelStyle: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
+                    ),
+                    tabs: const [
+                      Tab(text: 'Questions'),
+                      Tab(text: 'Responses'),
+                      Tab(text: 'Settings'),
+                    ],
+                  ),
                 ),
-                _ResponsesTab(
-                  formId: widget.formId,
-                  formSlug: widget.formSlug,
-                  totalSubmissions: _totalSubmissions,
-                ),
-                _SettingsTab(
-                  isPublic: _isPublic,
-                  formSlug: widget.formSlug,
-                  onToggleStatus: _toggleStatus,
-                  onDeleteForm: _deleteForm,
+                // ── Content ────────────────────────────────────
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _QuestionsTab(
+                        questions: _questions,
+                        formTitle: widget.formTitle,
+                        formSlug: widget.formSlug,
+                        onRefresh: _loadForm,
+                      ),
+                      _ResponsesTab(
+                        formId: widget.formId,
+                        formSlug: widget.formSlug,
+                        totalSubmissions: _totalSubmissions,
+                      ),
+                      _SettingsTab(
+                        isPublic: _isPublic,
+                        formSlug: widget.formSlug,
+                        onToggleStatus: _toggleStatus,
+                        onDeleteForm: _deleteForm,
+                        initialDurationMinutes: _durationMinutes,
+                        initialIsRandom: _isRandom,
+                        initialTokenRespon: _tokenRespon,
+                      ),
+                    ],
+                  ),
                 ),
               ],
+            ),
+      // ── Save Changes bottom bar ──────────────────────────────
+      bottomNavigationBar: _isLoading || _errorMessage.isNotEmpty
+          ? null
+          : Container(
+              color: Colors.transparent,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              child: Material(
+                color: const Color(0xFF1B4A5E),
+                borderRadius: BorderRadius.circular(16),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: _loadForm,
+                  child: Container(
+                    height: 52,
+                    alignment: Alignment.center,
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.check_rounded, color: Colors.white, size: 18),
+                        SizedBox(width: 8),
+                        Text(
+                          'Save Changes',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
     );
   }
@@ -430,17 +543,17 @@ class _QuestionsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Share link banner
+        // ── Slug banner ──────────────────────────────────────────
         Container(
-          margin: const EdgeInsets.all(16),
-          padding: const EdgeInsets.all(16),
+          margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
+            color: const Color(0xFFE8F8F5),
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
             children: [
-              const Icon(Icons.link, color: AppColors.primary, size: 20),
+              const Icon(Icons.link_rounded, color: AppColors.primary, size: 16),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -453,8 +566,10 @@ class _QuestionsTab extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              IconButton(
-                onPressed: () {
+              const SizedBox(width: 8),
+              // Copy icon
+              GestureDetector(
+                onTap: () {
                   Clipboard.setData(ClipboardData(text: formSlug));
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -463,51 +578,101 @@ class _QuestionsTab extends StatelessWidget {
                     ),
                   );
                 },
-                icon: const Icon(
-                  Icons.copy,
-                  color: AppColors.primary,
-                  size: 18,
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(7),
+                    border: Border.all(color: const Color(0xFFBDE8E0)),
+                  ),
+                  child: const Icon(Icons.copy_rounded,
+                      color: AppColors.primary, size: 15),
                 ),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
+              ),
+              const SizedBox(width: 6),
+              // QR icon
+              GestureDetector(
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => FormQrScreen(
+                    formSlug: formSlug,
+                    formTitle: formTitle,
+                  ),
+                )),
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  child: const Icon(Icons.qr_code_rounded,
+                      color: Colors.white, size: 15),
+                ),
               ),
             ],
           ),
         ),
 
-        // Questions header
+        // ── Questions header ─────────────────────────────────────
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
           child: Row(
             children: [
               Text(
                 'Questions (${questions.length})',
                 style: const TextStyle(
-                  fontSize: 18,
+                  fontSize: 15,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
                 ),
               ),
               const Spacer(),
-              TextButton.icon(
-                onPressed: () => _openImportWord(context),
-                icon: const Icon(Icons.upload_file, color: AppColors.primary),
-                label: const Text(
-                  'Import Word',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
+              GestureDetector(
+                onTap: () => _openImportWord(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFBDE8E0)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.upload_file_rounded,
+                          size: 14, color: AppColors.primary),
+                      const SizedBox(width: 4),
+                      Text('Import Word',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600)),
+                    ],
                   ),
                 ),
               ),
-              TextButton.icon(
-                onPressed: () => _openAddQuestion(context),
-                icon: const Icon(Icons.add, color: AppColors.primary),
-                label: const Text(
-                  'Add',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () => _openAddQuestion(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFBDE8E0)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.add_rounded, size: 16, color: AppColors.primary),
+                      const SizedBox(width: 2),
+                      Text('Add',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w700)),
+                    ],
                   ),
                 ),
               ),
@@ -515,69 +680,49 @@ class _QuestionsTab extends StatelessWidget {
           ),
         ),
 
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
 
-        // Questions list
         Expanded(
           child: questions.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.quiz_outlined,
-                        size: 64,
-                        color: AppColors.textSecondary.withOpacity(0.5),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'No Questions Yet',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Tap "Add" to create your first question',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textHint,
-                        ),
-                      ),
+                      Icon(Icons.quiz_outlined,
+                          size: 56,
+                          color: AppColors.textSecondary.withOpacity(0.4)),
+                      const SizedBox(height: 14),
+                      const Text('No Questions Yet',
+                          style: TextStyle(fontSize: 15, color: AppColors.textSecondary)),
+                      const SizedBox(height: 6),
+                      const Text('Tap "+ Add" to create your first question',
+                          style: TextStyle(fontSize: 13, color: AppColors.textHint)),
                     ],
                   ),
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
                   itemCount: questions.length,
-                  itemBuilder: (context, index) {
-                    final question = questions[index];
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      child: _buildQuestionCard(context, question),
-                    );
-                  },
+                  itemBuilder: (context, index) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _buildQuestionCard(context, questions[index]),
+                  ),
                 ),
         ),
       ],
     );
   }
 
-  Widget _buildQuestionCard(
-    BuildContext context,
-    Map<String, dynamic> question,
-  ) {
+  Widget _buildQuestionCard(BuildContext context, Map<String, dynamic> question) {
     final options = question['options'] as List? ?? [];
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
@@ -585,124 +730,151 @@ class _QuestionsTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Center(
-                  child: Text(
-                    question['number'].toString(),
-                    style: const TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.bold,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 8, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDFF7EE),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  child: Center(
+                    child: Text(
+                      question['number'].toString(),
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  stripHtmlTags(question['question']?.toString() ?? ''),
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 3),
+                    child: Text(
+                      stripHtmlTags(question['question']?.toString() ?? ''),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                        height: 1.35,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              IconButton(
-                onPressed: () =>
-                    _openAddQuestion(context, questionToEdit: question),
-                icon: const Icon(
-                  Icons.edit_outlined,
-                  color: AppColors.textSecondary,
-                  size: 20,
+                GestureDetector(
+                  onTap: () =>
+                      _openAddQuestion(context, questionToEdit: question),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Icon(Icons.edit_outlined,
+                        size: 18,
+                        color: AppColors.textSecondary.withOpacity(0.8)),
+                  ),
                 ),
-                visualDensity: VisualDensity.compact,
-              ),
-              IconButton(
-                onPressed: () => _confirmDelete(context, question),
-                icon: const Icon(
-                  Icons.delete_outline,
-                  color: AppColors.error,
-                  size: 20,
+                GestureDetector(
+                  onTap: () => _confirmDelete(context, question),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Icon(Icons.delete_outline,
+                        size: 18, color: AppColors.error.withOpacity(0.5)),
+                  ),
                 ),
-                visualDensity: VisualDensity.compact,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(6),
+              ],
             ),
-            child: Text(
-              question['typeDisplay'],
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.primary,
-                fontWeight: FontWeight.w600,
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 5, 14, 10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFDFF7EE),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                question['typeDisplay'],
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.3,
+                ),
               ),
             ),
           ),
           if (options.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            const Divider(height: 1),
-            const SizedBox(height: 8),
-            ...options
-                .map(
-                  (option) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
+            Divider(height: 1, color: const Color(0xFFEAF5F2), thickness: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
+              child: Column(
+                children: options.map<Widget>((option) {
+                  final val = option['value'] ?? option['option_value'] ?? '';
+                  final isCorrect = _isCorrectOption(option['is_correct']);
+                  final isCheckbox = question['type'] == 'checkbox';
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
                       children: [
-                        Icon(
-                          question['type'] == 'checkbox'
-                              ? Icons.check_box_outline_blank
-                              : Icons.radio_button_unchecked,
-                          size: 16,
-                          color: AppColors.textSecondary,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            option['value'] ?? option['option_value'] ?? '',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: AppColors.textPrimary,
+                        Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            shape: isCheckbox ? BoxShape.rectangle : BoxShape.circle,
+                            borderRadius: isCheckbox ? BorderRadius.circular(4) : null,
+                            border: Border.all(
+                              color: isCorrect
+                                  ? AppColors.primary
+                                  : const Color(0xFFCCDEDA),
+                              width: isCorrect ? 2 : 1.5,
                             ),
+                            color: isCorrect
+                                ? const Color(0xFFDFF7EE)
+                                : Colors.transparent,
                           ),
+                          child: isCorrect
+                              ? const Center(
+                                  child: Icon(Icons.circle,
+                                      size: 8, color: AppColors.primary))
+                              : null,
                         ),
-                        if (_isCorrectOption(option['is_correct']))
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(val,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppColors.textPrimary,
+                                fontWeight: isCorrect
+                                    ? FontWeight.w500
+                                    : FontWeight.normal,
+                              )),
+                        ),
+                        if (isCorrect)
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
+                                horizontal: 10, vertical: 3),
                             decoration: BoxDecoration(
-                              color: AppColors.success.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(4),
+                              color: const Color(0xFFDFF7EE),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Text(
-                              'CORRECT',
-                              style: TextStyle(
-                                fontSize: 9,
-                                color: AppColors.success,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                            child: const Text('CORRECT',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w700,
+                                )),
                           ),
                       ],
                     ),
-                  ),
-                )
-                .toList(),
+                  );
+                }).toList(),
+              ),
+            ),
           ],
         ],
       ),
@@ -1246,18 +1418,901 @@ class _ResponsesTabState extends State<_ResponsesTab> {
 
 // ============ SETTINGS TAB ============
 
-class _SettingsTab extends StatelessWidget {
+class _SettingsTab extends StatefulWidget {
   final bool isPublic;
   final String formSlug;
   final VoidCallback onToggleStatus;
   final VoidCallback onDeleteForm;
+  final int initialDurationMinutes;
+  final bool initialIsRandom;
+  final String initialTokenRespon;
 
   const _SettingsTab({
     required this.isPublic,
     required this.formSlug,
     required this.onToggleStatus,
     required this.onDeleteForm,
+    this.initialDurationMinutes = 0,
+    this.initialIsRandom = false,
+    this.initialTokenRespon = '',
   });
+
+  @override
+  State<_SettingsTab> createState() => _SettingsTabState();
+}
+
+class _SettingsTabState extends State<_SettingsTab> {
+  late TextEditingController _durationController;
+  late TextEditingController _tokenController;
+  bool _isSavingDuration = false;
+  bool _isSavingToken = false;
+  bool _isRandom = false;
+  bool _isSavingRandom = false;
+  String? _durationError;
+  String? _durationSuccessMsg;
+  String? _tokenError;
+  String? _tokenSuccessMsg;
+
+  @override
+  void initState() {
+    super.initState();
+    _isRandom = widget.initialIsRandom;
+    _durationController = TextEditingController(
+      text: widget.initialDurationMinutes > 0
+          ? widget.initialDurationMinutes.toString()
+          : '',
+    );
+    _tokenController = TextEditingController(
+      text: widget.initialTokenRespon,
+    );
+  }
+
+  @override
+  void dispose() {
+    _durationController.dispose();
+    _tokenController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveDuration() async {
+    final raw = _durationController.text.trim();
+    final minutes = raw.isEmpty ? 0 : int.tryParse(raw);
+
+    if (minutes == null || minutes < 0) {
+      setState(() {
+        _durationError = 'Masukkan angka menit yang valid (0 = tanpa batas).';
+        _durationSuccessMsg = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isSavingDuration = true;
+      _durationError = null;
+      _durationSuccessMsg = null;
+    });
+
+    final result = await FormService.updateFormSetting(
+      slug: widget.formSlug,
+      durationMinutes: minutes,
+      isRandom: _isRandom,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _isSavingDuration = false;
+      if (result['success']) {
+        _durationSuccessMsg = minutes == 0
+            ? 'Durasi dihapus — form tanpa batasan waktu.'
+            : 'Durasi disimpan: $minutes menit.';
+        _durationError = null;
+      } else {
+        _durationError = result['message'] ?? 'Gagal menyimpan durasi.';
+        _durationSuccessMsg = null;
+      }
+    });
+  }
+
+  Future<void> _saveToken() async {
+    setState(() {
+      _isSavingToken = true;
+      _tokenError = null;
+      _tokenSuccessMsg = null;
+    });
+
+    final result = await FormService.updateTokenRespon(
+      slug: widget.formSlug,
+      tokenRespon: _tokenController.text.trim(),
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _isSavingToken = false;
+      if (result['success']) {
+        _tokenSuccessMsg = _tokenController.text.trim().isEmpty
+            ? 'Token dihapus — form dapat diakses tanpa token.'
+            : 'Token berhasil disimpan.';
+        _tokenError = null;
+      } else {
+        _tokenError = result['message'] ?? 'Gagal menyimpan token.';
+        _tokenSuccessMsg = null;
+      }
+    });
+  }
+
+  Future<void> _toggleShuffle(bool value) async {
+    setState(() {
+      _isRandom = value;
+      _isSavingRandom = true;
+    });
+
+    final raw = _durationController.text.trim();
+    final minutes = raw.isEmpty ? 0 : (int.tryParse(raw) ?? 0);
+
+    final result = await FormService.updateFormSetting(
+      slug: widget.formSlug,
+      durationMinutes: minutes,
+      isRandom: value,
+    );
+
+    if (!mounted) return;
+    setState(() => _isSavingRandom = false);
+
+    if (!result['success']) {
+      setState(() => _isRandom = !value);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? 'Gagal menyimpan pengaturan.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+
+          // ── TOKEN UJIAN ───────────────────────────────────────
+          _buildSectionLabel('TOKEN UJIAN'),
+          const SizedBox(height: 8),
+          _buildCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildCardHeader(
+                  icon: Icons.key_rounded,
+                  title: 'Token Akses',
+                  subtitle: 'Masukkan atau ubah token kode akses untuk peserta ujian.',
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildTextField(
+                            controller: _tokenController,
+                            hint: 'cth. UBI-2024',
+                            suffixIcon: _tokenController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.copy_rounded,
+                                        size: 16, color: AppColors.primary),
+                                    onPressed: () {
+                                      Clipboard.setData(ClipboardData(
+                                          text: _tokenController.text));
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(const SnackBar(
+                                        content: Text('Token disalin!'),
+                                        backgroundColor: AppColors.success,
+                                        duration: Duration(seconds: 2),
+                                      ));
+                                    },
+                                  )
+                                : null,
+                            onChanged: (_) {
+                              if (_tokenError != null ||
+                                  _tokenSuccessMsg != null) {
+                                setState(() {
+                                  _tokenError = null;
+                                  _tokenSuccessMsg = null;
+                                });
+                              }
+                            },
+                          ),
+                          if (_tokenError != null)
+                            _buildFeedback(_tokenError!, isError: true),
+                          if (_tokenSuccessMsg != null)
+                            _buildFeedback(_tokenSuccessMsg!, isError: false),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    _buildSaveButton(
+                      label: 'Ubah',
+                      isSaving: _isSavingToken,
+                      onTap: _saveToken,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                // "Wajibkan Token untuk Masuk" toggle
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Wajibkan Token untuk Masuk',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            _tokenController.text.trim().isNotEmpty
+                                ? 'Siswa harus memasukkan form dengan token ini.'
+                                : 'Kosongkan token untuk akses bebas.',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _buildToggle(
+                      value: _tokenController.text.trim().isNotEmpty,
+                      onTap: () {
+                        setState(() {
+                          if (_tokenController.text.trim().isNotEmpty) {
+                            _tokenController.clear();
+                          }
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── PENGATURAN WAKTU ──────────────────────────────────
+          _buildSectionLabel('PENGATURAN WAKTU'),
+          const SizedBox(height: 8),
+          _buildCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildCardHeader(
+                  icon: Icons.timer_outlined,
+                  title: 'Durasi Pengerjaan',
+                  subtitle: 'Isi 0 atau kosongkan untuk tanpa batasan waktu.',
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildTextField(
+                            controller: _durationController,
+                            hint: 'cth. 60',
+                            suffixText: 'menit',
+                            keyboardType: TextInputType.number,
+                            onChanged: (_) {
+                              if (_durationError != null ||
+                                  _durationSuccessMsg != null) {
+                                setState(() {
+                                  _durationError = null;
+                                  _durationSuccessMsg = null;
+                                });
+                              }
+                            },
+                          ),
+                          if (_durationError != null)
+                            _buildFeedback(_durationError!, isError: true),
+                          if (_durationSuccessMsg != null)
+                            _buildFeedback(_durationSuccessMsg!, isError: false),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    _buildSaveButton(
+                      label: 'Simpan',
+                      isSaving: _isSavingDuration,
+                      onTap: _saveDuration,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    _buildPresetChip('30 mnt', 30),
+                    _buildPresetChip('45 mnt', 45),
+                    _buildPresetChip('60 mnt', 60),
+                    _buildPresetChip('90 mnt', 90),
+                    _buildPresetChip('120 mnt', 120),
+                    _buildPresetChip('Tanpa batas', 0),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── URUTAN SOAL ───────────────────────────────────────
+          _buildSectionLabel('URUTAN SOAL'),
+          const SizedBox(height: 8),
+          _buildCard(
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: _isRandom
+                        ? const Color(0xFFDFF7EE)
+                        : AppColors.background,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.shuffle_rounded,
+                      color: _isRandom
+                          ? AppColors.primary
+                          : AppColors.textSecondary,
+                      size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Acak Urutan Soal',
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary),
+                      ),
+                      Text(
+                        _isRandom
+                            ? 'Urutan soal akan diacak setiap kali form dibuka'
+                            : 'Urutan soal tetap sesuai yang dibuat',
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                _isSavingRandom
+                    ? const SizedBox(
+                        width: 36,
+                        height: 36,
+                        child: Padding(
+                          padding: EdgeInsets.all(8),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: AppColors.primary),
+                        ),
+                      )
+                    : _buildToggle(
+                        value: _isRandom,
+                        onTap: () => _toggleShuffle(!_isRandom),
+                      ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── VISIBILITAS ───────────────────────────────────────
+          _buildSectionLabel('VISIBILITAS'),
+          const SizedBox(height: 8),
+          _buildCard(
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDFF7EE),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    widget.isPublic ? Icons.public : Icons.lock_outline,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Status Form',
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary),
+                      ),
+                      Text(
+                        widget.isPublic
+                            ? 'Public — siapapun bisa mengisi form ini'
+                            : 'Private — hanya kamu yang bisa melihat',
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                _buildToggle(
+                  value: widget.isPublic,
+                  onTap: widget.onToggleStatus,
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          // Bagikan Form
+          _buildCard(
+            onTap: () {
+              Clipboard.setData(ClipboardData(text: widget.formSlug));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text('Link form disalin!'),
+                    backgroundColor: AppColors.success),
+              );
+            },
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDFF7EE),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.share,
+                      color: AppColors.primary, size: 20),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Bagikan Form',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary)),
+                      Text('Salin slug form untuk dibagikan',
+                          style: TextStyle(
+                              fontSize: 12, color: AppColors.textSecondary)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios,
+                    size: 14, color: AppColors.textSecondary),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── DANGER ZONE ───────────────────────────────────────
+          _buildCard(
+            onTap: widget.onDeleteForm,
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.delete_outline,
+                      color: AppColors.error, size: 20),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Hapus Form',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.error)),
+                      Text('Hapus form ini secara permanen',
+                          style: TextStyle(
+                              fontSize: 12, color: AppColors.textSecondary)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios,
+                    size: 14, color: AppColors.error),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 32),
+        ],
+      ),
+    );
+  }
+
+  // ── Shared helper widgets ─────────────────────────────────────
+
+  Widget _buildSectionLabel(String label) {
+    return Text(
+      label,
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textSecondary,
+        letterSpacing: 1.0,
+      ),
+    );
+  }
+
+  Widget _buildCard({required Widget child, VoidCallback? onTap}) {
+    final card = Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: child,
+    );
+    if (onTap == null) return card;
+    return GestureDetector(onTap: onTap, child: card);
+  }
+
+  Widget _buildCardHeader({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: const Color(0xFFDFF7EE),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: AppColors.primary, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary)),
+              Text(subtitle,
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    String? hint,
+    String? suffixText,
+    Widget? suffixIcon,
+    TextInputType? keyboardType,
+    ValueChanged<String>? onChanged,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      onChanged: onChanged,
+      style: const TextStyle(
+          fontSize: 14,
+          color: AppColors.textPrimary,
+          fontWeight: FontWeight.w500),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle:
+            const TextStyle(color: AppColors.textHint, fontSize: 13),
+        suffixText: suffixText,
+        suffixStyle: const TextStyle(
+            color: AppColors.textSecondary, fontSize: 13),
+        suffixIcon: suffixIcon,
+        filled: true,
+        fillColor: const Color(0xFFF5FEFA),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide:
+              const BorderSide(color: Color(0xFFBDE8E0)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide:
+              const BorderSide(color: Color(0xFFBDE8E0)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide:
+              const BorderSide(color: AppColors.primary, width: 1.5),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSaveButton({
+    required String label,
+    required bool isSaving,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: isSaving ? null : onTap,
+      child: Container(
+        height: 46,
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        decoration: BoxDecoration(
+          color: AppColors.primary,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Center(
+          child: isSaving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(Colors.white)),
+                )
+              : Text(label,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToggle({required bool value, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeInOut,
+        width: 48,
+        height: 26,
+        decoration: BoxDecoration(
+          color: value ? AppColors.primary : const Color(0xFFCCDEDA),
+          borderRadius: BorderRadius.circular(13),
+        ),
+        child: AnimatedAlign(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeInOut,
+          alignment:
+              value ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            width: 22,
+            height: 22,
+            margin: const EdgeInsets.symmetric(horizontal: 2),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                    color: Color(0x22000000),
+                    blurRadius: 4,
+                    offset: Offset(0, 1))
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeedback(String msg, {required bool isError}) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 5),
+      child: Row(
+        children: [
+          Icon(
+            isError ? Icons.error_outline : Icons.check_circle_outline,
+            size: 13,
+            color: isError ? AppColors.error : AppColors.success,
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(msg,
+                style: TextStyle(
+                    fontSize: 11,
+                    color: isError ? AppColors.error : AppColors.success)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPresetChip(String label, int minutes) {
+    final isActive = _durationController.text.trim() ==
+        (minutes == 0 ? '' : minutes.toString());
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _durationController.text =
+              minutes == 0 ? '' : minutes.toString();
+          _durationError = null;
+          _durationSuccessMsg = null;
+        });
+      },
+      child: Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          color: isActive
+              ? const Color(0xFFDFF7EE)
+              : AppColors.background,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isActive
+                ? AppColors.primary
+                : const Color(0xFFBDE8E0),
+            width: isActive ? 1.5 : 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isActive
+                  ? AppColors.primary
+                  : AppColors.textSecondary),
+        ),
+      ),
+    );
+  }
+}
+    required this.onToggleStatus,
+    required this.onDeleteForm,
+    this.initialDurationMinutes = 0,
+    this.initialIsRandom = false,
+  });
+
+  @override
+  State<_SettingsTab> createState() => _SettingsTabState();
+}
+
+class _SettingsTabState extends State<_SettingsTab> {
+  late TextEditingController _durationController;
+  bool _isSavingDuration = false;
+  bool _isRandom = false;
+  bool _isSavingRandom = false;
+  String? _durationError;
+  String? _durationSuccessMsg;
+
+  @override
+  void initState() {
+    super.initState();
+    _isRandom = widget.initialIsRandom;
+    _durationController = TextEditingController(
+      text: widget.initialDurationMinutes > 0
+          ? widget.initialDurationMinutes.toString()
+          : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _durationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveDuration() async {
+    final raw = _durationController.text.trim();
+    final minutes = raw.isEmpty ? 0 : int.tryParse(raw);
+
+    if (minutes == null || minutes < 0) {
+      setState(() {
+        _durationError = 'Masukkan angka menit yang valid (0 = tanpa batas).';
+        _durationSuccessMsg = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isSavingDuration = true;
+      _durationError = null;
+      _durationSuccessMsg = null;
+    });
+
+    final result = await FormService.updateFormSetting(
+      slug: widget.formSlug,
+      durationMinutes: minutes,
+      isRandom: _isRandom,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _isSavingDuration = false;
+      if (result['success']) {
+        _durationSuccessMsg = minutes == 0
+            ? 'Durasi dihapus — form tanpa batasan waktu.'
+            : 'Durasi disimpan: $minutes menit.';
+        _durationError = null;
+      } else {
+        _durationError = result['message'] ?? 'Gagal menyimpan durasi.';
+        _durationSuccessMsg = null;
+      }
+    });
+  }
+
+  Future<void> _toggleShuffle(bool value) async {
+    setState(() {
+      _isRandom = value;
+      _isSavingRandom = true;
+    });
+
+    final raw = _durationController.text.trim();
+    final minutes = raw.isEmpty ? 0 : (int.tryParse(raw) ?? 0);
+
+    final result = await FormService.updateFormSetting(
+      slug: widget.formSlug,
+      durationMinutes: minutes,
+      isRandom: value,
+    );
+
+    if (!mounted) return;
+    setState(() => _isSavingRandom = false);
+
+    if (!result['success']) {
+      // Revert on failure
+      setState(() => _isRandom = !value);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? 'Gagal menyimpan pengaturan.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1266,7 +2321,223 @@ class _SettingsTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Status toggle
+          // ── Duration Card ─────────────────────────────────────
+          _buildSectionLabel('Pengaturan Waktu'),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.timer_outlined,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Durasi Pengerjaan',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Isi 0 atau kosongkan untuk tanpa batasan waktu.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextField(
+                            controller: _durationController,
+                            keyboardType: TextInputType.number,
+                            onChanged: (_) {
+                              if (_durationError != null ||
+                                  _durationSuccessMsg != null) {
+                                setState(() {
+                                  _durationError = null;
+                                  _durationSuccessMsg = null;
+                                });
+                              }
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'cth. 60',
+                              suffixText: 'menit',
+                              filled: true,
+                              fillColor: AppColors.background,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(
+                                  color: _durationError != null
+                                      ? AppColors.error
+                                      : AppColors.inputBorder,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(
+                                  color: _durationError != null
+                                      ? AppColors.error
+                                      : AppColors.inputBorder,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(
+                                  color: AppColors.primary,
+                                  width: 2,
+                                ),
+                              ),
+                              errorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(
+                                  color: AppColors.error,
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (_durationError != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Text(
+                                _durationError!,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.error,
+                                ),
+                              ),
+                            ),
+                          if (_durationSuccessMsg != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.check_circle_outline,
+                                    size: 14,
+                                    color: AppColors.success,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      _durationSuccessMsg!,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.success,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: _isSavingDuration ? null : _saveDuration,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                        ),
+                        child: _isSavingDuration
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : const Text(
+                                'Simpan',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Quick presets
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    _buildPresetChip('30 mnt', 30),
+                    _buildPresetChip('45 mnt', 45),
+                    _buildPresetChip('60 mnt', 60),
+                    _buildPresetChip('90 mnt', 90),
+                    _buildPresetChip('120 mnt', 120),
+                    _buildPresetChip('Tanpa batas', 0),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── Shuffle Soal Card ──────────────────────────────────
+          _buildSectionLabel('Urutan Soal'),
+          const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -1282,10 +2553,20 @@ class _SettingsTab extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(
-                  isPublic ? Icons.public : Icons.lock_outline,
-                  color: AppColors.primary,
-                  size: 24,
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: _isRandom
+                        ? AppColors.primary.withOpacity(0.12)
+                        : AppColors.background,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.shuffle_rounded,
+                    color: _isRandom ? AppColors.primary : AppColors.textSecondary,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -1293,19 +2574,134 @@ class _SettingsTab extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Public Status',
+                        'Acak Urutan Soal',
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
-                        isPublic
-                            ? 'Form can be accessed by anyone with the link'
-                            : 'Form is private',
+                        _isRandom
+                            ? 'Urutan soal akan diacak setiap kali form dibuka'
+                            : 'Urutan soal tetap sesuai yang dibuat',
                         style: const TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                _isSavingRandom
+                    ? const SizedBox(
+                        width: 36,
+                        height: 36,
+                        child: Padding(
+                          padding: EdgeInsets.all(8),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      )
+                    : GestureDetector(
+                        onTap: () => _toggleShuffle(!_isRandom),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeInOut,
+                          width: 52,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: _isRandom
+                                ? AppColors.primary
+                                : AppColors.inputBorder,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: AnimatedAlign(
+                            duration: const Duration(milliseconds: 220),
+                            curve: Curves.easeInOut,
+                            alignment: _isRandom
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: Container(
+                              width: 24,
+                              height: 24,
+                              margin: const EdgeInsets.symmetric(horizontal: 2),
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Color(0x22000000),
+                                    blurRadius: 4,
+                                    offset: Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── Visibility Card ────────────────────────────────────
+          _buildSectionLabel('Visibilitas'),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    widget.isPublic ? Icons.public : Icons.lock_outline,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Status Form',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        widget.isPublic
+                            ? 'Public — siapapun bisa mengisi form ini'
+                            : 'Private — hanya kamu yang bisa melihat',
+                        style: const TextStyle(
+                          fontSize: 12,
                           color: AppColors.textSecondary,
                         ),
                       ),
@@ -1313,19 +2709,19 @@ class _SettingsTab extends StatelessWidget {
                   ),
                 ),
                 GestureDetector(
-                  onTap: onToggleStatus,
+                  onTap: widget.onToggleStatus,
                   child: Container(
                     width: 52,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: isPublic
+                      color: widget.isPublic
                           ? AppColors.primary
                           : AppColors.inputBorder,
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: AnimatedAlign(
                       duration: const Duration(milliseconds: 200),
-                      alignment: isPublic
+                      alignment: widget.isPublic
                           ? Alignment.centerRight
                           : Alignment.centerLeft,
                       child: Container(
@@ -1346,7 +2742,7 @@ class _SettingsTab extends StatelessWidget {
 
           const SizedBox(height: 12),
 
-          // Copy link
+          // ── Share Card ─────────────────────────────────────────
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
@@ -1364,10 +2760,10 @@ class _SettingsTab extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               child: InkWell(
                 onTap: () {
-                  Clipboard.setData(ClipboardData(text: formSlug));
+                  Clipboard.setData(ClipboardData(text: widget.formSlug));
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Share link copied!'),
+                      content: Text('Link form disalin!'),
                       backgroundColor: AppColors.success,
                     ),
                   );
@@ -1396,15 +2792,16 @@ class _SettingsTab extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Share Form',
+                              'Bagikan Form',
                               style: TextStyle(
-                                fontSize: 16,
+                                fontSize: 15,
                                 fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
                               ),
                             ),
-                            SizedBox(height: 4),
+                            SizedBox(height: 2),
                             Text(
-                              'Copy the form link to share',
+                              'Salin slug form untuk dibagikan',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppColors.textSecondary,
@@ -1425,9 +2822,11 @@ class _SettingsTab extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 20),
 
-          // Delete form
+          // ── Danger Zone ────────────────────────────────────────
+          _buildSectionLabel('Danger Zone'),
+          const SizedBox(height: 8),
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
@@ -1444,7 +2843,7 @@ class _SettingsTab extends StatelessWidget {
               color: Colors.transparent,
               borderRadius: BorderRadius.circular(12),
               child: InkWell(
-                onTap: onDeleteForm,
+                onTap: widget.onDeleteForm,
                 borderRadius: BorderRadius.circular(12),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -1469,16 +2868,16 @@ class _SettingsTab extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Delete Form',
+                              'Hapus Form',
                               style: TextStyle(
-                                fontSize: 16,
+                                fontSize: 15,
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.error,
                               ),
                             ),
-                            SizedBox(height: 4),
+                            SizedBox(height: 2),
                             Text(
-                              'Permanently delete this form',
+                              'Hapus form ini secara permanen',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppColors.textSecondary,
@@ -1499,32 +2898,55 @@ class _SettingsTab extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(height: 24),
-
-          // Info
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.info.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline, color: AppColors.info, size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Questions can be edited or deleted from the Questions tab. Use "Import Word" to bulk-import .docx questions.',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          const SizedBox(height: 32),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSectionLabel(String label) {
+    return Text(
+      label,
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textSecondary,
+        letterSpacing: 1.0,
+      ),
+    );
+  }
+
+  Widget _buildPresetChip(String label, int minutes) {
+    final isActive = _durationController.text.trim() ==
+        (minutes == 0 ? '' : minutes.toString());
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _durationController.text = minutes == 0 ? '' : minutes.toString();
+          _durationError = null;
+          _durationSuccessMsg = null;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isActive
+              ? AppColors.primary.withOpacity(0.12)
+              : AppColors.background,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isActive ? AppColors.primary : AppColors.inputBorder,
+            width: isActive ? 1.5 : 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: isActive ? AppColors.primary : AppColors.textSecondary,
+          ),
+        ),
       ),
     );
   }

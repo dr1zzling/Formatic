@@ -11,7 +11,10 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   String _username = 'User';
   bool _isLoading = true;
 
@@ -205,10 +208,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // required by AutomaticKeepAliveClientMixin
     return Scaffold(
       backgroundColor: AppColors.background,
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.blueAccent))
+          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
           : SafeArea(
               child: SingleChildScrollView(
                 child: Column(
@@ -233,23 +237,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 32),
                     // Avatar
                     Container(
-                      width: 100,
-                      height: 100,
+                      width: 96,
+                      height: 96,
                       decoration: BoxDecoration(
-                        color: AppColors.blueAccent,
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF28ACCE), Color(0xFF1D93B4)],
+                        ),
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.blueAccent.withOpacity(0.3),
+                            color: AppColors.primary.withOpacity(0.30),
                             blurRadius: 20,
-                            offset: const Offset(0, 10),
+                            offset: const Offset(0, 8),
                           ),
                         ],
                       ),
                       child: Center(
                         child: Text(
                           _username.isNotEmpty ? _username[0].toUpperCase() : 'U',
-                          style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white),
+                          style: const TextStyle(
+                            fontSize: 38,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            fontFamily: 'Plus Jakarta Sans',
+                          ),
                         ),
                       ),
                     ),
@@ -265,16 +278,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
                       decoration: BoxDecoration(
-                        color: AppColors.blueAccent.withOpacity(0.1),
+                        color: AppColors.primary.withOpacity(0.10),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
                         'Form Creator',
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.blueAccent,
+                          color: AppColors.primary,
                           fontWeight: FontWeight.w600,
                           fontFamily: 'Plus Jakarta Sans',
                         ),
@@ -410,10 +423,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: AppColors.blueAccent.withOpacity(0.1),
+                    color: AppColors.primary.withOpacity(0.10),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(icon, color: AppColors.blueAccent, size: 20),
+                  child: Icon(icon, color: AppColors.primary, size: 20),
                 ),
                 const SizedBox(width: 16),
                 Expanded(

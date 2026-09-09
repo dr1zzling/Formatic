@@ -2,9 +2,10 @@ class ApiConfig {
   // Base URLs
   // Web browser: http://localhost:3000
   // Android Emulator: http://10.0.2.2:3000
-  // Physical Device: use computer IP
-  static const String userApiBaseUrl = 'http://localhost:3000';
-  static const String formApiBaseUrl = 'http://localhost:3002';
+  // Physical Device: use computer WiFi IP (run: ipconfig → Wi-Fi → IPv4)
+  static const String userApiBaseUrl = 'http://10.10.18.159:3000';
+  static const String formApiBaseUrl = 'http://10.10.18.159:3002';
+
 
   // User API Endpoints
   static const String loginEndpoint = '/user/login';
@@ -18,6 +19,7 @@ class ApiConfig {
   static const String userFormsEndpoint = '/form/user';
   static const String formSlugEndpoint = '/form/slug';
   static const String formStatusEndpoint = '/form';
+  static const String formSettingEndpoint = '/form/setting';
   static const String soalEndpoint = '/form/soal';
   static const String submitEndpoint = '/form/submit';
   static const String submitDetailEndpoint = '/form/submit/detail';

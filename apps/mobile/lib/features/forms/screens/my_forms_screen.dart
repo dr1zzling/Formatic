@@ -12,7 +12,10 @@ class MyFormsScreen extends StatefulWidget {
   State<MyFormsScreen> createState() => _MyFormsScreenState();
 }
 
-class _MyFormsScreenState extends State<MyFormsScreen> {
+class _MyFormsScreenState extends State<MyFormsScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   int _selectedTab = 0;
   String _username = 'User';
   bool _isLoading = true;
@@ -48,28 +51,36 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
     final result = await FormService.getUserForms();
 
     if (result['success'] && mounted) {
-      final responseData = result['data']['data'];
-      final Map<String, dynamic> userData = responseData is Map
-          ? Map<String, dynamic>.from(responseData)
-          : {};
-      final List<dynamic> forms =
-          (userData['form'] ?? userData['forms'] ?? []) is List
-          ? (userData['form'] ?? userData['forms'] ?? []) as List
-          : [];
+      // Backend: { message, data: { user_id, username, forms: [...] } }
+      // getUserForms() returns: {'success': true, 'data': jsonDecode(body)}
+      // So result['data'] = { message, data: { user_id, username, forms: [] } }
+      final dynamic topLevel = result['data'];
+      List<dynamic> forms = [];
+
+      if (topLevel is Map) {
+        final inner = topLevel['data'];
+        if (inner is Map) {
+          // { user_id, username, forms: [...] }
+          final f = inner['forms'] ?? inner['form'] ?? [];
+          forms = f is List ? f : [];
+        } else if (inner is List) {
+          forms = inner;
+        }
+      }
 
       setState(() {
         _myForms = forms
             .map(
               (form) => {
                 'id': (form['form_id'] ?? form['id'] ?? '').toString(),
-                'title': form['form_title'] ?? 'Untitled Form',
-                'slug': form['form_slug'] ?? '',
+                'title': form['form_title'] ?? form['title'] ?? 'Untitled Form',
+                'slug': form['form_slug'] ?? form['slug'] ?? '',
                 'questions': 0,
                 'responses': 0,
                 'role': (form['access_type'] ?? 'CREATOR')
                     .toString()
                     .toUpperCase(),
-                'visibility': form['form_status'] ?? 'private',
+                'visibility': form['form_status'] ?? form['status'] ?? 'private',
                 'category': form['category'] ?? '',
               },
             )
@@ -171,6 +182,7 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // required by AutomaticKeepAliveClientMixin
     final forms = _selectedTab == 0
         ? _filteredForms
         : _filteredForms.where((f) => f['role'] == 'COLLABORATOR').toList();
@@ -182,25 +194,45 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
           children: [
             // Header
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
               child: Row(
                 children: [
                   Text(
                     'My Forms',
                     style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                      fontSize: 24,
+                      fontSize: 22,
                       fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const Spacer(),
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: AppColors.primary,
-                    child: Text(
-                      _username.isNotEmpty ? _username[0].toUpperCase() : 'U',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF28ACCE), Color(0xFF1D93B4)],
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.25),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        _username.isNotEmpty ? _username[0].toUpperCase() : 'U',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          fontFamily: 'Plus Jakarta Sans',
+                        ),
                       ),
                     ),
                   ),
@@ -210,31 +242,43 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
 
             // Search
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: TextField(
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                    _applyFilters();
-                  });
-                },
-                decoration: InputDecoration(
-                  hintText: 'Search forms...',
-                  prefixIcon: const Icon(
-                    Icons.search,
-                    color: AppColors.textHint,
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+              child: Container(
+                height: 46,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE4EEF8)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.06),
+                      blurRadius: 12,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: TextField(
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                      _applyFilters();
+                    });
+                  },
+                  decoration: const InputDecoration(
+                    hintText: 'Cari form...',
+                    hintStyle: TextStyle(
+                      color: AppColors.textHint,
+                      fontSize: 13,
+                      fontFamily: 'Plus Jakarta Sans',
+                    ),
+                    prefixIcon: Icon(
+                      Icons.search_rounded,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(vertical: 13),
                   ),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.inputBorder),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.inputBorder),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
             ),
@@ -260,7 +304,8 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
                           _applyFilters();
                         });
                       },
-                      child: Container(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
                           color: isSelected ? AppColors.primary : Colors.white,
@@ -268,8 +313,18 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
                           border: Border.all(
                             color: isSelected
                                 ? AppColors.primary
-                                : AppColors.inputBorder,
+                                : const Color(0xFFD9E6F6),
+                            width: isSelected ? 1.5 : 1,
                           ),
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: AppColors.primary.withOpacity(0.20),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ]
+                              : null,
                         ),
                         child: Center(
                           child: Text(
@@ -278,8 +333,11 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
                               color: isSelected
                                   ? Colors.white
                                   : AppColors.textSecondary,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
+                              fontWeight: isSelected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              fontSize: 12,
+                              fontFamily: 'Plus Jakarta Sans',
                             ),
                           ),
                         ),
@@ -290,26 +348,30 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
             // Tabs
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
-                  _buildTab('All', 0),
-                  const SizedBox(width: 12),
-                  _buildTab('Shared with me', 1),
+                  _buildTab('Semua', 0),
+                  const SizedBox(width: 10),
+                  _buildTab('Dibagikan', 1),
                 ],
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
             // Forms List
             Expanded(
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
+                      ),
+                    )
                   : forms.isEmpty
                   ? _buildEmptyState()
                   : RefreshIndicator(
@@ -357,26 +419,34 @@ class _MyFormsScreenState extends State<MyFormsScreen> {
   Widget _buildTab(String label, int index) {
     final isSelected = _selectedTab == index;
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedTab = index;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      onTap: () => setState(() => _selectedTab = index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.inputBorder,
+            color: isSelected ? AppColors.primary : const Color(0xFFD9E6F6),
+            width: isSelected ? 1.5 : 1,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.20),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
           style: TextStyle(
             color: isSelected ? Colors.white : AppColors.textSecondary,
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+            fontSize: 13,
+            fontFamily: 'Plus Jakarta Sans',
           ),
         ),
       ),
