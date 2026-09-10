@@ -7,6 +7,7 @@ import 'package:flutter_quill/flutter_quill.dart' as quill;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/form_service.dart';
 import '../../../core/config/api_config.dart';
+import '../widgets/form_audio_player.dart';
 
 class FormViewerScreen extends StatefulWidget {
   final String slug;
@@ -107,6 +108,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
               'typeDisplay': _mapQuestionType(type),
               'options': soal['options'] ?? [],
               'image': soal['image']?.toString(),
+              'audio': soal['audio']?.toString(),
               'answer': null,
             };
           }).toList();
@@ -1060,6 +1062,13 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
           ),
           if (question['image'] != null && (question['image'] as String).isNotEmpty)
             _buildQuestionImage(question['image']),
+          if (question['audio'] != null && (question['audio'] as String).isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: FormAudioPlayer(
+                url: '${ApiConfig.formApiBaseUrl}${question['audio']}',
+              ),
+            ),
           const SizedBox(height: 20),
           if (type == 'radio' && options.isNotEmpty)
             _buildRadioOptions(question, options, index)

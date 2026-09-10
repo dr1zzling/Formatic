@@ -798,6 +798,8 @@ class FormService {
     File? imageFile,
     Uint8List? imageBytes,
     String? imageName,
+    Uint8List? audioBytes,
+    String? audioName,
   }) async {
     try {
       final url = Uri.parse(
@@ -830,6 +832,20 @@ class FormService {
             'soal_images',
             imageFile.path,
             filename: filename,
+          ),
+        );
+      }
+
+      // Add audio if provided (bytes for web, file for native)
+      if (audioBytes != null && audioName != null) {
+        if (questionData['soal'] is Map<String, dynamic>) {
+          questionData['soal']['audio_filename'] = audioName;
+        }
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'soal_audios',
+            audioBytes,
+            filename: audioName,
           ),
         );
       }
@@ -870,6 +886,9 @@ class FormService {
     Uint8List? imageBytes,
     String? imageName,
     bool removeImage = false,
+    Uint8List? audioBytes,
+    String? audioName,
+    bool removeAudio = false,
   }) async {
     try {
       final url = Uri.parse(
@@ -913,6 +932,27 @@ class FormService {
         );
       }
       // If neither removeImage nor imageFile, keep existing image (don't modify)
+
+      // Handle audio updates — mirrors Web FE contract:
+      // - removeAudio: send `audio: null` (backend parity, same as Web FE)
+      // - audioBytes: replace with new file in `soal_audios`
+      // - otherwise: keep existing audio (payload may carry `audio` from screen)
+      if (removeAudio) {
+        if (payload['soal'] is Map<String, dynamic>) {
+          payload['soal']['audio'] = null;
+        }
+      } else if (audioBytes != null && audioName != null) {
+        if (payload['soal'] is Map<String, dynamic>) {
+          payload['soal']['audio_filename'] = audioName;
+        }
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'soal_audios',
+            audioBytes,
+            filename: audioName,
+          ),
+        );
+      }
 
       request.fields['data'] = jsonEncode(payload);
 

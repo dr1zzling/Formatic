@@ -1,11 +1,16 @@
-class ApiConfig {
-  // Base URLs
-  // Web browser: http://localhost:3000
-  // Android Emulator: http://10.0.2.2:3000
-  // Physical Device: use computer WiFi IP (run: ipconfig → Wi-Fi → IPv4)
-  static const String userApiBaseUrl = 'http://10.10.18.159:3000';
-  static const String formApiBaseUrl = 'http://10.10.18.159:3002';
+import 'package:flutter/foundation.dart';
 
+class ApiConfig {
+  // Base URLs:
+  // Web browser -> localhost
+  // Android physical device -> IP WiFi komputer
+  static String get userApiBaseUrl => kIsWeb
+      ? 'http://localhost:3000'
+      : 'http://10.10.18.201:3000';
+
+  static String get formApiBaseUrl => kIsWeb
+      ? 'http://localhost:3002'
+      : 'http://10.10.18.201:3002';
 
   // User API Endpoints
   static const String loginEndpoint = '/user/login';

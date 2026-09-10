@@ -61,6 +61,7 @@ dependencies:
 
   # QR Code Scanner — CameraX/MLKit for Android
   mobile_scanner: ^6.0.0
+  audioplayers: ^6.8.1
 
 dev_dependencies:
   flutter_test:

@@ -6,6 +6,7 @@ import 'package:flutter_quill/flutter_quill.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/form_service.dart';
 import '../../../core/config/api_config.dart';
+import '../widgets/form_audio_player.dart';
 
 class AddQuestionScreen extends StatefulWidget {
   final String? formSlug;
@@ -37,6 +38,12 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
   Uint8List? _selectedImageBytes;
   String? _selectedImageName;
   String? _existingImageUrl;
+
+  // Audio upload state
+  Uint8List? _selectedAudioBytes;
+  String? _selectedAudioName;
+  String? _selectedAudioPath;
+  String? _existingAudioUrl;
 
   // Validation flag — track if question was ever touched
   bool _questionTouched = false;
@@ -105,6 +112,12 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
     final imageUrl = question['image']?.toString();
     if (imageUrl != null && imageUrl.isNotEmpty) {
       _existingImageUrl = imageUrl;
+    }
+
+    // Parse existing audio URL (backend contract: `soal.audio`)
+    final audioUrl = question['audio']?.toString();
+    if (audioUrl != null && audioUrl.isNotEmpty) {
+      _existingAudioUrl = audioUrl;
     }
 
     final options = question['options'] as List? ?? [];
@@ -247,6 +260,61 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
     });
   }
 
+  static const List<String> _audioExtensions = ['mp3', 'wav', 'ogg', 'm4a', 'aac'];
+
+  Future<void> _pickAudio() async {
+    try {
+      final result = await FilePickerPlatform.instance.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: _audioExtensions,
+      );
+      if (result.isEmpty) return;
+      final file = result.first;
+      final ext = (file.extension ?? '').toLowerCase();
+      if (!_audioExtensions.contains(ext)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Format audio tidak didukung. Gunakan MP3, WAV, OGG, M4A, atau AAC.'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
+      final bytes = await file.xFile.readAsBytes();
+      if (bytes.isEmpty) return;
+      if (mounted) {
+        setState(() {
+          _selectedAudioBytes = bytes;
+          _selectedAudioName = file.name;
+          _selectedAudioPath = (file.path != null && file.path!.isNotEmpty)
+              ? file.path
+              : null;
+          _existingAudioUrl = null;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Gagal memilih audio. Coba lagi.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  void _removeAudio() {
+    setState(() {
+      _selectedAudioBytes = null;
+      _selectedAudioName = null;
+      _selectedAudioPath = null;
+      _existingAudioUrl = null;
+    });
+  }
+
   Future<void> _saveQuestion() async {
     setState(() => _questionTouched = true);
 
@@ -285,7 +353,10 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
     try {
       // Store as Quill Delta JSON — backward compatible, can be rendered or plain-text extracted
       final questionJson = _getQuestionJson();
-      final soalPayload = {'question': questionJson, 'type': _selectedType};
+      final Map<String, dynamic> soalPayload = {
+        'question': questionJson,
+        'type': _selectedType,
+      };
 
       final List<Map<String, dynamic>> optionValues = _needsOptions()
           ? _optionControllers.asMap().entries.map((e) => {
@@ -314,12 +385,28 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
             _selectedImageBytes == null &&
             _existingImageUrl!.isNotEmpty;
 
+        final removeAudio =
+            _existingAudioUrl != null &&
+            _selectedAudioBytes == null &&
+            _existingAudioUrl!.isNotEmpty;
+
+        // Audio contract (Web FE parity): delete → `audio: null`,
+        // keep → `audio: <existing url>`, replace → audio_filename + file
+        if (removeAudio) {
+          soalPayload['audio'] = null;
+        } else if (_existingAudioUrl != null && _selectedAudioBytes == null) {
+          soalPayload['audio'] = _existingAudioUrl;
+        }
+
         result = await FormService.updateQuestionWithImage(
           soalId: soalId,
           payload: {'soal': soalPayload, 'options': optionsForUpdate},
           imageBytes: _selectedImageBytes,
           imageName: _selectedImageName,
           removeImage: removeImage,
+          audioBytes: _selectedAudioBytes,
+          audioName: _selectedAudioName,
+          removeAudio: removeAudio,
         );
       } else {
         result = await FormService.createQuestionWithImage(
@@ -327,6 +414,8 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
           questionData: {'soal': soalPayload, 'options': optionValues},
           imageBytes: _selectedImageBytes,
           imageName: _selectedImageName,
+          audioBytes: _selectedAudioBytes,
+          audioName: _selectedAudioName,
         );
       }
 
@@ -686,6 +775,52 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
               )
             else
               _buildImagePreview(),
+
+            // ── Audio ─────────────────────────────────────────────
+            const SizedBox(height: 24),
+            _buildSectionLabel('Audio (Opsional)'),
+            const SizedBox(height: 10),
+            if (_selectedAudioBytes == null && _existingAudioUrl == null)
+              GestureDetector(
+                onTap: _pickAudio,
+                child: Container(
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.inputBorder),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.audiotrack_rounded,
+                        size: 20,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Tambah Audio',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '(MP3, WAV, OGG, M4A, AAC)',
+                        style: TextStyle(
+                          color: AppColors.textHint,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              _buildAudioPreview(),
 
             // ── Opsi Jawaban ──────────────────────────────────────
             if (_needsOptions()) ...[
@@ -1055,6 +1190,83 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildAudioPreview() {
+    final String label = _selectedAudioName ??
+        _existingAudioUrl?.split('/').last ??
+        'Audio';
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.audiotrack_rounded,
+                  size: 16, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              GestureDetector(
+                onTap: _pickAudio,
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: Icon(
+                    Icons.edit_rounded,
+                    size: 16,
+                    color: AppColors.textSecondary.withOpacity(0.8),
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: _removeAudio,
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: Icon(
+                    Icons.close_rounded,
+                    size: 16,
+                    color: AppColors.error.withOpacity(0.7),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (_existingAudioUrl != null)
+            FormAudioPlayer(url: '${ApiConfig.formApiBaseUrl}$_existingAudioUrl')
+          else if (_selectedAudioPath != null)
+            FormAudioPlayer(url: '', deviceFilePath: _selectedAudioPath)
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'Preview audio tersedia setelah soal disimpan.',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
