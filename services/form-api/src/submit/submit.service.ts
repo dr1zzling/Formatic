@@ -58,12 +58,11 @@ export class SubmitService {
     if (checkRole != false) throw new ForbiddenException("Anda Tidak Berhak Sebagai Responden")
 
     const isFormPublic = await this.knexService.connection("forms")
-      .select("status", "start_at")
+      .select("status")
       .where({ id: form.id })
       .first()
 
     if (isFormPublic.status == "private") throw new ForbiddenException("Maaf Form Masih Tertutup")
-    if (Number(isFormPublic.start_at) > Date.now()) throw new ForbiddenException("waktu Pengerjaan belom dimulai")
 
     const getStatus = await this.knexService.connection("form_submit")
       .select("status", "attemps")
@@ -110,7 +109,6 @@ export class SubmitService {
     const totalSubmit = await this.knexService.connection('form_submit')
       .count('* as total')
       .where('form_id', form.id)
-      .where('status', 'completed')
       .first()
 
     const optionCountRows = await this.knexService.connection('user_answer')
@@ -118,7 +116,6 @@ export class SubmitService {
       .select('user_answer.soal_id', 'user_answer.soal_option_id as option_value_id')
       .count('user_answer.id as total')
       .where('form_submit.form_id', form.id)
-      .where('form_submit.status', 'completed')
       .whereNotNull('user_answer.soal_option_id')
       .groupBy('user_answer.soal_id', 'user_answer.soal_option_id')
 
@@ -132,7 +129,6 @@ export class SubmitService {
       .innerJoin('form_submit', 'form_submit.id', 'user_answer.submitted_id')
       .select('user_answer.soal_id', 'user_answer.answer_text')
       .where('form_submit.form_id', form.id)
-      .where('form_submit.status', 'completed')
       .whereNotNull('user_answer.answer_text')
 
     const textAnswersMap = textAnswersRows.reduce((acc: any, row: any) => {
@@ -401,7 +397,7 @@ export class SubmitService {
   }
 
   // Submit Form
-  async submitForm(req: { id: number, username: string }, form: any, data: string, files: Express.Multer.File[] = []) {
+  async submitForm(req: { id: number }, form: any, data: string, files: Express.Multer.File[] = []) {
     const checkRole = await this.isCreator.isCreator(req.id, form.id)
     if (checkRole != false) throw new ForbiddenException("Anda Tidak Berhak Sebagai Responden")
 
@@ -461,16 +457,9 @@ export class SubmitService {
       const existingSubmit = await trx('form_submit')
         .where({ user_id: req.id, form_id: form.id })
         .first()
+      if (existingSubmit.status == "completed") throw new ConflictException("Anda sudah mengisi form ini")
 
-      // Kalau sudah completed, tolak
-      if (existingSubmit?.status === "completed") throw new ConflictException("Anda sudah mengisi form ini")
-
-      // Kalau belum ada row (sudah di-cleanup atau pertama kali), insert dulu
-      if (!existingSubmit) {
-        await this.changeFormSubmit("insert", req.id, form.id, 1, req.username)
-      }
-
-      const updateToCompleted = await this.changeFormSubmit("submit", req.id, form.id, 1, req.username, this.knexService.connection.fn.now())
+      const updateToCompleted = await this.changeFormSubmit("update", req.id, form.id, this.knexService.connection.fn.now())
 
       await trx('user_answer').insert(
         answers.map((answer) => ({ ...answer, submitted_id: updateToCompleted.id }))
