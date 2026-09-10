@@ -2,8 +2,8 @@
  * @param { import("knex").Knex } knex
  * @returns { Promise<void> }
  */
-exports.up = function(knex) {
-  return knex.schema.createTable('forms', function(table){
+exports.up = function (knex) {
+  return knex.schema.createTable('forms', function (table) {
     table.increments()
     table.string('slug').unique().index()
     table.string('title').notNullable()
@@ -16,6 +16,10 @@ exports.up = function(knex) {
     table.text('banner').notNullable()
     table.string('theme_color')
 
+
+    table.integer('group_id').defaultTo(null)
+    table.text('group_text').defaultTo(null)
+
     table.integer('kategori_id').unsigned()
     table.foreign('kategori_id').references('sub_kategori.id').onDelete('CASCADE')
   })
@@ -25,6 +29,6 @@ exports.up = function(knex) {
  * @param { import("knex").Knex } knex
  * @returns { Promise<void> }
  */
-exports.down = function(knex) {
+exports.down = function (knex) {
   return knex.schema.dropTable('forms')
 };
