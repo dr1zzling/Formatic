@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
+import { Info, HelpCircle, CheckCircle2, XCircle, AlertTriangle, Trash2, X } from "lucide-react";
 
 /**
  * AlertModal — pengganti alert() dan confirm() browser
@@ -52,13 +53,23 @@ export default function AlertModal({
   if (!open) return null;
 
   const icons = {
-    alert:   "ℹ️",
-    info:    "ℹ️",
-    confirm: "❓",
-    success: "✅",
-    error:   "❌",
-    warning: "⚠️",
-    trash:   "🗑️",
+    alert:   Info,
+    info:    Info,
+    confirm: HelpCircle,
+    success: CheckCircle2,
+    error:   XCircle,
+    warning: AlertTriangle,
+    trash:   Trash2,
+  };
+
+  const iconColors = {
+    alert:   "#1a4fa0",
+    info:    "#1a4fa0",
+    confirm: "#1a4fa0",
+    success: "#16a34a",
+    error:   "#ef4444",
+    warning: "#f59e0b",
+    trash:   "#ef4444",
   };
 
   const confirmColors = {
@@ -98,10 +109,17 @@ export default function AlertModal({
           aria-label="Tutup"
           className="absolute top-3.5 right-3.5 w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
         >
-          ✕
+          <X size={16} />
         </button>
 
-        <div className="text-4xl mb-3">{icons[type] ?? "ℹ️"}</div>
+        {(() => {
+          const Icon = icons[type] ?? Info;
+          return (
+            <div className="mx-auto mb-3 w-12 h-12 rounded-2xl grid place-items-center" style={{ backgroundColor: `${iconColors[type] ?? "#1a4fa0"}14`, color: iconColors[type] ?? "#1a4fa0" }}>
+              <Icon size={26} />
+            </div>
+          );
+        })()}
 
         {title && (
           <h3 className="text-[17px] font-bold mb-1" style={{ color: "var(--fm-text)" }}>

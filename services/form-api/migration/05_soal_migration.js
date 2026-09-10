@@ -13,6 +13,8 @@ exports.up = function(knex) {
         table.integer('page').defaultTo(1)
         table.text('audio').nullable()
         table.boolean('is_required')
+        table.integer('group_id').defaultTo(null)
+        table.text('group_text').defaultTo(null)
         
         table.foreign('form_id').references('forms.id').onDelete('CASCADE')
     })

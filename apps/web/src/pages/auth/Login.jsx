@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eye, EyeOff, FileText, Users, BarChart3 } from "lucide-react";
+import { Check, Eye, EyeOff, FileText, Users, BarChart3 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { authAPI } from "../../utils/api";
 
@@ -155,7 +155,7 @@ export default function Login() {
                                             className="rounded flex items-center justify-center text-white flex-shrink-0"
                                             style={{ width: "26px", height: "26px", fontSize: "13px", background: COLORS.cyan }}
                                         >
-                                            ✓
+                                            <Check size={13} strokeWidth={3.5} />
                                         </div>
                                         <div className="flex-1 rounded bg-slate-200" style={{ height: "13px" }} />
                                     </div>

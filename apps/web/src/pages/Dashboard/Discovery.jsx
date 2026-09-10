@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
-import { Search, X, BookOpen, Copy, Check } from "lucide-react";
+import { Search, X, BookOpen, Copy, Check, FileText, ClipboardList } from "lucide-react";
 import RichTextDisplay from "../../components/RichTextDisplay";
 
 const CATEGORIES = ["Semua", "ujian", "survei"];
@@ -98,9 +98,9 @@ export default function Discovery() {
           {/* Header */}
           <header className="mb-6">
             <div className="flex items-center gap-3 mb-1">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
-                style={{ backgroundColor: "var(--fm-hover)" }}>
-                🔍
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ backgroundColor: "var(--fm-hover)", color: "#1a4fa0" }}>
+                <Search size={20} />
               </div>
               <div>
                 <h1 className="text-[24px] font-extrabold tracking-tight" style={{ color: "var(--fm-text)" }}>Discovery</h1>
@@ -147,7 +147,7 @@ export default function Discovery() {
 
           {!loading && filtered.length === 0 && (
             <div className="text-center py-20">
-              <div className="text-5xl mb-3">🔍</div>
+              <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-400"><Search size={26} /></div>
               <p className="font-bold text-[16px]" style={{ color: "var(--fm-text)" }}>Tidak ada form ditemukan</p>
               <p className="text-[13px] mt-1" style={{ color: "var(--fm-text-2)" }}>Coba kata kunci lain</p>
             </div>
@@ -167,8 +167,8 @@ export default function Discovery() {
                       {banner
                         ? <img src={`${FORM_API_URL}${banner}`} alt={form.title}
                             className="w-full h-full object-contain" />
-                        : <div className="w-full h-full grid place-items-center text-3xl opacity-40">
-                            {form.category === "ujian" ? "📝" : "📋"}
+                        : <div className="w-full h-full grid place-items-center opacity-40 text-gray-500">
+                            {form.category === "ujian" ? <FileText size={28} /> : <ClipboardList size={28} />}
                           </div>
                       }
                     </div>

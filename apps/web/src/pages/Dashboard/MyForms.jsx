@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
 import { addToTrash } from "./Trash";
 import AlertModal from "../../components/AlertModal";
+import { ImagePlus, Handshake, Plus, Search, PenLine, ClipboardList, Trash2 } from "lucide-react";
 const CATEGORIES = ["All", "Survey", "Quiz / Ujian"];
 
 function getUsername() {
@@ -116,7 +117,7 @@ function CreateModal({ onClose, onCreated }) {
               {preview
                 ? <img src={preview} className="w-full h-auto object-contain rounded-lg" alt="preview" style={{ maxHeight: "160px" }} />
                 : <>
-                    <span className="text-[20px] leading-none">🖼️</span>
+                    <ImagePlus size={20} className="leading-none text-[#3d91b2]" />
                     <span className="text-[11px] text-[#7290a9]">Klik untuk upload (JPG/PNG/WEBP, maks 5MB)</span>
                   </>
               }
@@ -231,7 +232,7 @@ export default function MyForms() {
                 onClick={() => setShowJoin(true)}
                 className="inline-flex items-center gap-2 px-[19px] py-3 rounded-xl text-[14px] font-semibold border border-violet-300 text-violet-700 bg-violet-50 hover:bg-violet-100 hover:-translate-y-0.5 transition-all"
               >
-                <span className="text-lg leading-none">🤝</span>
+                <Handshake size={18} className="leading-none" />
                 <span className="hidden sm:inline">Join Kolaborasi</span>
               </button>
               <button
@@ -239,14 +240,14 @@ export default function MyForms() {
                 className="inline-flex items-center gap-2 px-[19px] py-3 rounded-xl text-white text-[14px] font-semibold shadow-[0_6px_15px_rgba(61,145,178,0.22)] hover:-translate-y-0.5 transition-all"
                 style={{ background: "linear-gradient(135deg,#183056,#3d91b2)" }}
               >
-                <span className="text-lg leading-none">＋</span> Create Form
+                <Plus size={18} className="leading-none" /> Create Form
               </button>
             </div>
           </header>
 
           {/* ── Search ─────────────────────────────── */}
           <div className="flex items-center h-11 px-4 rounded-xl bg-white/90 border border-[#d9e8f1] mb-4 focus-within:border-[#3d91b2] focus-within:ring-4 focus-within:ring-[#3d91b2]/10 transition-all">
-            <span className="text-[19px] text-[#3d91b2] mr-2.5">⌕</span>
+            <Search size={19} className="text-[#3d91b2] mr-2.5 shrink-0" />
             <input
               type="text"
               placeholder="Search your forms..."
@@ -283,13 +284,13 @@ export default function MyForms() {
 
           {/* ── Grid ───────────────────────────────── */}
           {loading && (
-            <div className="grid grid-cols-2 gap-[18px] items-stretch max-[800px]:grid-cols-1">
+            <div className="grid grid-cols-4 gap-[18px] items-stretch max-[800px]:grid-cols-1">
               {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
             </div>
           )}
 
           {!loading && filtered.length > 0 && (
-            <div className="grid grid-cols-2 gap-[18px] items-stretch max-[800px]:grid-cols-1">
+            <div className="grid grid-cols-4 gap-[18px] items-stretch max-[800px]:grid-cols-1">
               {filtered.map((form, index) => {
                 const banner = form.form_banner ?? form.banner;
                 const cat    = form.category ?? "";
@@ -315,7 +316,7 @@ export default function MyForms() {
                       ) : (
                         <div className="w-full h-full grid place-items-center text-4xl opacity-50"
                           style={{ background: cat === "ujian" ? "linear-gradient(135deg,#ede9fe,#ddd6fe)" : "linear-gradient(135deg,#dbeafe,#bfdbfe)" }}>
-                          {cat === "ujian" ? "📝" : "📋"}
+                          {cat === "ujian" ? <PenLine size={34} className="text-violet-400" /> : <ClipboardList size={34} className="text-blue-400" />}
                         </div>
                       )}
                       <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase ${
@@ -326,7 +327,7 @@ export default function MyForms() {
                       <button
                         className="absolute top-2 right-2.5 w-7 h-7 rounded-full bg-white/90 text-[#183056] text-[18px] leading-none grid place-items-center hover:bg-white transition-colors"
                         onClick={e => { e.stopPropagation(); handleDeleteForm(form); }}
-                      >🗑️</button>
+                      ><Trash2 size={14} /></button>
                     </div>
 
                     {/* Content */}
@@ -354,7 +355,7 @@ export default function MyForms() {
           {/* ── Empty state ─────────────────────────── */}
           {!loading && filtered.length === 0 && (
             <div className="text-center py-20 text-[#7892a6]">
-              <div className="w-[55px] h-[55px] mx-auto mb-4 rounded-2xl bg-[#e4f2f8] text-[#3d91b2] text-[25px] grid place-items-center">□</div>
+              <div className="w-[55px] h-[55px] mx-auto mb-4 rounded-2xl bg-[#e4f2f8] grid place-items-center"><ClipboardList size={25} className="text-[#3d91b2]" /></div>
               <h3 className="text-[16px] font-bold text-[#183056] mb-1">{search ? "Form tidak ditemukan" : "Belum ada form"}</h3>
               <p className="text-[12.5px]">
                 {search
@@ -464,7 +465,7 @@ function JoinModal({ onClose, onJoined }) {
 
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center text-xl">🤝</div>
+            <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center"><Handshake size={18} className="text-violet-500" /></div>
             <div>
               <h3 className="text-[16px] font-bold text-[#183056]">Join Kolaborasi</h3>
               <p className="text-[11px] text-[#7290a9]">Masukkan link undangan collaborator</p>
@@ -498,7 +499,7 @@ function JoinModal({ onClose, onJoined }) {
           <button onClick={handleJoin} disabled={loading || !link.trim()}
             className="flex-1 h-11 rounded-lg text-white text-[13.5px] font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ background: "linear-gradient(135deg,#6d28d9,#7c3aed)" }}>
-            {loading ? "Bergabung..." : "Bergabung 🤝"}
+            {loading ? "Bergabung..." : "Bergabung"}
           </button>
         </div>
       </div>

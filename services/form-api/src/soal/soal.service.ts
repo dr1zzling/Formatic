@@ -353,7 +353,29 @@ export class SoalService {
             throw new BadRequestException('Tidak ada soal yang ditemukan di dokumen DOCX.')
         }
 
-        return this.createSoalAndOption(form_slug, finalParsedSoal)
+        // Hapus semua soal KECUALI soal identitas (page 1) sebelum import yang baru
+        const existingSoal = await this.knexService.connection("soal")
+            .select("id", "page")
+            .where("form_id", form_slug.id)
+        // Soal page 1 = identitas, jangan dihapus saat import
+        const toDelete = existingSoal.filter((s: any) => (s.page ?? 1) > 1)
+        if (toDelete.length > 0) {
+            const ids = toDelete.map((s: any) => s.id)
+            await this.knexService.connection("soal_option").whereIn("soal_id", ids).delete()
+            await this.knexService.connection("soal").whereIn("id", ids).delete()
+        }
+
+        // Soal dari import Word mulai dari page 2 (page 1 = identitas)
+        const identityCount = existingSoal.filter((s: any) => (s.page ?? 1) === 1).length
+        const soalWithPage = finalParsedSoal.map((item: any, idx: number) => ({
+            ...item,
+            soal: {
+                ...item.soal,
+                page: identityCount > 0 ? idx + 2 : idx + 1
+            }
+        }))
+
+        return this.createSoalAndOption(form_slug, soalWithPage)
     }
 
     // Get Soal From Form

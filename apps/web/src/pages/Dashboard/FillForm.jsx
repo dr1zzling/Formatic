@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
 import { socket } from "../../utils/socket";
-import { ArrowLeft, Send, Check, CheckCircle2, UploadCloud, FileText, Bell, ArrowRight, ZoomIn, ZoomOut, RefreshCw } from "lucide-react";
+import { ArrowLeft, Send, Check, CheckCircle2, UploadCloud, FileText, Bell, ArrowRight, ZoomIn, ZoomOut, RefreshCw, Flag, LockKeyhole, Music, FileQuestion, AlarmClock } from "lucide-react";
 import { saveToHistory } from "./History";
 import RichTextDisplay from "../../components/RichTextDisplay";
 import { getStoredTheme, DEFAULT_FORM_THEME } from "../../utils/theme";
@@ -451,7 +451,8 @@ export default function FillForm() {
 
     if (!form?.is_random) return pages;
 
-    // Shuffle: page pertama (identitas) TIDAK diacak, page 2+ diacak
+    // Shuffle: page pertama (identitas/page 1) TIDAK diacak
+    // Soal dalam group_id yang sama bergerak bersama dan tidak diacak urutannya internal
     function shuffleArr(arr) {
       const a = [...arr];
       for (let i = a.length - 1; i > 0; i--) {
@@ -460,9 +461,27 @@ export default function FillForm() {
       }
       return a;
     }
-    const firstPage = pages.slice(0, 1);
+    const firstPage = pages.slice(0, 1); // identitas, tidak diacak
     const restPages = pages.slice(1);
-    return [...firstPage, ...shuffleArr(restPages)];
+
+    // Setiap page soal: acak berdasarkan group unit
+    const shuffledRest = restPages.map(pg => {
+      const soalList = pg.soal ?? [];
+      const units = [];
+      const groupMap = new Map();
+      soalList.forEach(s => {
+        if (s.group_id != null) {
+          if (!groupMap.has(s.group_id)) groupMap.set(s.group_id, []);
+          groupMap.get(s.group_id).push(s);
+        } else {
+          units.push([s]);
+        }
+      });
+      groupMap.forEach(group => units.push(group));
+      return { ...pg, soal: shuffleArr(units).flat() };
+    });
+
+    return [...firstPage, ...shuffledRest];
   }, [form?.soal, form?.is_random, form?.slug, form?.category]);
 
   const allSoal = soalList;
@@ -509,7 +528,7 @@ export default function FillForm() {
   if (error) return (
     <div className="min-h-screen grid place-items-center px-4" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
       <div className="bg-white rounded-3xl shadow-[0_16px_50px_rgba(23,64,120,0.12)] p-10 max-w-sm text-center border border-[#e5eef7]">
-        <p className="text-3xl mb-3">😕</p>
+        <FileQuestion size={30} className="mx-auto mb-3 text-gray-300" />
         <p className="font-bold text-gray-800 mb-1">Form tidak ditemukan</p>
         <p className="text-[14px] text-gray-400 mb-6">{error}</p>
         <button onClick={() => navigate("/")} className="px-5 py-2.5 rounded-xl text-white text-[14px] font-semibold" style={{ backgroundColor: "#1a4fa0" }}>Ke Beranda</button>
@@ -522,7 +541,7 @@ export default function FillForm() {
     <div className="min-h-screen grid place-items-center px-4" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
       <div className="rounded-3xl shadow-[0_16px_50px_rgba(23,64,120,0.12)] p-10 max-w-sm w-full text-center border"
         style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}>
-        <div className="text-5xl mb-4">⏰</div>
+        <AlarmClock size={44} className="mx-auto mb-4 text-gray-300" />
         <h2 className="text-[20px] font-extrabold mb-2" style={{ color: "var(--fm-text)" }}>Waktu Habis!</h2>
         <p className="text-[14px] mb-6" style={{ color: "var(--fm-text-2)" }}>
           Waktu pengerjaan telah habis. Jawaban kamu sedang dikirim secara otomatis.
@@ -590,7 +609,7 @@ export default function FillForm() {
   if (needsToken && !tokenVerified) return (
     <div className="min-h-screen grid place-items-center px-4" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
       <div className="bg-white rounded-3xl shadow-[0_16px_50px_rgba(23,64,120,0.12)] p-8 w-full max-w-sm border border-[#e5eef7] text-center">
-        <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-blue-50 flex items-center justify-center text-2xl">🔐</div>
+        <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-blue-50 flex items-center justify-center"><LockKeyhole size={22} className="text-blue-500" /></div>
         <h2 className="text-[18px] font-extrabold text-[#102f56] mb-1">Form Terbatas</h2>
         <p className="text-[13px] text-gray-400 mb-5">
           Form <strong>"{title}"</strong> memerlukan token khusus untuk diakses.
@@ -776,7 +795,7 @@ export default function FillForm() {
                   <div className="mb-4 rounded-2xl border border-[#d4e5fa] overflow-hidden"
                     style={{ backgroundColor: "var(--fm-card)" }}>
                     <div className="px-4 py-2 bg-[#eef5fb] border-b border-[#d4e5fa] flex items-center gap-2">
-                      <span className="text-[11px] font-bold text-[#1a4fa0] uppercase tracking-wider">📄 Wacana / Teks</span>
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#1a4fa0] uppercase tracking-wider"><FileText size={12} /> Wacana / Teks</span>
                       <span className="text-[11px] text-gray-400">Group #{soal.group_id}</span>
                     </div>
                     <div className="px-5 py-4">
@@ -805,7 +824,7 @@ export default function FillForm() {
                         ? "bg-amber-50 border-amber-300 text-amber-700"
                         : "bg-white border-gray-200 text-gray-400 hover:border-amber-300 hover:text-amber-600"
                     }`}>
-                    <span>🚩</span> {isDoubt ? "Ragu-ragu" : "Tandai ragu-ragu"}
+                    <Flag size={13} /> {isDoubt ? "Ragu-ragu" : "Tandai ragu-ragu"}
                   </button>
                 </div>
                 )}
@@ -951,7 +970,7 @@ export default function FillForm() {
                 <div className="mb-4 rounded-2xl border border-[#d4e5fa] overflow-hidden"
                   style={{ backgroundColor: "var(--fm-card)" }}>
                   <div className="px-4 py-2 bg-[#eef5fb] border-b border-[#d4e5fa] flex items-center gap-2">
-                    <span className="text-[11px] font-bold text-[#1a4fa0] uppercase tracking-wider">📄 Wacana / Teks</span>
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#1a4fa0] uppercase tracking-wider"><FileText size={12} /> Wacana / Teks</span>
                     <span className="text-[11px] text-gray-400">Group #{soal.group_id}</span>
                   </div>
                   <div className="px-5 py-4">
@@ -994,7 +1013,7 @@ export default function FillForm() {
               {/* Audio soal — quiz mode */}
               {soal.audio && (
                 <div className="mb-4 px-4 py-3 bg-purple-50 border border-purple-200 rounded-xl">
-                  <p className="text-[12px] font-bold text-purple-700 mb-2">🎵 Audio Soal</p>
+                  <p className="text-[12px] font-bold text-purple-700 mb-2 flex items-center gap-1.5"><Music size={13} /> Audio Soal</p>
                   <audio controls src={`${FORM_API_URL}${soal.audio}`} className="w-full h-10" />
                 </div>
               )}
@@ -1058,7 +1077,7 @@ export default function FillForm() {
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border transition ${
                     isDoubt ? "bg-amber-50 border-amber-300 text-amber-700" : "bg-white border-gray-200 text-gray-400 hover:border-amber-300 hover:text-amber-600"
                   }`}>
-                  <span>🚩</span> {isDoubt ? "Ragu-ragu" : "Tandai ragu-ragu"}
+                  <Flag size={13} /> {isDoubt ? "Ragu-ragu" : "Tandai ragu-ragu"}
                 </button>
               </div>
             </div>
@@ -1133,7 +1152,7 @@ function SoalItem({ soal, idx, answers, setAnswer, toggleOption, errorSoalId, so
 
       {soal.audio && (
         <div className="mb-4 px-4 py-3 bg-purple-50 border border-purple-200 rounded-xl">
-          <p className="text-[12px] font-bold text-purple-700 mb-2">🎵 Audio Soal</p>
+          <p className="text-[12px] font-bold text-purple-700 mb-2 flex items-center gap-1.5"><Music size={13} /> Audio Soal</p>
           <audio controls src={`${FORM_API_URL}${soal.audio}`} className="w-full h-10" />
         </div>
       )}
@@ -1281,7 +1300,7 @@ function SoalIndicatorBtn({ allSoal, answers, hasAnswer, doubtfulIds, pageGroups
                   </span>
                   {doubtCount > 0 && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-[11px] font-semibold text-amber-700">
-                      🚩 {doubtCount} ragu-ragu
+                      <Flag size={11} /> {doubtCount} ragu-ragu
                     </span>
                   )}
                   {unanswered > 0 && (

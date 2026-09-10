@@ -81,9 +81,9 @@ export default function Trash() {
       // Form masih ada di DB dengan status private — cukup keluarkan dari trash localStorage
       // Status tetap private, user bisa publish ulang dari MyForms
       removeFromTrash(form.form_slug);
-      showToast("✅ Form berhasil dipulihkan ke My Forms!");
+      showToast("Form berhasil dipulihkan ke My Forms!");
       load();
-    } catch { showToast("❌ Gagal memulihkan."); }
+    } catch { showToast("Gagal memulihkan."); }
   }
 
   async function destroy(form) {
@@ -99,9 +99,9 @@ export default function Trash() {
       });
       if (!res.ok) throw new Error();
       removeFromTrash(form.form_slug);
-      showToast("✅ Form dihapus permanen.");
+      showToast("Form dihapus permanen.");
       load();
-    } catch { showToast("❌ Gagal menghapus."); }
+    } catch { showToast("Gagal menghapus."); }
   }
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(""), 3000); }

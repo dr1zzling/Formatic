@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../utils/api";
-import { Clock, CheckCircle2, FileText, RefreshCw, Bell, ArrowUpRight, Search, Trash2, Info, X } from "lucide-react";
+import { Clock, CheckCircle2, FileText, RefreshCw, Bell, ArrowUpRight, Search, Trash2, Info, X, ClipboardList } from "lucide-react";
 
 const HISTORY_KEY = "formatic_history";
 
@@ -190,7 +190,7 @@ export default function History() {
 
           {!loading && filtered.length === 0 && (
             <div className="flex flex-col items-center py-20 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center text-2xl mb-4">📋</div>
+              <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4 text-gray-400"><ClipboardList size={26} /></div>
               <p className="font-semibold text-gray-700">Belum ada history</p>
               <p className="text-[13px] text-gray-400 mt-1">Form yang kamu kerjakan akan muncul di sini.</p>
               <button onClick={() => navigate("/")}

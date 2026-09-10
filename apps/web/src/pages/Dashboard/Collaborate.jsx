@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
-import { Users, CheckCircle2, ArrowLeft, Loader2 } from "lucide-react";
+import { Users, CheckCircle2, ArrowLeft, Loader2, FileQuestion } from "lucide-react";
 
 export default function Collaborate() {
   const { slug }             = useParams();
@@ -66,7 +66,7 @@ export default function Collaborate() {
   if (!form && !loading) return (
     <div className="min-h-screen grid place-items-center bg-gradient-to-br from-[#f5f9ff] to-[#e6f0fb] px-4">
       <div className="bg-white rounded-3xl shadow-xl p-10 max-w-sm text-center border border-[#e5eef7]">
-        <p className="text-4xl mb-3">😕</p>
+        <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-400"><FileQuestion size={28} /></div>
         <p className="font-bold text-gray-800 mb-1">Form tidak ditemukan</p>
         <button onClick={() => navigate("/")} className="mt-4 px-5 py-2.5 rounded-xl text-white text-sm font-semibold bg-[#1a4fa0]">Ke Beranda</button>
       </div>

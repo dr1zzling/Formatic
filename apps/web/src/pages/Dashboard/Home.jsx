@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
-import { Bell, HelpCircle, Plus, ArrowRight, FileText, Search } from "lucide-react";
+import { Bell, HelpCircle, Plus, ArrowRight, FileText, Search, ClipboardList, LockKeyhole } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 
 const FORM_API = FORM_API_URL;
@@ -280,7 +280,7 @@ function FetchFormsGrid({ search, category }) {
 
       {!loading && filtered.length === 0 && (
         <div className="text-center py-10 bg-white rounded-2xl border border-gray-100">
-          <div className="text-3xl mb-2">📋</div>
+          <div className="mb-2 flex justify-center text-gray-300"><ClipboardList size={30} /></div>
           <p className="text-[13px] text-gray-500 font-medium">Belum ada form tersedia</p>
         </div>
       )}
@@ -327,7 +327,7 @@ function FetchFormsGrid({ search, category }) {
           onClick={() => setTokenModal(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center"
             onClick={e => e.stopPropagation()}>
-            <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-blue-50 flex items-center justify-center text-2xl">🔐</div>
+            <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-blue-50 flex items-center justify-center"><LockKeyhole size={20} className="text-blue-500" /></div>
             <h3 className="text-[16px] font-extrabold text-[#102f56] mb-1">Form Terbatas</h3>
             <p className="text-[13px] text-gray-400 mb-4">
               Masukkan token untuk mengisi <strong>"{tokenModal.title}"</strong>
