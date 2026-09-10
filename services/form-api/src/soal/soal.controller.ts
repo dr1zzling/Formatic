@@ -32,6 +32,7 @@ export class SoalController {
     FileFieldsInterceptor(
       [
         { name: 'soal_images', maxCount: 10 },
+        { name: 'soal_audios', maxCount: 10 },
         { name: 'option_images', maxCount: 50 },
       ],
       {
@@ -42,6 +43,15 @@ export class SoalController {
             cb(null, `${file.fieldname}-${uniqueSuffix}${extname(file.originalname)}`)
           },
         }),
+        fileFilter: (req, file, cb) => {
+          if (file.fieldname === 'soal_audios') {
+            const allowed = ['.mp3', '.wav', '.ogg', '.m4a', '.aac']
+            if (!allowed.includes(extname(file.originalname).toLowerCase())) {
+              return cb(new BadRequestException('Format audio tidak didukung. Gunakan mp3, wav, ogg, m4a, atau aac.'), false)
+            }
+          }
+          cb(null, true)
+        },
       },
     ),
   )
@@ -51,6 +61,7 @@ export class SoalController {
     @UploadedFiles()
     files?: {
       soal_images?: Express.Multer.File[]
+      soal_audios?: Express.Multer.File[]
       option_images?: Express.Multer.File[]
     },
   ) {
@@ -71,6 +82,15 @@ export class SoalController {
           )
           if (matchSoalFile) {
             item.soal.image = `/uploads/soal/${matchSoalFile.filename}`
+          }
+        }
+
+        if (item.soal && item.soal.audio_filename) {
+          const matchAudioFile = files.soal_audios?.find(
+            (f) => f.originalname === item.soal.audio_filename,
+          )
+          if (matchAudioFile) {
+            item.soal.audio = `/uploads/soal/${matchAudioFile.filename}`
           }
         }
 
@@ -99,6 +119,7 @@ export class SoalController {
     FileFieldsInterceptor(
       [
         { name: 'soal_images', maxCount: 1 },
+        { name: 'soal_audios', maxCount: 1 },
         { name: 'option_images', maxCount: 10 },
       ],
       {
@@ -109,6 +130,15 @@ export class SoalController {
             cb(null, `${file.fieldname}-${uniqueSuffix}${extname(file.originalname)}`)
           },
         }),
+        fileFilter: (req, file, cb) => {
+          if (file.fieldname === 'soal_audios') {
+            const allowed = ['.mp3', '.wav', '.ogg', '.m4a', '.aac']
+            if (!allowed.includes(extname(file.originalname).toLowerCase())) {
+              return cb(new BadRequestException('Format audio tidak didukung.'), false)
+            }
+          }
+          cb(null, true)
+        },
       },
     ),
   )
@@ -119,6 +149,7 @@ export class SoalController {
     @UploadedFiles()
     files?: {
       soal_images?: Express.Multer.File[]
+      soal_audios?: Express.Multer.File[]
       option_images?: Express.Multer.File[]
     },
   ) {
@@ -137,6 +168,15 @@ export class SoalController {
         )
         if (matchSoalFile) {
           parsedData.soal.image = `/uploads/soal/${matchSoalFile.filename}`
+        }
+      }
+
+      if (parsedData.soal && parsedData.soal.audio_filename) {
+        const matchAudioFile = files.soal_audios?.find(
+          (f) => f.originalname === parsedData.soal.audio_filename,
+        )
+        if (matchAudioFile) {
+          parsedData.soal.audio = `/uploads/soal/${matchAudioFile.filename}`
         }
       }
 

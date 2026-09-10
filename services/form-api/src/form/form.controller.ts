@@ -65,7 +65,7 @@ export class FormController {
       }),
     )
     banner: Express.Multer.File,
-    @Body() body: { title: string; category: string, token_respon: string },
+    @Body() body: { title: string, category: string, token_respon: string, theme_color: string },
   ) {
     if (!body.title || !body.category) {
       throw new BadRequestException('Judul dan kategori wajib diisi');
@@ -74,8 +74,8 @@ export class FormController {
     return this.formService.create(req.user, body, banner);
   }
 
-  // Update Form
-  @Patch()
+  // Post Public Form
+  @Put()
   @UseGuards(JwtAuthGuard)
   postPublic(
     @Request() req,
@@ -83,6 +83,17 @@ export class FormController {
     @Body('status') status: string
   ) {
     return this.formService.postPublic(req.user, form_slug, status)
+  }
+
+  // Update Form
+  @Patch('/setting')
+  @UseGuards(JwtAuthGuard)
+  updateForm(
+    @Request() req,
+    @Query('form_slug', ValidateFormExist) form_slug: string,
+    @Body() body: { token_respon: string, duration: number, start_at: number, is_random: boolean, theme_color: string}
+  ){
+    return this.formService.updateFormSetting(req.user, form_slug, body)
   }
 
   // Delete Form
@@ -115,13 +126,4 @@ export class FormController {
     return this.formService.changeRole(req.user, form_slug, token_collab)
   }
 
-  @Patch('/setting')
-  @UseGuards(JwtAuthGuard)
-  updateForm(
-    @Request() req,
-    @Query('form_slug', ValidateFormExist) form_slug: string,
-    @Body() body: { duration: number, start_at: number, is_random: boolean}
-  ){
-    return this.formService.updateForm(req.user, form_slug, body)
-  }
 }

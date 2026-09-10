@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
+import { ThemeProvider } from "./context/ThemeContext";
 import Login          from "./pages/auth/Login";
 import Register       from "./pages/auth/Register";
 import ForgotPassword from "./pages/auth/ForgotPassword";
@@ -12,6 +13,7 @@ import Trash          from "./pages/Dashboard/Trash";
 import Profile        from "./pages/Dashboard/Profile";
 import History        from "./pages/Dashboard/History";
 import Collaborate    from "./pages/Dashboard/Collaborate";
+import Discovery      from "./pages/Dashboard/Discovery";
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("token");
@@ -28,15 +30,16 @@ function AuthRoute({ children }) {
 const AUTH_PATHS = ["/login", "/register", "/forgot-password", "/fill/"];
 
 /* ── Nav order untuk arah slide ─────────────────────────────── */
-const NAV = ["/", "/home", "/my-forms", "/history", "/trash", "/profile"];
+const NAV = ["/", "/home", "/my-forms", "/discovery", "/history", "/trash", "/profile"];
 
 function getNavIndex(pathname) {
   let i = NAV.indexOf(pathname);
   if (i !== -1) return i;
   if (pathname.startsWith("/my-forms")) return 2;
-  if (pathname.startsWith("/history"))  return 3;
-  if (pathname.startsWith("/trash"))    return 4;
-  if (pathname.startsWith("/profile"))  return 5;
+  if (pathname.startsWith("/discovery")) return 3;
+  if (pathname.startsWith("/history"))  return 4;
+  if (pathname.startsWith("/trash"))    return 5;
+  if (pathname.startsWith("/profile"))  return 6;
   return -1;
 }
 
@@ -123,14 +126,14 @@ function AnimatedContent({ children }) {
   const isAuth = AUTH_PATHS.some(p => location.pathname === p || location.pathname.startsWith(p));
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
+    <div style={{ display: "flex", minHeight: "100dvh", width: "100%" }}>
       {/* Sidebar tetap diam — tidak ikut animasi */}
       {!isAuth && <Sidebar />}
 
       {/* Hanya konten yang slide */}
       <div
         ref={containerRef}
-        style={{ flex: 1, minWidth: 0, position: "relative", overflow: "hidden" }}
+        style={{ flex: 1, minWidth: 0, width: "100%", position: "relative", overflow: "clip" }}
       >
         {displayLoc.prev && (
           <div style={{ position: "absolute", inset: 0, zIndex: 1, willChange: "transform, opacity" }}>
@@ -164,6 +167,7 @@ function PageContent({ location }) {
       <Route path="/form/:slug" element={<ProtectedRoute><FormEditor /></ProtectedRoute>} />
       <Route path="/fill/:slug"             element={<ProtectedRoute><FillForm /></ProtectedRoute>} />
       <Route path="/history"                element={<ProtectedRoute><History /></ProtectedRoute>} />
+      <Route path="/discovery"              element={<ProtectedRoute><Discovery /></ProtectedRoute>} />
       <Route path="/form/:slug/collaborate" element={<ProtectedRoute><Collaborate /></ProtectedRoute>} />
       <Route path="/trash"      element={<ProtectedRoute><Trash /></ProtectedRoute>} />
       <Route path="/profile"    element={<ProtectedRoute><Profile /></ProtectedRoute>} />
@@ -174,11 +178,13 @@ function PageContent({ location }) {
 
 function App() {
   return (
-    <Router>
-      <AnimatedContent>
-        <PageContent />
-      </AnimatedContent>
-    </Router>
+    <ThemeProvider>
+      <Router>
+        <AnimatedContent>
+          <PageContent />
+        </AnimatedContent>
+      </Router>
+    </ThemeProvider>
   );
 }
 

@@ -4,9 +4,271 @@
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
+/* ── Theme variables ─────────────────────────────────────────── */
+:root, [data-theme="light"] {
+  --fm-bg:          #f5f9ff;
+  --fm-bg-2:        #eef7fc;
+  --fm-bg-3:        #e6f3fa;
+  --fm-card:        #ffffff;
+  --fm-card-border: #dceaf2;
+  --fm-text:        #102f56;
+  --fm-text-2:      #64779d;
+  --fm-text-3:      #8195b2;
+  --fm-border:      #dae6f1;
+  --fm-input-bg:    #ffffff;
+  --fm-hover:       #eef5fb;
+  --fm-divider:     #e8f0f8;
+}
+
+[data-theme="dark"] {
+  --fm-bg:          #0d1117;
+  --fm-bg-2:        #111827;
+  --fm-bg-3:        #161d2b;
+  --fm-card:        #1a2235;
+  --fm-card-border: #2a3a54;
+  --fm-text:        #f0f6ff;
+  --fm-text-2:      #a8bdd8;
+  --fm-text-3:      #8aaac8;
+  --fm-border:      #243047;
+  --fm-input-bg:    #1e2d45;
+  --fm-hover:       #1e2d45;
+  --fm-divider:     #1e2d45;
+}
+
+html { transition: color-scheme 0.2s; }
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
 body {
   font-family: var(--font-sans);
+  background-color: var(--fm-bg);
+  color: var(--fm-text);
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
+
+/* ── Global dark-mode overrides — otomatis apply ke semua card ── */
+[data-theme="dark"] .bg-white,
+[data-theme="dark"] .bg-white\/90,
+[data-theme="dark"] .bg-white\/95 {
+  background-color: var(--fm-card) !important;
+}
+
+[data-theme="dark"] .bg-gray-50,
+[data-theme="dark"] .bg-gray-100 {
+  background-color: var(--fm-bg-3) !important;
+}
+
+[data-theme="dark"] .border-gray-100,
+[data-theme="dark"] .border-gray-200,
+[data-theme="dark"] .border-\[\#e5eef7\],
+[data-theme="dark"] .border-\[\#dae6f1\],
+[data-theme="dark"] .border-\[\#dceaf2\],
+[data-theme="dark"] .border-\[\#e7edf6\],
+[data-theme="dark"] .border-\[\#e5ebf4\],
+[data-theme="dark"] .border-\[\#edf1f7\],
+[data-theme="dark"] .border-\[\#f0f4fa\] {
+  border-color: var(--fm-card-border) !important;
+}
+
+[data-theme="dark"] .text-gray-700,
+[data-theme="dark"] .text-gray-800,
+[data-theme="dark"] .text-gray-900,
+[data-theme="dark"] .text-\[\#102f56\],
+[data-theme="dark"] .text-\[\#102f68\],
+[data-theme="dark"] .text-\[\#142d63\],
+[data-theme="dark"] .text-\[\#17366d\] {
+  color: var(--fm-text) !important;
+}
+
+[data-theme="dark"] .text-gray-400,
+[data-theme="dark"] .text-gray-500,
+[data-theme="dark"] .text-gray-600,
+[data-theme="dark"] .text-\[\#64779d\],
+[data-theme="dark"] .text-\[\#7284a3\],
+[data-theme="dark"] .text-\[\#7384a4\],
+[data-theme="dark"] .text-\[\#8195b2\],
+[data-theme="dark"] .text-\[\#8ca0ba\] {
+  color: var(--fm-text-2) !important;
+}
+
+[data-theme="dark"] input:not([type="file"]),
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  background-color: var(--fm-input-bg) !important;
+  color: var(--fm-text) !important;
+  border-color: var(--fm-border) !important;
+}
+
+[data-theme="dark"] .bg-\[\#eef5fb\],
+[data-theme="dark"] .bg-\[\#f0f6fe\],
+[data-theme="dark"] .bg-\[\#edf4ff\],
+[data-theme="dark"] .bg-\[\#f7fafd\],
+[data-theme="dark"] .bg-\[\#f8fafc\],
+[data-theme="dark"] .bg-\[\#f5f9ff\],
+[data-theme="dark"] .bg-\[\#faf9ff\] {
+  background-color: var(--fm-hover) !important;
+}
+
+[data-theme="dark"] .border-\[\#c3d4e4\],
+[data-theme="dark"] .border-dashed {
+  border-color: #2a3a54 !important;
+}
+
+/* ── Dark mode: semua teks utama yang tidak tertangkap ───────── */
+[data-theme="dark"] * {
+  --tw-text-opacity: 1;
+}
+
+[data-theme="dark"] p,
+[data-theme="dark"] span:not([class*="text-white"]):not([class*="text-red"]):not([class*="text-green"]):not([class*="text-blue"]):not([class*="text-amber"]):not([class*="text-purple"]):not([class*="text-indigo"]):not([class*="text-violet"]):not([class*="badge"]),
+[data-theme="dark"] h1:not([class*="text-white"]),
+[data-theme="dark"] h2:not([class*="text-white"]),
+[data-theme="dark"] h3:not([class*="text-white"]),
+[data-theme="dark"] label:not([class*="text-white"]),
+[data-theme="dark"] li {
+  color: var(--fm-text);
+}
+
+/* ── Dark mode: Quill editor ─────────────────────────────────── */
+[data-theme="dark"] .quill-wrapper {
+  background-color: var(--fm-input-bg) !important;
+  border-color: var(--fm-card-border) !important;
+}
+
+[data-theme="dark"] .quill-wrapper .ql-toolbar.ql-snow {
+  background-color: #1a2538 !important;
+  border-color: var(--fm-card-border) !important;
+}
+
+[data-theme="dark"] .quill-wrapper .ql-container.ql-snow,
+[data-theme="dark"] .quill-wrapper .ql-editor {
+  background-color: var(--fm-input-bg) !important;
+  color: var(--fm-text) !important;
+  border-color: var(--fm-card-border) !important;
+}
+
+[data-theme="dark"] .quill-wrapper .ql-editor.ql-blank::before {
+  color: var(--fm-text-3) !important;
+}
+
+[data-theme="dark"] .quill-wrapper .ql-stroke {
+  stroke: #8fa8cc !important;
+}
+
+[data-theme="dark"] .quill-wrapper .ql-fill {
+  fill: #8fa8cc !important;
+}
+
+[data-theme="dark"] .quill-wrapper .ql-picker-label,
+[data-theme="dark"] .quill-wrapper .ql-picker-item {
+  color: #8fa8cc !important;
+}
+
+[data-theme="dark"] .quill-wrapper .ql-picker-options {
+  background-color: var(--fm-card) !important;
+  border-color: var(--fm-card-border) !important;
+}
+
+/* toolbar bottom bar (LaTeX/Code/upload buttons) */
+[data-theme="dark"] .quill-wrapper > div:last-child {
+  background-color: #1a2538 !important;
+  border-color: var(--fm-card-border) !important;
+}
+
+[data-theme="dark"] .bg-blue-50 { background-color: #0f2236 !important; }
+[data-theme="dark"] .bg-blue-100 { background-color: #0f2236 !important; }
+[data-theme="dark"] .border-blue-100 { border-color: #1a3a5c !important; }
+[data-theme="dark"] .border-blue-200 { border-color: #1a3a5c !important; }
+[data-theme="dark"] .text-blue-700 { color: #7ab3ef !important; }
+
+[data-theme="dark"] .bg-amber-50 { background-color: #1f1a0f !important; }
+[data-theme="dark"] .bg-yellow-50 { background-color: #1f1a0f !important; }
+[data-theme="dark"] .border-amber-100 { border-color: #3d2e0a !important; }
+[data-theme="dark"] .border-amber-200 { border-color: #3d2e0a !important; }
+[data-theme="dark"] .border-amber-300 { border-color: #5a4010 !important; }
+[data-theme="dark"] .text-amber-700 { color: #fbbf24 !important; }
+[data-theme="dark"] .text-amber-600 { color: #f59e0b !important; }
+
+[data-theme="dark"] .bg-indigo-50 { background-color: #0f1230 !important; }
+[data-theme="dark"] .border-indigo-100 { border-color: #1e2560 !important; }
+[data-theme="dark"] .text-indigo-700 { color: #a5b4fc !important; }
+
+[data-theme="dark"] .bg-violet-50 { background-color: #160d2a !important; }
+[data-theme="dark"] .border-violet-300 { border-color: #4c1d95 !important; }
+[data-theme="dark"] .text-violet-700 { color: #c4b5fd !important; }
+[data-theme="dark"] .hover\:bg-violet-100:hover { background-color: #1e1040 !important; }
+
+[data-theme="dark"] .bg-green-50 { background-color: #0a1f12 !important; }
+[data-theme="dark"] .border-green-100 { border-color: #14401e !important; }
+[data-theme="dark"] .text-green-700 { color: #4ade80 !important; }
+
+[data-theme="dark"] .bg-white\/90 { background-color: rgba(26,34,53,0.92) !important; }
+[data-theme="dark"] .bg-white\/95 { background-color: rgba(26,34,53,0.96) !important; }
+[data-theme="dark"] .bg-red-50 { background-color: #1f0a0a !important; }
+[data-theme="dark"] .border-red-100 { border-color: #3d1414 !important; }
+[data-theme="dark"] .text-red-400 { color: #f87171 !important; }
+[data-theme="dark"] .text-red-500 { color: #ef4444 !important; }
+
+/* ── Dark mode: option input bg warna lain ───────────────────── */
+[data-theme="dark"] .bg-\[\#eef2f6\] {
+  background-color: #243047 !important;
+}
+
+[data-theme="dark"] .border-\[\#5b6c7e\] {
+  border-color: #4a5e78 !important;
+}
+
+[data-theme="dark"] .border-\[\#c3d4e4\],
+[data-theme="dark"] .border-dashed.border-\[\#c3d4e4\] {
+  border-color: #2a3a54 !important;
+}
+
+/* ── Dark mode: teks di dalam card/soal ─────────────────────── */
+[data-theme="dark"] .text-\[\#364a6e\] { color: #a8c4e0 !important; }
+[data-theme="dark"] .text-\[\#1a4fa0\] { color: #7ab3ef !important; }
+[data-theme="dark"] .text-\[\#102f56\] { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-\[\#102f68\] { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-\[\#142d63\] { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-\[\#17366d\] { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-\[\#103b86\] { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-\[\#183056\] { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-\[\#1b3d6e\] { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-gray-900 { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-gray-800 { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-gray-700 { color: #d0dff0 !important; }
+[data-theme="dark"] .text-gray-600 { color: #b0c4d8 !important; }
+[data-theme="dark"] .text-gray-500 { color: #8fa8c8 !important; }
+[data-theme="dark"] .text-gray-400 { color: #7090b0 !important; }
+[data-theme="dark"] .text-\[\#64779d\] { color: #8fa8c8 !important; }
+[data-theme="dark"] .text-\[\#7284a3\] { color: #8fa8c8 !important; }
+[data-theme="dark"] .text-\[\#7384a4\] { color: #8fa8c8 !important; }
+[data-theme="dark"] .text-\[\#8195b2\] { color: #8fa8c8 !important; }
+[data-theme="dark"] .text-\[\#8ca0ba\] { color: #8fa8c8 !important; }
+[data-theme="dark"] .text-\[\#7088a8\] { color: #8fa8c8 !important; }
+[data-theme="dark"] .text-\[\#879bb5\] { color: #7090b0 !important; }
+[data-theme="dark"] .text-\[\#7290a9\] { color: #8fa8c8 !important; }
+
+/* ── Dark mode: semua p/span/h yang tidak punya class teks ────── */
+[data-theme="dark"] body { color: var(--fm-text); }
+[data-theme="dark"] button:not([class*="text-white"]):not([class*="text-blue"]):not([class*="text-red"]):not([class*="text-green"]):not([class*="text-amber"]):not([class*="text-violet"]):not([class*="text-purple"]):not([class*="text-indigo"]) {
+  color: var(--fm-text);
+}
+
+/* ── Dark mode: strong/b tag ─────────────────────────────────── */
+[data-theme="dark"] strong, [data-theme="dark"] b { color: var(--fm-text) !important; }
+
+/* ── Dark mode: placeholder ──────────────────────────────────── */
+[data-theme="dark"] ::placeholder { color: #4a6080 !important; }
+
+/* ── Dark mode: hr dan divider ───────────────────────────────── */
+[data-theme="dark"] .h-px { background-color: var(--fm-border) !important; }
+[data-theme="dark"] .divide-gray-100 > * + * { border-color: var(--fm-border) !important; }
+
 
 @layer utilities {
   .scrollbar-hide {
@@ -19,6 +281,70 @@ body {
   .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+}
+
+/* ── Option Quill (compact WYSIWYG untuk opsi jawaban) ───────────────────── */
+.option-quill-wrapper .ql-toolbar.ql-snow {
+  border: none;
+  border-bottom: 1px solid #e5eef7;
+  background-color: #f8fafc;
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+  padding: 4px 8px;
+}
+
+.option-quill-wrapper .ql-container.ql-snow {
+  border: none;
+  font-family: inherit;
+  font-size: 14px;
+  min-height: 36px;
+}
+
+.option-quill-wrapper .ql-editor {
+  min-height: 36px;
+  max-height: 120px;
+  overflow-y: auto;
+  padding: 6px 10px;
+  color: #374151;
+  line-height: 1.5;
+}
+
+.option-quill-wrapper .ql-editor.ql-blank::before {
+  color: #9ca3af;
+  font-style: normal;
+  left: 10px;
+}
+
+.option-quill-wrapper .ql-toolbar.ql-snow .ql-formats {
+  margin-right: 6px;
+}
+
+/* Dark mode */
+[data-theme="dark"] .option-quill-wrapper {
+  border-color: var(--fm-card-border) !important;
+}
+
+[data-theme="dark"] .option-quill-wrapper .ql-toolbar.ql-snow {
+  background-color: #1a2538 !important;
+  border-color: var(--fm-card-border) !important;
+}
+
+[data-theme="dark"] .option-quill-wrapper .ql-container.ql-snow,
+[data-theme="dark"] .option-quill-wrapper .ql-editor {
+  background-color: var(--fm-input-bg) !important;
+  color: var(--fm-text) !important;
+}
+
+[data-theme="dark"] .option-quill-wrapper .ql-editor.ql-blank::before {
+  color: var(--fm-text-3) !important;
+}
+
+[data-theme="dark"] .option-quill-wrapper .ql-stroke {
+  stroke: #8fa8cc !important;
+}
+
+[data-theme="dark"] .option-quill-wrapper .ql-fill {
+  fill: #8fa8cc !important;
 }
 
 /* Quill Custom Styling */
@@ -66,3 +392,99 @@ body {
 }
 
 
+
+/* ── Code Block (hljs) ────────────────────────────────────────────────────── */
+.hljs-pre {
+  margin: 10px 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.hljs-pre code.hljs {
+  display: block;
+  padding: 14px 16px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13.5px;
+  line-height: 1.6;
+  overflow-x: auto;
+  background: #f6f8fa;
+  color: #24292e;
+  border-radius: 0;
+}
+
+code.inline-code {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  background: #f0f4f8;
+  border: 1px solid #d4dde8;
+  border-radius: 4px;
+  padding: 1px 6px;
+  color: #c7254e;
+}
+
+/* Quill built-in code-block styling override */
+.ql-editor pre.ql-syntax {
+  background: #f6f8fa;
+  color: #24292e;
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13.5px;
+  border: 1px solid #e2e8f0;
+  overflow-x: auto;
+}
+
+/* ── KaTeX Display Math ────────────────────────────────────────────────────── */
+.katex-display-wrap {
+  display: block;
+  text-align: center;
+  margin: 12px 0;
+  overflow-x: auto;
+  /* KaTeX pakai em, jadi perbesar font-size di wrapper = KaTeX ikut membesar */
+  font-size: 1.5rem;
+}
+
+.katex-inline-wrap {
+  display: inline;
+  /* font-size di wrapper akan di-inherit oleh .katex yang pakai em */
+  font-size: 1.35rem;
+  line-height: 1.8;
+}
+
+/* ── RichTextDisplay container ────────────────────────────────────────────── */
+.rich-display {
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+/* ── Quill code-block toolbar icon hint ──────────────────────────────────── */
+.ql-code-block::before {
+  font-family: monospace;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* ── Math display (Unicode rumus dari import docx) ────────────────────────── */
+.math-display {
+  display: block;
+  text-align: center;
+  margin: 8px auto;
+  font-family: 'Cambria Math', 'Times New Roman', Georgia, serif;
+  font-size: 1.1em;
+  color: #102f56;
+  background: #f8faff;
+  border: 1px solid #d4e5fa;
+  border-radius: 8px;
+  padding: 8px 16px;
+  letter-spacing: 0.02em;
+}
+
+.math-inline {
+  font-family: 'Cambria Math', 'Times New Roman', Georgia, serif;
+  font-size: 1.05em;
+  color: #102f56;
+  background: #f0f6fe;
+  border-radius: 4px;
+  padding: 1px 5px;
+}

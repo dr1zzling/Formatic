@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import api, { FORM_API_URL } from "../../utils/api";
 import { addToTrash } from "./Trash";
+import AlertModal from "../../components/AlertModal";
+import { ImagePlus, Handshake, Plus, Search, PenLine, ClipboardList, Trash2 } from "lucide-react";
 const CATEGORIES = ["All", "Survey", "Quiz / Ujian"];
 
 function getUsername() {
@@ -65,22 +68,25 @@ function CreateModal({ onClose, onCreated }) {
     finally { setLoading(false); }
   }
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-5"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
       style={{ background: "rgba(10,30,60,0.45)", backdropFilter: "blur(4px)" }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-[420px] bg-white rounded-2xl overflow-hidden shadow-[0_24px_50px_rgba(10,30,60,0.18)]"
+        className="w-full max-w-[420px] bg-white rounded-2xl shadow-[0_24px_50px_rgba(10,30,60,0.18)] flex flex-col"
+        style={{ maxHeight: "calc(100dvh - 32px)" }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-[22px] pt-5">
+        {/* Header — sticky */}
+        <div className="flex items-center justify-between px-[22px] pt-5 pb-3 shrink-0 border-b border-[#edf3f7]">
           <h3 className="text-[17px] font-bold text-[#183056]">Buat Form Baru</h3>
           <button onClick={onClose} className="text-[#7290a9] hover:text-[#183056] text-[22px] leading-none transition-colors">×</button>
         </div>
 
-        <div className="px-[22px] py-[18px] flex flex-col gap-4">
+        {/* Scrollable body */}
+        <div className="px-[22px] py-[16px] flex flex-col gap-3.5 overflow-y-auto flex-1">
           {error && <div className="text-[12.5px] text-[#d94f4f] bg-[#fff0f0] px-3 py-2 rounded-lg border border-[#f5c0c0]">{error}</div>}
 
           <div>
@@ -107,12 +113,12 @@ function CreateModal({ onClose, onCreated }) {
 
           <div>
             <label className="block text-[11px] font-bold text-[#4d6a82] uppercase tracking-wider mb-1.5">Banner Form</label>
-            <label className="relative w-full h-20 border-2 border-dashed border-[#c5dce8] rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer bg-[#f4fafd] hover:border-[#3d91b2] hover:bg-[#edf6fb] transition-all overflow-hidden">
+            <label className="relative w-full border-2 border-dashed border-[#c5dce8] rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer bg-[#f4fafd] hover:border-[#3d91b2] hover:bg-[#edf6fb] transition-all overflow-hidden" style={{ minHeight: preview ? "auto" : "72px" }}>
               {preview
-                ? <img src={preview} className="absolute inset-0 w-full h-full object-cover" alt="preview" />
+                ? <img src={preview} className="w-full h-auto object-contain rounded-lg" alt="preview" style={{ maxHeight: "160px" }} />
                 : <>
-                    <span className="text-[22px] leading-none">🖼️</span>
-                    <span className="text-[11.5px] text-[#7290a9]">Klik untuk upload (JPG/PNG/WEBP, maks 5MB)</span>
+                    <ImagePlus size={20} className="leading-none text-[#3d91b2]" />
+                    <span className="text-[11px] text-[#7290a9]">Klik untuk upload (JPG/PNG/WEBP, maks 5MB)</span>
                   </>
               }
               <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} className="absolute inset-0 opacity-0 cursor-pointer" />
@@ -122,7 +128,7 @@ function CreateModal({ onClose, onCreated }) {
           <div>
             <label className="block text-[11px] font-bold text-[#4d6a82] uppercase tracking-wider mb-1.5">
               Token Responden
-              <span className="ml-1 text-[10px] text-[#8ca0ba] normal-case tracking-normal font-normal">(opsional — kosongkan jika form terbuka untuk umum)</span>
+              <span className="ml-1 text-[10px] text-[#8ca0ba] normal-case tracking-normal font-normal">(opsional)</span>
             </label>
             <input
               className="w-full h-10 border border-[#d9e8f1] rounded-lg px-3.5 text-[14px] text-[#183056] outline-none bg-[#f7fbff] focus:border-[#3d91b2] focus:bg-white focus:ring-4 focus:ring-[#3d91b2]/10 transition-all box-border"
@@ -130,11 +136,12 @@ function CreateModal({ onClose, onCreated }) {
               value={tokenRespon}
               onChange={e => { setTokenRespon(e.target.value); setError(""); }}
             />
-            <p className="text-[11px] text-[#8ca0ba] mt-1">Token digunakan untuk membatasi siapa yang bisa mengisi form ini.</p>
+            <p className="text-[11px] text-[#8ca0ba] mt-1">Kosongkan jika form terbuka untuk umum.</p>
           </div>
         </div>
 
-        <div className="flex gap-2.5 px-[22px] pb-5">
+        {/* Footer — sticky */}
+        <div className="flex gap-2.5 px-[22px] py-4 shrink-0 border-t border-[#edf3f7]">
           <button onClick={onClose} className="flex-1 h-10 rounded-lg border border-[#d6e5ee] bg-white text-[#55738d] text-[13.5px] font-semibold hover:bg-[#f4fafd] transition-all">Batal</button>
           <button
             onClick={submit}
@@ -147,10 +154,8 @@ function CreateModal({ onClose, onCreated }) {
         </div>
       </div>
     </div>
-  );
+  , document.body);
 }
-
-/* ── Main ────────────────────────────────────────────────────── */
 export default function MyForms() {
   const navigate  = useNavigate();
   const username  = getUsername();
@@ -161,6 +166,8 @@ export default function MyForms() {
   const [search, setSearch]         = useState("");
   const [showModal, setShowModal]   = useState(false);
   const [showJoin, setShowJoin]     = useState(false);
+  const [alertModal, setAlertModal] = useState(null); // { type, title, message, onConfirm }
+  const [confirmDelete, setConfirmDelete] = useState(null); // form to delete
 
   useEffect(() => { load(); }, []);
 
@@ -174,24 +181,24 @@ export default function MyForms() {
   }
 
   const handleDeleteForm = async (form) => {
-    const isConfirmed = window.confirm(`Yakin ingin menghapus form "${form.form_title}"?`);
-    if (!isConfirmed) return;
+    setConfirmDelete(form);
+  };
+
+  const doDeleteForm = async (form) => {
+    setConfirmDelete(null);
     try {
-      const response = await fetch(`http://localhost:3000/form?form_slug=${form.form_slug}`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+      const response = await fetch(`${FORM_API_URL}/form?form_slug=${form.form_slug}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+        body: JSON.stringify({ status: "private" }),
       });
-      if (!response.ok) throw new Error("Gagal menghapus data dari server");
-      // Simpan ke trash localStorage
+      if (!response.ok) throw new Error("Gagal memindahkan ke trash");
       addToTrash(form);
       setForms(prev => prev.filter(f => f.form_slug !== form.form_slug));
-      alert("Form berhasil dihapus dan dipindahkan ke Trash!");
+      setAlertModal({ type: "success", title: "Berhasil", message: "Form dipindahkan ke Trash!" });
     } catch (error) {
       console.error("Error delete:", error);
-      alert("Gagal menghapus form.");
+      setAlertModal({ type: "error", title: "Gagal", message: "Gagal menghapus form." });
     }
   };
 
@@ -209,11 +216,10 @@ export default function MyForms() {
 
   return (
     <div className="flex min-h-screen">
-
-      <main className="flex-1 min-w-0" style={{ width: "calc(100% - 366px)" }}>
+      <main className="flex-1 min-w-0 overflow-x-hidden">
         <div
-          className="min-h-screen px-[42px] py-[34px] pb-[60px] max-[1050px]:px-[25px] max-[800px]:px-4 max-[800px]:py-[28px] box-border"
-          style={{ background: "linear-gradient(135deg,#f5faff 0%,#eef7fc 55%,#e6f3fa 100%)", color: "#102f56" }}
+          className="min-h-screen px-4 sm:px-6 md:px-8 xl:px-[42px] py-6 md:py-[34px] pb-[80px] md:pb-[60px] box-border"
+          style={{ background: "linear-gradient(135deg, var(--fm-bg) 0%, var(--fm-bg-2) 55%, var(--fm-bg-3) 100%)", color: "var(--fm-text)" }}
         >
           {/* ── Header ─────────────────────────────── */}
           <header className="flex items-center justify-between gap-4 mb-[25px] max-[800px]:flex-col max-[800px]:items-start">
@@ -226,7 +232,7 @@ export default function MyForms() {
                 onClick={() => setShowJoin(true)}
                 className="inline-flex items-center gap-2 px-[19px] py-3 rounded-xl text-[14px] font-semibold border border-violet-300 text-violet-700 bg-violet-50 hover:bg-violet-100 hover:-translate-y-0.5 transition-all"
               >
-                <span className="text-lg leading-none">🤝</span>
+                <Handshake size={18} className="leading-none" />
                 <span className="hidden sm:inline">Join Kolaborasi</span>
               </button>
               <button
@@ -234,14 +240,14 @@ export default function MyForms() {
                 className="inline-flex items-center gap-2 px-[19px] py-3 rounded-xl text-white text-[14px] font-semibold shadow-[0_6px_15px_rgba(61,145,178,0.22)] hover:-translate-y-0.5 transition-all"
                 style={{ background: "linear-gradient(135deg,#183056,#3d91b2)" }}
               >
-                <span className="text-lg leading-none">＋</span> Create Form
+                <Plus size={18} className="leading-none" /> Create Form
               </button>
             </div>
           </header>
 
           {/* ── Search ─────────────────────────────── */}
           <div className="flex items-center h-11 px-4 rounded-xl bg-white/90 border border-[#d9e8f1] mb-4 focus-within:border-[#3d91b2] focus-within:ring-4 focus-within:ring-[#3d91b2]/10 transition-all">
-            <span className="text-[19px] text-[#3d91b2] mr-2.5">⌕</span>
+            <Search size={19} className="text-[#3d91b2] mr-2.5 shrink-0" />
             <input
               type="text"
               placeholder="Search your forms..."
@@ -278,13 +284,13 @@ export default function MyForms() {
 
           {/* ── Grid ───────────────────────────────── */}
           {loading && (
-            <div className="grid grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] gap-[18px] items-stretch max-[1050px]:grid-cols-[1fr_0.8fr] max-[800px]:grid-cols-1">
+            <div className="grid grid-cols-4 gap-[18px] items-stretch max-[800px]:grid-cols-1">
               {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
             </div>
           )}
 
           {!loading && filtered.length > 0 && (
-            <div className="grid grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] gap-[18px] items-stretch max-[1050px]:grid-cols-[1fr_0.8fr] max-[800px]:grid-cols-1">
+            <div className="grid grid-cols-4 gap-[18px] items-stretch max-[800px]:grid-cols-1">
               {filtered.map((form, index) => {
                 const banner = form.form_banner ?? form.banner;
                 const cat    = form.category ?? "";
@@ -294,14 +300,15 @@ export default function MyForms() {
                 return (
                   <div
                     key={form.form_id ?? index}
-                    className="group rounded-2xl bg-white/95 border border-[#dceaf2] overflow-hidden cursor-pointer flex flex-col min-h-[310px] shadow-[0_5px_16px_rgba(30,73,105,0.05)] hover:-translate-y-1 hover:border-[#b7d7e6] hover:shadow-[0_12px_28px_rgba(30,73,105,0.12)] transition-all"
+                    style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}
+                    className="group rounded-2xl border overflow-hidden cursor-pointer flex flex-col min-h-[310px] shadow-[0_5px_16px_rgba(30,73,105,0.05)] hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(30,73,105,0.12)] transition-all"
                     onClick={() => navigate(`/form/${form.form_slug}`)}
                   >
                     {/* Image */}
-                    <div className={`relative w-full overflow-hidden bg-[#dcecf4] ${large ? "h-[178px]" : "h-[145px]"}`}>
+                    <div className="relative w-full overflow-hidden bg-[#dcecf4]" style={{ aspectRatio: "16/9" }}>
                       {banner ? (
                         <img src={`${FORM_API_URL}${banner}`} alt={form.form_title}
-                          className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                          className="w-full h-full object-contain group-hover:scale-[1.03] transition-transform duration-300"
                           onError={e => { e.target.style.display = "none"; }} />
                       ) : form.image ? (
                         <img src={form.image} alt={form.form_title}
@@ -309,7 +316,7 @@ export default function MyForms() {
                       ) : (
                         <div className="w-full h-full grid place-items-center text-4xl opacity-50"
                           style={{ background: cat === "ujian" ? "linear-gradient(135deg,#ede9fe,#ddd6fe)" : "linear-gradient(135deg,#dbeafe,#bfdbfe)" }}>
-                          {cat === "ujian" ? "📝" : "📋"}
+                          {cat === "ujian" ? <PenLine size={34} className="text-violet-400" /> : <ClipboardList size={34} className="text-blue-400" />}
                         </div>
                       )}
                       <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase ${
@@ -320,7 +327,7 @@ export default function MyForms() {
                       <button
                         className="absolute top-2 right-2.5 w-7 h-7 rounded-full bg-white/90 text-[#183056] text-[18px] leading-none grid place-items-center hover:bg-white transition-colors"
                         onClick={e => { e.stopPropagation(); handleDeleteForm(form); }}
-                      >🗑️</button>
+                      ><Trash2 size={14} /></button>
                     </div>
 
                     {/* Content */}
@@ -348,7 +355,7 @@ export default function MyForms() {
           {/* ── Empty state ─────────────────────────── */}
           {!loading && filtered.length === 0 && (
             <div className="text-center py-20 text-[#7892a6]">
-              <div className="w-[55px] h-[55px] mx-auto mb-4 rounded-2xl bg-[#e4f2f8] text-[#3d91b2] text-[25px] grid place-items-center">□</div>
+              <div className="w-[55px] h-[55px] mx-auto mb-4 rounded-2xl bg-[#e4f2f8] grid place-items-center"><ClipboardList size={25} className="text-[#3d91b2]" /></div>
               <h3 className="text-[16px] font-bold text-[#183056] mb-1">{search ? "Form tidak ditemukan" : "Belum ada form"}</h3>
               <p className="text-[12.5px]">
                 {search
@@ -375,6 +382,25 @@ export default function MyForms() {
       {showJoin && (
         <JoinModal onClose={() => setShowJoin(false)} onJoined={() => { setShowJoin(false); load(); }} />
       )}
+
+      {/* AlertModal — ganti browser alert/confirm */}
+      <AlertModal
+        open={!!confirmDelete}
+        type="trash"
+        title="Hapus Form?"
+        message={`Form "${confirmDelete?.form_title}" akan dipindahkan ke Trash.`}
+        confirmLabel="Hapus"
+        cancelLabel="Batal"
+        onConfirm={() => doDeleteForm(confirmDelete)}
+        onCancel={() => setConfirmDelete(null)}
+      />
+      <AlertModal
+        open={!!alertModal}
+        type={alertModal?.type ?? "alert"}
+        title={alertModal?.title}
+        message={alertModal?.message}
+        onConfirm={() => setAlertModal(null)}
+      />
     </div>
   );
 }
@@ -431,7 +457,7 @@ function JoinModal({ onClose, onJoined }) {
     } finally { setLoading(false); }
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
       onClick={onClose}>
       <div className="w-full max-w-[420px] bg-white rounded-2xl overflow-hidden shadow-2xl"
@@ -439,7 +465,7 @@ function JoinModal({ onClose, onJoined }) {
 
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center text-xl">🤝</div>
+            <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center"><Handshake size={18} className="text-violet-500" /></div>
             <div>
               <h3 className="text-[16px] font-bold text-[#183056]">Join Kolaborasi</h3>
               <p className="text-[11px] text-[#7290a9]">Masukkan link undangan collaborator</p>
@@ -473,10 +499,10 @@ function JoinModal({ onClose, onJoined }) {
           <button onClick={handleJoin} disabled={loading || !link.trim()}
             className="flex-1 h-11 rounded-lg text-white text-[13.5px] font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ background: "linear-gradient(135deg,#6d28d9,#7c3aed)" }}>
-            {loading ? "Bergabung..." : "Bergabung 🤝"}
+            {loading ? "Bergabung..." : "Bergabung"}
           </button>
         </div>
       </div>
     </div>
-  );
+  , document.body);
 }

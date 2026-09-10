@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, Camera, ChevronRight, LogOut, Shield, FileText, BarChart2, Eye, Calendar } from "lucide-react";
+import { KeyRound, Download, ClipboardList, Construction, Bell, Camera, ChevronRight, LogOut, Shield, FileText, BarChart2, Eye, Calendar } from "lucide-react";
 import { authAPI } from "../../utils/api";
 
 const TABS = ["Profil", "Keamanan", "Notifikasi", "Integrasi"];
@@ -169,13 +169,13 @@ export default function Profile() {
                   <h3 className="text-[13px] font-bold text-gray-700 mb-2">Aksi Cepat</h3>
                   <div className="space-y-0.5">
                     {[
-                      { emoji: "🔑", label: "Ganti Password", onClick: () => setTab("Keamanan") },
-                      { emoji: "📥", label: "Unduh Data Saya" },
-                      { emoji: "📋", label: "Log Aktivitas" },
-                    ].map(({ emoji, label, onClick }) => (
+                      { icon: KeyRound, label: "Ganti Password", onClick: () => setTab("Keamanan") },
+                      { icon: Download, label: "Unduh Data Saya" },
+                      { icon: ClipboardList, label: "Log Aktivitas" },
+                    ].map(({ icon: ActionIcon, label, onClick }) => (
                       <button key={label} onClick={onClick}
                         className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] text-gray-600 hover:bg-gray-50 transition group">
-                        <span className="text-base">{emoji}</span>
+                        <ActionIcon size={15} className="text-gray-400 shrink-0" />
                         <span className="flex-1 text-left">{label}</span>
                         <ChevronRight size={13} className="text-gray-300 group-hover:text-gray-400 transition" />
                       </button>
@@ -233,7 +233,9 @@ export default function Profile() {
 
           {(tab === "Notifikasi" || tab === "Integrasi") && (
             <div className="flex flex-col items-center py-24 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center text-2xl mb-4">🚧</div>
+              <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+                <Construction size={22} className="text-gray-400" />
+              </div>
               <p className="font-semibold text-gray-700">Segera Hadir</p>
               <p className="text-[13px] text-gray-400 mt-1">Fitur ini sedang dalam pengembangan.</p>
             </div>
