@@ -9,13 +9,15 @@ exports.up = function(knex) {
     table.string('title').notNullable()
     table.text('token_respon').nullable()
     table.text('token_collab').notNullable()
-    table.enum('category', ['ujian', 'survei']).notNullable()
     table.enum('status', ['public', 'private']).defaultTo('private')
     table.boolean('is_random')
     table.integer('duration').nullable()
     table.timestamp('start_at', { useTz: true }).nullable()
     table.text('banner').notNullable()
     table.string('theme_color')
+
+    table.integer('kategori_id').unsigned()
+    table.foreign('kategori_id').references('sub_kategori.id').onDelete('CASCADE')
   })
 };
 

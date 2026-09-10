@@ -17,13 +17,22 @@ function jwtToken(payload){
     return jwt.sign(payload, process.env.SECRET, { expiresIn: '365d'})
 }
 
+function isPasswordStrong(password){
+    const minLength = password.length >= 8
+    const hasUpperCase = /[A-Z]/.test(password)
+    const hasLowerCase = /[a-z]/.test(password)
+    const hasNumber = /[0-9]/.test(password)
+
+    return minLength && hasLowerCase && hasUpperCase && hasNumber
+}
+
 async function queryWithLimit(text, params) {
     return limit(() => pool.query(text, params))
 }
 
 async function userExist(username){
     try {
-        const get = await queryWithLimit(
+        const get = await pool.query(
             `SELECT id, username, password FROM users WHERE username = $1`, 
             [username]
         )
@@ -56,22 +65,22 @@ app.post('/user/register', async (req, res) => {
             })
         }
 
+        const isSpace = password.trim()
+        if(!isPasswordStrong(isSpace)){
+            return res.status(400).json({
+                status: 400,
+                message: "Password Min 8 Char, 1 Kapital, 1 Lower"
+            })
+        }
+
         const hashPassword = await bcrypt.hash(password, 10)
         
-        // Gunakan queryWithLimit
         const register = await queryWithLimit(
-            `INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id`, 
+            `INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id, username`, 
             [username, hashPassword]
         )
 
-        const getId = register.rows[0].id
-
-        const get = await queryWithLimit(
-            `SELECT id, username FROM users WHERE id = $1`, 
-            [getId]
-        )
-
-        const token = jwtToken(get.rows[0])
+        const token = jwtToken({id: register.rows[0].id, username: register.rows[0].username})
 
         return res.status(201).json({
             status: 201,
@@ -150,6 +159,14 @@ app.put('/user/forgot-password', async (req, res) => {
             return res.status(404).json({
                 status: 404,
                 message: "User Tidak Ada",
+            })
+        }
+
+        const cleanCode = password.trim()
+        if(!isPasswordStrong(cleanCode)){
+            return res.status(400).json({
+                status: 400,
+                message: "Password Min 8 Char, 1 Kapital, 1 Lower"
             })
         }
 
