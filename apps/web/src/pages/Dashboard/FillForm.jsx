@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
-import api, { FORM_API_URL } from "../../utils/api";
+import api, { FORM_API_URL, flattenForm } from "../../utils/api";
 import { socket } from "../../utils/socket";
 import { ArrowLeft, Send, Check, CheckCircle2, UploadCloud, FileText, Bell, ArrowRight, ZoomIn, ZoomOut, RefreshCw, Flag, LockKeyhole, Music, FileQuestion, AlarmClock } from "lucide-react";
 import { saveToHistory } from "./History";
@@ -130,7 +130,10 @@ export default function FillForm() {
     (async () => {
       try {
         const res = await api.get("/form/slug", { params: { slug } });
-        setForm(res.data?.data);
+        const raw = res.data?.data;
+        // Response baru: { form: {...formPayload}, soal: [...] }
+        const formObj = raw?.form ? { ...flattenForm(raw.form), soal: raw.soal } : raw;
+        setForm(formObj);
         setError("");
       } catch {
         setError("Form tidak ditemukan atau sudah tidak tersedia.");
@@ -408,7 +411,7 @@ export default function FillForm() {
   }
 
   const title = form?.title ?? form?.form_title ?? "Form";
-  const isQuiz = form?.category === "ujian";
+  const isQuiz = (form?.primary_kategori ?? form?.category) === "ujian";
 
   // ── Flatten & group soal — harus di atas early returns (Rules of Hooks) ──
   const rawSoal  = form?.soal ?? [];
@@ -422,7 +425,8 @@ export default function FillForm() {
     if (!form) return [];
 
     // Survey: tampilkan semua soal dalam 1 halaman
-    if (form?.category !== "ujian") {
+    // isQuiz: primary_kategori = ujian
+    if ((form?.primary_kategori ?? form?.category) !== "ujian") {
       const flat = (form?.soal ?? []).length > 0 && (form?.soal ?? [])[0]?.soal
         ? (form?.soal ?? []).flatMap(p => p.soal ?? [])
         : (form?.soal ?? []);
@@ -502,7 +506,9 @@ export default function FillForm() {
     setRefreshing(true);
     try {
       const res = await api.get("/form/slug", { params: { slug } });
-      setForm(res.data?.data);
+      const raw2 = res.data?.data;
+      const formObj2 = raw2?.form ? { ...flattenForm(raw2.form), soal: raw2.soal } : raw2;
+      setForm(formObj2);
       setError("");
       setLiveNotice("Form berhasil diperbarui!");
       setTimeout(() => setLiveNotice(""), 3000);

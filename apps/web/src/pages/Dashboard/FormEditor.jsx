@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
-import api, { FORM_API_URL } from "../../utils/api";
+import api, { FORM_API_URL, flattenForm } from "../../utils/api";
 import AlertModal from "../../components/AlertModal";
 import * as XLSX from "xlsx";
 import { socket } from "../../utils/socket";
-import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical, ImagePlus, X, QrCode, Download, Palette, Info, BookOpen, ChevronRight, IdCard, Eye, EyeOff, Paperclip, Lightbulb, AlertTriangle, Music, Lock, LockOpen, Target, Star, Inbox, Users, CheckCircle2, Clock, PieChart, Dices, PenLine, Save, RefreshCw, Timer, Trophy, Shuffle } from "lucide-react";
+import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical, ImagePlus, X, QrCode, Download, Palette, Info, BookOpen, ChevronRight, IdCard, Eye, EyeOff, Paperclip, Lightbulb, AlertTriangle, Music, Lock, LockOpen, LockKeyhole, Target, Star, Inbox, Users, CheckCircle2, Clock, PieChart, Dices, PenLine, Save, RefreshCw, Timer, Trophy, Shuffle } from "lucide-react";
 import QRCode from "qrcode";
 import QuillEditor from "../../components/QuillEditor";
 import OptionQuillEditor from "../../components/OptionQuillEditor";
@@ -115,19 +115,22 @@ export default function FormEditor() {
     setError("");
     try {
       const res = await api.get("/form/slug", { params: { slug } });
-      const f   = res.data?.data;
+      const rawData = res.data?.data;
+      // Response baru: { form: {...formPayload}, soal: [...] }
+      // Response lama: flat object dengan soal embedded
+      const f    = rawData?.form ? { ...flattenForm(rawData.form), soal: rawData.soal } : rawData;
+      const soalData = rawData?.soal ?? rawData?.form?.soal ?? [];
+
       if (f) {
-        setForm(f);
+        setForm({ ...f, soal: soalData });
         setQuestions(prev => {
-          // Backend return soal sebagai array of { page, soal: [...] } atau flat array
+          // soal dari response baru ada di soalData (array of { page, soal[] })
           let soalFlat = [];
-          if (Array.isArray(f?.soal)) {
-            // Cek apakah format baru (array of pages) atau lama (flat)
-            if (f.soal.length > 0 && f.soal[0]?.soal) {
-              // Format baru: { page, soal: [] }[]
-              soalFlat = f.soal.flatMap(p => p.soal ?? []);
+          if (Array.isArray(soalData)) {
+            if (soalData.length > 0 && soalData[0]?.soal) {
+              soalFlat = soalData.flatMap(p => p.soal ?? []);
             } else {
-              soalFlat = f.soal;
+              soalFlat = soalData;
             }
           }
           const fromDB = soalFlat.map((s) => ({
@@ -146,11 +149,11 @@ export default function FormEditor() {
           return [...fromDB, ...unsaved];
         });
 
-        // Ambil role user untuk form ini dari endpoint my forms
+        // Ambil role user
         try {
           const myRes = await api.get("/form/user");
-          const myForms = myRes.data?.data?.forms ?? [];
-          const match = myForms.find(mf => mf.form_slug === slug);
+          const myForms = (myRes.data?.data?.forms ?? []).map(flattenForm);
+          const match = myForms.find(mf => mf.slug === slug || mf.form_slug === slug);
           setUserRole(match?.access_type ?? null);
         } catch { setUserRole(null); }
       } else {
@@ -291,7 +294,7 @@ export default function FormEditor() {
 
     // Survey: semua soal di page 1. Ujian: page = urutan soal (1-indexed)
     // Soal identitas (Nama/Kelas/Absen) selalu page 1 agar tampil bersama
-    const isQuiz = form?.category === "ujian";
+    const isQuiz = (form?.primary_kategori ?? form?.category) === "ujian";
     const IDENTITY_LABELS = ["nama lengkap", "kelas", "nomor absen", "nama", "absen"];
     const isIdentitySoal = (q) => {
       const txt = (q.question ?? "").replace(/<[^>]*>/g, "").trim().toLowerCase();
@@ -518,7 +521,7 @@ export default function FormEditor() {
             <h1 className="font-bold text-gray-900 truncate text-[17px] leading-tight">
               {form?.title ?? form?.form_title ?? "Form"}
             </h1>
-            <p className="text-[12.5px] text-gray-400 hidden sm:block">{form?.category}</p>
+            <p className="text-[12.5px] text-gray-400 hidden sm:block">{form?.sub_kategori ?? form?.category}</p>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={copyLink} title="Salin link" className="hidden sm:flex w-10 h-10 rounded-xl items-center justify-center text-gray-400 hover:bg-[#eef5fb] hover:text-[#1a4fa0] transition-all">
@@ -615,7 +618,29 @@ export default function FormEditor() {
               }}
               onImportGuard={(v) => { isSavingRef.current = v; }}
               hasUnsaved={questions.some(q => q._new)}
-              onSaveFirst={saveQuestions}
+              onSaveFirst={async () => {
+                // Simpan hanya soal _new (identitas) tanpa validasi penuh
+                const token = localStorage.getItem("token");
+                const newOnes = questions.filter(q => q._new && q.question);
+                if (newOnes.length === 0) return;
+                const fd = new FormData();
+                const payload = newOnes.map((q, i) => {
+                  const globalIdx = questions.findIndex(x => x === q);
+                  const isQuiz = (form?.primary_kategori ?? form?.category) === "ujian";
+                  const pageVal = isQuiz ? (globalIdx + 1) : 1;
+                  return {
+                    soal: { question: q.question, type: q.type || "text", page: pageVal, score: q.score ?? null },
+                    options: [],
+                  };
+                });
+                fd.append("data", JSON.stringify(payload));
+                await fetch(`${FORM_API_URL}/form/soal?form_slug=${slug}`, {
+                  method: "POST",
+                  headers: { Authorization: `Bearer ${token}` },
+                  body: fd,
+                });
+                setQuestions(prev => prev.filter(q => !q._new));
+              }}
             />
           )}
           {activeTab === "Jawaban" && (
@@ -1212,7 +1237,7 @@ function ResponsesTab({ formId, form }) {
     if (total === 0) { setExportAlert({ type: "alert", title: "Tidak Ada Data", message: "Belum ada data untuk diekspor." }); return; }
     setExporting(true);
     try {
-      const isQuiz = form?.category === "ujian";
+      const isQuiz = (form?.primary_kategori ?? form?.category) === "ujian";
 
       // Fetch detail jawaban per responden
       const res = await fetch(`${FORM_API_URL}/form/submit/detail?form_slug=${formSlug}`, {
@@ -1782,7 +1807,7 @@ function buildQuestionStats(responses) {
 /* ── Settings Tab ───────────────────────────────────────────── */
 function SettingsTab({ form, onUpdateStatus, slug, onSaved }) {
   const isPublic   = form?.status === "public" || form?.form_status === "public";
-  const isQuiz     = form?.category === "ujian";
+  const isQuiz     = (form?.primary_kategori ?? form?.category) === "ujian";
 
   // Token state — persist di localStorage supaya tidak hilang saat form reload
   const tokenStorageKey = `token_active_${form?.slug ?? slug}`;

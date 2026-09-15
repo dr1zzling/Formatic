@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import api, { FORM_API_URL } from "../../utils/api";
+import api, { FORM_API_URL, flattenForm } from "../../utils/api";
 import { Search, X, BookOpen, Copy, Check, FileText, ClipboardList } from "lucide-react";
 import RichTextDisplay from "../../components/RichTextDisplay";
 
@@ -24,12 +24,11 @@ export default function Discovery() {
 
   useEffect(() => {
     api.get("/form").then(res => {
-      setForms(res.data?.data ?? []);
+      setForms((res.data?.data ?? []).map(flattenForm));
     }).catch(() => setForms([])).finally(() => setLoading(false));
 
-    // Load my forms untuk pilih tujuan salin
     api.get("/form/user").then(res => {
-      const all = res.data?.data?.forms ?? [];
+      const all = (res.data?.data?.forms ?? []).map(flattenForm);
       setMyForms(all.filter(f => f.access_type === "Creator"));
     }).catch(() => {});
   }, []);
@@ -40,11 +39,12 @@ export default function Discovery() {
     setSoalLoading(true);
     try {
       const res = await api.get("/form/slug", { params: { slug: form.slug } });
-      const f   = res.data?.data;
-      const raw = f?.soal ?? [];
-      const flat = raw.length > 0 && raw[0]?.soal
-        ? raw.flatMap(p => p.soal ?? [])
-        : raw;
+      const raw = res.data?.data;
+      // Response baru: { form: {...}, soal: [...] }
+      const soalData = raw?.soal ?? raw?.form?.soal ?? [];
+      const flat = soalData.length > 0 && soalData[0]?.soal
+        ? soalData.flatMap(p => p.soal ?? [])
+        : soalData;
       setSoal(flat);
     } catch { setSoal([]); }
     finally { setSoalLoading(false); }

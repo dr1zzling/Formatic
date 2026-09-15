@@ -3,35 +3,41 @@ import { KnexService } from '../database/knex.service';
 import { SoalService } from '../soal/soal.service';
 import { ValidateIsCreator } from '../Pipe/validate.is.creator';
 import * as crypto from 'crypto'
+import { formPayload } from 'src/mapping/formMapping';
+import { KategoriService } from 'src/kategori/kategori.service';
 const slugify = require('slugify')
 
 @Injectable()
 export class FormService {
   constructor(
-    private knexService: KnexService, 
+    private knexService: KnexService,
     private soalService: SoalService,
-    private isCreator: ValidateIsCreator
-  ) {}
+    private isCreator: ValidateIsCreator,
+    private kategoriService: KategoriService
+  ) { }
 
   // Get All Form
   async getAll() {
     const get = await this.knexService.connection('forms')
+      .innerJoin('sub_kategori', 'sub_kategori.id', 'forms.kategori_id')
+      .innerJoin('primary_kategori', "primary_kategori.id", "sub_kategori.primary_kategori_id")
       .select({
         id: 'forms.id',
         slug: 'forms.slug',
         title: 'forms.title',
-        category: 'forms.category',
         banner: 'forms.banner',
         status: 'forms.status',
-        token_respon: 'forms.token_respon'
+        token_respon: 'forms.token_respon',
+        primary_kategori: 'primary_kategori.name',
+        sub_kategori: 'sub_kategori.name'
       })
-      .where('status', 'public')
+      .where('forms.status', 'public')
 
     if (get.length === 0) throw new NotFoundException('Tidak Ada Form Dari Category Tersebut')
 
     return {
       message: 'Berhasil Mendapatkan Seluruh Form',
-      data: get,
+      data: get.map(formPayload)
     }
   }
 
@@ -39,64 +45,95 @@ export class FormService {
   async getAllByCategory(category: string) {
     const lower = category.toLowerCase()
     const get = await this.knexService.connection('forms')
+      .innerJoin('sub_kategori', 'sub_kategori.id', 'forms.kategori_id')
+      .innerJoin('primary_kategori', "primary_kategori.id", "sub_kategori.primary_kategori_id")
       .select({
         id: 'forms.id',
         slug: 'forms.slug',
         title: 'forms.title',
-        category: 'forms.category',
         banner: 'forms.banner',
         status: 'forms.status',
-        token_respon: 'forms.token_respon'
+        token_respon: 'forms.token_respon',
+        primary_kategori: 'primary_kategori.name',
+        sub_kategori: 'sub_kategori.name'
       })
-      .where({"category": lower, "status": "public"})
+      .where({ "sub_kategori.name": lower, "forms.status": "public" })
+      .orWhere({ "primary_kategori.name": lower, "forms.status": "public" })
 
     if (get.length === 0) throw new NotFoundException('Tidak Ada Form Dari Category Tersebut')
 
     return {
       message: 'Berhasil Mendapatkan Seluruh Form',
-      data: get,
+      data: get.map(formPayload),
     }
   }
 
   // Get By Slug
-  async getFormBySlug(req: {id: number}, slug: string) {
-      const getForm = await this.knexService.connection("forms")
-      .select("*")
-      .where("slug", slug)
+  async getFormBySlug(req: { id: number }, slug: string) {
+    const getForm = await this.knexService.connection("forms")
+      .innerJoin('sub_kategori', 'sub_kategori.id', 'forms.kategori_id')
+      .innerJoin('primary_kategori', "primary_kategori.id", "sub_kategori.primary_kategori_id")
+      .select({
+        id: 'forms.id',
+        slug: 'forms.slug',
+        title: 'forms.title',
+        banner: 'forms.banner',
+
+        token_respon: 'forms.token_respon',
+        token_collab: 'forms.token_collab',
+
+        primary_kategori: 'primary_kategori.name',
+        sub_kategori: 'sub_kategori.name',
+
+        status: 'forms.status',
+        theme_color: 'forms.theme_color',
+        start_at: 'forms.start_at',
+        duration: 'forms.duration',
+        is_random: 'forms.is_random'
+      })
+      .where("forms.slug", slug)
       .first()
 
-      if(!getForm) throw new NotFoundException("Tidak Ada Form")
+    if (!getForm) throw new NotFoundException("Tidak Ada Form")
 
-      const isCreator = await this.isCreator.isCreator(req.id, getForm.id)
-      if(isCreator == false && getForm.status == 'private') throw new ForbiddenException("Maaf tapi form belum dibuka, silahkan hubungi creator") 
-      
-      const listSoal = await this.soalService.getSoalByForm(getForm.id, getForm.is_random)
+    const isCreator = await this.isCreator.isCreator(req.id, getForm.id)
+    if (isCreator == false && getForm.status == 'private') throw new ForbiddenException("Maaf tapi form belum dibuka, silahkan hubungi creator")
 
-      return {
-        message: "Berhasil Mendapatkan Form",
-        data: {
-          ...getForm,
-          soal: listSoal
-        }
+    const listSoal = await this.soalService.getSoalByForm(getForm.id)
+
+    return {
+      message: "Berhasil Mendapatkan Form",
+      data: {
+        form: formPayload(getForm),
+        soal: listSoal
       }
+    }
   }
 
   // Get All My Form
   async getMyForm(data: { id: number, username: string }) {
     const get = await this.knexService.connection('user_form')
       .innerJoin('forms', 'forms.id', 'user_form.form_id')
+      .innerJoin('sub_kategori', 'sub_kategori.id', 'forms.kategori_id')
+      .innerJoin('primary_kategori', "primary_kategori.id", "sub_kategori.primary_kategori_id")
       .select({
         access_type: 'user_form.access_type',
-        form_id: 'forms.id',
-        form_slug: 'forms.slug',
-        form_title: 'forms.title',
-        form_status: 'forms.status',
-        form_banner: 'forms.banner',
+        id: 'forms.id',
+        slug: 'forms.slug',
+        title: 'forms.title',
+        banner: 'forms.banner',
+
         token_respon: 'forms.token_respon',
         token_collab: 'forms.token_collab',
-        category: 'forms.category',
+
+        primary_kategori: 'primary_kategori.name',
+        sub_kategori: 'sub_kategori.name',
+
+        status: 'forms.status',
+        theme_color: 'forms.theme_color',
+        start_at: 'forms.start_at',
         duration: 'forms.duration',
-        start_at: 'forms.start_at'
+        is_random: 'forms.is_random'
       })
       .where('user_form.user_id', data.id)
 
@@ -105,22 +142,23 @@ export class FormService {
       data: {
         user_id: data.id,
         username: data.username,
-        forms: get
+        forms: get.map(formPayload)
       },
     }
   }
 
   // Create Form
   async create(
-    user: { id: number, username: string }, 
-    body: { title: string, category: string, token_respon: string, theme_color: string }, 
+    user: { id: number, username: string },
+    body: { title: string, sub_kategori: number, token_respon: string, theme_color: string },
     banner: Express.Multer.File
-  ){
+  ) {
     const slug = slugify(body.title, { lower: true, strict: true })
     const finalSlug = `${slug}-${Date.now()}`
     const bannerPath = `/uploads/banner/${banner.filename}`
-    const tokenCollab = await crypto.randomBytes(8).toString('hex')
+    const tokenCollab = crypto.randomBytes(8).toString('hex')
 
+    const isExist = await this.kategoriService.getSubKategoriById(body.sub_kategori)
     const formResult = await this.knexService.connection.transaction(async (trx) => {
 
       const [insertedForm] = await trx('forms')
@@ -128,7 +166,7 @@ export class FormService {
           title: body.title,
           slug: finalSlug,
           status: 'private',
-          category: body.category,
+          kategori_id: body.sub_kategori,
           banner: bannerPath,
           token_respon: body.token_respon,
           token_collab: tokenCollab
@@ -143,7 +181,10 @@ export class FormService {
         access_type: 'Creator',
       })
 
-      return { formId }
+      return {
+        formId
+      }
+
     })
 
     return {
@@ -155,30 +196,35 @@ export class FormService {
           access_type: 'Creator',
         },
         form: {
-          form_id: formResult.formId,
-          form_title: body.title,
-          form_slug: finalSlug,
-          form_status: 'private',
-          form_banner: bannerPath,
-          token_collab: formResult.token_collab,
-          token_respon: formResult.token_respon,
-          category: body.category,
+          id: formResult.formId,
+          title: body.title,
+          slug: finalSlug,
+          status: 'private',
+          banner: bannerPath,
+          token: {
+            token_collab: formResult.token_collab,
+            token_respon: formResult.token_respon,
+          },
+          kategori: {
+            primary_kategori: isExist.primary_kategori,
+            sub_kategori: isExist.sub_kategori
+          }
         },
       },
     }
   }
 
   // Post Form to Public or Private
-  async postPublic(req: {id: number }, form_id, status: string ){
+  async postPublic(req: { id: number }, form_id, status: string) {
     const isCreator = await this.isCreator.isCreator(req.id, form_id.id)
-    if(isCreator != 'Creator') throw new ForbiddenException("Anda Tidak Berhak Menghapus Form Ini")
+    if (isCreator != 'Creator') throw new ForbiddenException("Anda Tidak Berhak Menghapus Form Ini")
 
     const validateStatus = ['public', 'private']
 
-    if(!validateStatus.includes(status)) throw new BadRequestException("Isi Yang Benar")
+    if (!validateStatus.includes(status)) throw new BadRequestException("Isi Yang Benar")
     const updateToPublic = await this.knexService.connection("forms")
-    .update({status: status})
-    .where("id", form_id.id)
+      .update({ status: status })
+      .where("id", form_id.id)
 
     return {
       message: `Berhasil Mengubah ke ${status}`
@@ -187,61 +233,83 @@ export class FormService {
 
   // Update Form
   async updateFormSetting(
-    req: {id: number }, 
-    form, 
-    body: { token_respon: string, duration: number, start_at: number, is_random: boolean, theme_color: string}
-  ){
+    req: { id: number },
+    form,
+    body: { token_respon: string, duration: number, start_at: number, is_random: boolean, theme_color: string }
+  ) {
     const isCreator = await this.isCreator.isCreator(req.id, form.id)
-    if(isCreator == false) throw new UnauthorizedException("Anda Tidak Berhak Update Form Ini")
+    if (isCreator != 'Creator') throw new UnauthorizedException("Anda Tidak Berhak Update Form Ini")
 
-    if(!body) throw new BadRequestException("Isi yang benar")
+    if (!body) throw new BadRequestException("Isi yang benar")
     const updateForm = await this.knexService.connection("forms")
-    .update({
-      duration: body.duration,
-      token_respon: body.token_respon,
-      start_at: body.start_at ? new Date(body.start_at) : null,
-      is_random: body.is_random,
-      theme_color: body.theme_color
-    })
-    .where("id", form.id)
+      .update({
+        duration: body.duration,
+        token_respon: body.token_respon,
+        start_at: body.start_at ? new Date(body.start_at) : null,
+        is_random: body.is_random,
+        theme_color: body.theme_color
+      })
+      .where("id", form.id)
 
-    const getUpdate = await this.knexService.connection("forms").select("*").where("id", form.id).first()
+    const getUpdate = await this.knexService.connection("forms")
+      .innerJoin('sub_kategori', 'sub_kategori.id', 'forms.kategori_id')
+      .innerJoin('primary_kategori', "primary_kategori.id", "sub_kategori.primary_kategori_id")
+      .select({
+        id: 'forms.id',
+        slug: 'forms.slug',
+        title: 'forms.title',
+        banner: 'forms.banner',
+
+        token_respon: 'forms.token_respon',
+        token_collab: 'forms.token_collab',
+
+        primary_kategori: 'primary_kategori.name',
+        sub_kategori: 'sub_kategori.name',
+
+        status: 'forms.status',
+        theme_color: 'forms.theme_color',
+        start_at: 'forms.start_at',
+        duration: 'forms.duration',
+        is_random: 'forms.is_random'
+      })
+      .where("forms.id", form.id)
+      .first()
 
     return {
       message: "Berhasil Update",
-      data: getUpdate
+      data: formPayload(getUpdate)
     }
   }
 
   // Delete Form
-  async deleteForm(req: { id: number}, form_id) {
+  async deleteForm(req: { id: number }, form_id) {
     const isCreator = await this.isCreator.isCreator(req.id, form_id.id)
-    if(isCreator != 'Creator') throw new ForbiddenException("Anda Tidak Berhak Menghapus Form Ini")
+    if (isCreator != 'Creator') throw new ForbiddenException("Anda Tidak Berhak Menghapus Form Ini")
 
     const deleteForm = await this.knexService.connection("forms")
-    .delete()
-    .where("id", form_id.id)
+      .delete()
+      .where("id", form_id.id)
 
     return {
-      message: "Berhasil Menghapus" 
+      message: "Berhasil Menghapus"
     }
   }
 
   // Jadi collaborator
-  async changeRole(req: { id: number, username: string}, form_id, token_collab: string){
+  async changeRole(req: { id: number, username: string }, form_id, token_collab: string) {
     const isCreator = await this.isCreator.isCreator(req.id, form_id.id)
-    if(isCreator == 'Collaborator' || isCreator == 'Creator') throw new ForbiddenException("Anda sudah menjadi bagian dari form ini")
+    if (isCreator == 'Collaborator' || isCreator == 'Creator') throw new ForbiddenException("Anda sudah menjadi bagian dari form ini")
 
     // Get Form
-    if(form_id.token_collab != token_collab) throw new BadRequestException("Token Salah")
-    
+    if (form_id.token_collab != token_collab) throw new BadRequestException("Token Salah")
+
     const changeRole = await this.knexService.connection("user_form")
-    .insert({
-      user_id: req.id,
-      form_id: form_id.id,
-      access_type: 'Collaborator'
-    })
-    .returning("access_type")
+      .insert({
+        user_id: req.id,
+        form_id: form_id.id,
+        access_type: 'Collaborator'
+      })
+      .returning("access_type")
 
     return {
       message: "Selamat Anda Sekarang Collaborator",

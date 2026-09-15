@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import api, { FORM_API_URL } from "../../utils/api";
+import api, { FORM_API_URL, flattenForm } from "../../utils/api";
 import { addToTrash } from "./Trash";
 import AlertModal from "../../components/AlertModal";
 import { ImagePlus, Handshake, Plus, Search, PenLine, ClipboardList, Trash2 } from "lucide-react";
@@ -32,12 +32,35 @@ function SkeletonCard() {
 /* ── Create Form Modal ───────────────────────────────────────── */
 function CreateModal({ onClose, onCreated }) {
   const [title, setTitle]             = useState("");
-  const [cat, setCat] = useState("ujian");
+  const [subKategoriId, setSubKategoriId] = useState("");
+  const [primaryList, setPrimaryList] = useState([]);
+  const [subList, setSubList]         = useState([]);
+  const [selectedPrimary, setSelectedPrimary] = useState("");
   const [banner, setBanner]           = useState(null);
   const [preview, setPreview]         = useState(null);
   const [tokenRespon, setTokenRespon] = useState("");
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState("");
+
+  // Load primary kategori saat modal buka
+  useEffect(() => {
+    api.get("/kategori/primary").then(res => {
+      const list = res.data?.data ?? [];
+      setPrimaryList(list);
+      if (list.length > 0) setSelectedPrimary(String(list[0].id));
+    }).catch(() => {});
+  }, []);
+
+  // Load sub kategori saat primary dipilih
+  useEffect(() => {
+    if (!selectedPrimary) return;
+    api.get(`/kategori/sub/${selectedPrimary}`).then(res => {
+      const list = res.data?.data ?? [];
+      setSubList(list);
+      if (list.length > 0) setSubKategoriId(String(list[0].id));
+      else setSubKategoriId("");
+    }).catch(() => setSubList([]));
+  }, [selectedPrimary]);
 
   function handleFile(e) {
     const f = e.target.files[0];
@@ -47,13 +70,14 @@ function CreateModal({ onClose, onCreated }) {
   }
 
   async function submit() {
-    if (!title.trim()) { setError("Judul wajib diisi."); return; }
-    if (!banner)       { setError("Banner wajib diunggah."); return; }
+    if (!title.trim())    { setError("Judul wajib diisi."); return; }
+    if (!banner)          { setError("Banner wajib diunggah."); return; }
+    if (!subKategoriId)   { setError("Pilih kategori terlebih dahulu."); return; }
     setLoading(true); setError("");
     try {
       const fd = new FormData();
       fd.append("title", title.trim());
-      fd.append("category", cat);
+      fd.append("sub_kategori", subKategoriId);
       fd.append("banner", banner);
       fd.append("token_respon", tokenRespon.trim());
       const res  = await fetch(`${FORM_API_URL}/form`, {
@@ -63,7 +87,7 @@ function CreateModal({ onClose, onCreated }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Gagal membuat form.");
-      onCreated(data?.data?.form?.form_slug);
+      onCreated(data?.data?.form?.slug ?? data?.data?.form?.form_slug);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }
@@ -102,13 +126,25 @@ function CreateModal({ onClose, onCreated }) {
           <div>
             <label className="block text-[11px] font-bold text-[#4d6a82] uppercase tracking-wider mb-1.5">Kategori</label>
             <select
-              className="w-full h-10 border border-[#d9e8f1] rounded-lg px-3.5 text-[14px] text-[#183056] outline-none bg-[#f7fbff] focus:border-[#3d91b2] focus:bg-white focus:ring-4 focus:ring-[#3d91b2]/10 transition-all box-border"
-              value={cat}
-              onChange={e => setCat(e.target.value)}
+              className="w-full h-10 border border-[#d9e8f1] rounded-lg px-3.5 text-[14px] text-[#183056] outline-none bg-[#f7fbff] focus:border-[#3d91b2] focus:bg-white transition-all box-border mb-2"
+              value={selectedPrimary}
+              onChange={e => setSelectedPrimary(e.target.value)}
             >
-              <option value="ujian">Ujian / Quiz</option>
-              <option value="survei">Survey</option>
+              {primaryList.map(p => (
+                <option key={p.id} value={String(p.id)}>{p.name}</option>
+              ))}
             </select>
+            {subList.length > 0 && (
+              <select
+                className="w-full h-10 border border-[#d9e8f1] rounded-lg px-3.5 text-[14px] text-[#183056] outline-none bg-[#f7fbff] focus:border-[#3d91b2] focus:bg-white transition-all box-border"
+                value={subKategoriId}
+                onChange={e => setSubKategoriId(e.target.value)}
+              >
+                {subList.map(s => (
+                  <option key={s.id} value={String(s.id)}>{s.name}</option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div>
@@ -175,7 +211,7 @@ export default function MyForms() {
     setLoading(true);
     try {
       const res = await api.get("/form/user");
-      setForms(res.data?.data?.forms ?? []);
+      setForms((res.data?.data?.forms ?? []).map(flattenForm));
     } catch { setForms([]); }
     finally { setLoading(false); }
   }
@@ -186,15 +222,16 @@ export default function MyForms() {
 
   const doDeleteForm = async (form) => {
     setConfirmDelete(null);
+    const formSlug = form.slug ?? form.form_slug;
     try {
-      const response = await fetch(`${FORM_API_URL}/form?form_slug=${form.form_slug}`, {
+      const response = await fetch(`${FORM_API_URL}/form?form_slug=${formSlug}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: JSON.stringify({ status: "private" }),
       });
       if (!response.ok) throw new Error("Gagal memindahkan ke trash");
-      addToTrash(form);
-      setForms(prev => prev.filter(f => f.form_slug !== form.form_slug));
+      addToTrash({ ...form, form_slug: formSlug, form_title: form.title ?? form.form_title });
+      setForms(prev => prev.filter(f => (f.slug ?? f.form_slug) !== formSlug));
       setAlertModal({ type: "success", title: "Berhasil", message: "Form dipindahkan ke Trash!" });
     } catch (error) {
       console.error("Error delete:", error);
@@ -204,12 +241,12 @@ export default function MyForms() {
 
   /* filter */
   const filtered = forms.filter(f => {
-    const title = (f.form_title ?? "").toLowerCase();
-    const cat   = f.category ?? "";
+    const title = (f.title ?? f.form_title ?? "").toLowerCase();
+    const cat   = (f.category ?? f.sub_kategori ?? f.primary_kategori ?? "").toLowerCase();
     const matchSearch = title.includes(search.toLowerCase());
     const matchCat =
       activeCategory === "All" ||
-      (activeCategory === "Survey"       && (cat === "survey" || cat === "survei")) ||
+      (activeCategory === "Survey"       && (cat === "survei" || cat === "survey")) ||
       (activeCategory === "Quiz / Ujian" && cat === "ujian");
     return matchSearch && matchCat;
   });
@@ -292,17 +329,17 @@ export default function MyForms() {
           {!loading && filtered.length > 0 && (
             <div className="grid grid-cols-4 gap-[18px] items-stretch max-[800px]:grid-cols-1">
               {filtered.map((form, index) => {
-                const banner = form.form_banner ?? form.banner;
-                const cat    = form.category ?? "";
-                const status = form.form_status ?? "private";
+                const banner = form.banner ?? form.form_banner;
+                const cat    = form.category ?? form.sub_kategori ?? "";
+                const status = form.status ?? form.setting?.status ?? "private";
                 const large  = index % 4 === 0 || index % 4 === 3;
 
                 return (
                   <div
-                    key={form.form_id ?? index}
+                    key={form.id ?? form.form_id ?? index}
                     style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}
                     className="group rounded-2xl border overflow-hidden cursor-pointer flex flex-col min-h-[310px] shadow-[0_5px_16px_rgba(30,73,105,0.05)] hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(30,73,105,0.12)] transition-all"
-                    onClick={() => navigate(`/form/${form.form_slug}`)}
+                    onClick={() => navigate(`/form/${form.slug ?? form.form_slug}`)}
                   >
                     {/* Image */}
                     <div className="relative w-full overflow-hidden bg-[#dcecf4]" style={{ aspectRatio: "16/9" }}>
@@ -332,7 +369,7 @@ export default function MyForms() {
 
                     {/* Content */}
                     <div className="px-[17px] py-[14px] flex flex-col flex-1">
-                      <h3 className="mb-2 text-[16px] font-bold text-[#183056] leading-snug truncate">{form.form_title ?? "Untitled"}</h3>
+                      <h3 className="mb-2 text-[16px] font-bold text-[#183056] leading-snug truncate">{form.title ?? form.form_title ?? "Untitled"}</h3>
                       <p className="mb-3 text-[12.5px] text-[#7892a6] line-clamp-2">{cat || "—"}</p>
                       <div className="flex items-center gap-2 text-[11px] text-[#3d91b2] whitespace-nowrap mb-3">
                         <span>▧ — Questions</span>
@@ -388,7 +425,7 @@ export default function MyForms() {
         open={!!confirmDelete}
         type="trash"
         title="Hapus Form?"
-        message={`Form "${confirmDelete?.form_title}" akan dipindahkan ke Trash.`}
+        message={`Form "${confirmDelete?.title ?? confirmDelete?.form_title}" akan dipindahkan ke Trash.`}
         confirmLabel="Hapus"
         cancelLabel="Batal"
         onConfirm={() => doDeleteForm(confirmDelete)}

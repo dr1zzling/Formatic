@@ -5,6 +5,44 @@ export const FORM_API_URL = import.meta.env.VITE_FORM_API_URL || "http://localho
 
 export const API_BASE_URL = FORM_API_URL;
 
+/**
+ * Flatten formPayload nested structure ke flat shape yang dipakai frontend
+ * Backend sekarang return: { id, slug, title, banner, access_type,
+ *   token: { token_respon, token_collab },
+ *   kategori: { primary_kategori, sub_kategori },
+ *   setting: { status, theme_color, start_at, duration, is_random }
+ * }
+ */
+export function flattenForm(f) {
+  if (!f) return f;
+  return {
+    // Identitas
+    form_id:     f.id,
+    id:          f.id,
+    form_slug:   f.slug,
+    slug:        f.slug,
+    form_title:  f.title,
+    title:       f.title,
+    form_banner: f.banner,
+    banner:      f.banner,
+    access_type: f.access_type,
+    // Token
+    token_respon: f.token?.token_respon ?? null,
+    token_collab: f.token?.token_collab ?? null,
+    // Kategori
+    category:     f.kategori?.sub_kategori ?? f.kategori?.primary_kategori ?? "",
+    primary_kategori: f.kategori?.primary_kategori ?? "",
+    sub_kategori: f.kategori?.sub_kategori ?? "",
+    // Setting
+    status:       f.setting?.status ?? "private",
+    form_status:  f.setting?.status ?? "private",
+    theme_color:  f.setting?.theme_color ?? null,
+    start_at:     f.setting?.start_at ?? null,
+    duration:     f.setting?.duration ?? null,
+    is_random:    f.setting?.is_random ?? false,
+  };
+}
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {

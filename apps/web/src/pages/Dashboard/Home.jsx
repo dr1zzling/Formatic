@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import api, { FORM_API_URL } from "../../utils/api";
+import api, { FORM_API_URL, flattenForm } from "../../utils/api";
 import { Bell, HelpCircle, Plus, ArrowRight, FileText, Search, ClipboardList, LockKeyhole } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 
@@ -29,7 +29,7 @@ const HISTORY_KEY = "formatic_history";
 /* ── Activity Card ─────────────────────────────────────────────── */
 function ActivityCard({ forms, loading }) {
   const navigate = useNavigate();
-  const CAT_STYLE = { ujian: "bg-[#eee7ff] text-[#7850d9]", survey: "bg-[#e9f2ff] text-[#1768df]", default: "bg-[#e5faee] text-[#21a964]" };
+  const CAT_STYLE = { ujian: "bg-[#eee7ff] text-[#7850d9]", survey: "bg-[#e9f2ff] text-[#1768df]", survei: "bg-[#e9f2ff] text-[#1768df]", default: "bg-[#e5faee] text-[#21a964]" };
   return (
     <section className="border border-[#e0eaf6] rounded-xl shadow-[0_8px_25px_rgba(35,83,145,0.08)] p-6 min-h-[355px] flex flex-col transition-colors"
       style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}>
@@ -48,10 +48,10 @@ function ActivityCard({ forms, loading }) {
           const cat = form.category ?? "default";
           const style = CAT_STYLE[cat] ?? CAT_STYLE.default;
           return (
-            <div key={form.form_id ?? i} onClick={() => navigate(`/form/${form.form_slug}`)} className="flex items-center gap-3 cursor-pointer group">
+            <div key={form.id ?? form.form_id ?? i} onClick={() => navigate(`/form/${form.slug ?? form.form_slug}`)} className="flex items-center gap-3 cursor-pointer group">
               <div className={`w-[42px] h-[42px] flex items-center justify-center rounded-[9px] shrink-0 ${style}`}><FileText size={20} /></div>
               <div className="flex-1 min-w-0">
-                <p className="text-[12px] font-semibold text-[#17366d] truncate group-hover:text-[#1764d6] transition-colors">{form.form_title ?? "Untitled"}</p>
+                <p className="text-[12px] font-semibold text-[#17366d] truncate group-hover:text-[#1764d6] transition-colors">{form.title ?? form.form_title ?? "Untitled"}</p>
                 <p className="text-[10px] text-[#8ca0ba] mt-1">{form.category ?? "—"} &nbsp;•&nbsp; 0 responses</p>
               </div>
             </div>
@@ -70,7 +70,7 @@ function ActivityCard({ forms, loading }) {
 function HistoryPengerjaan({ loading: parentLoading }) {
   const navigate = useNavigate();
   const [history, setHistory] = useState([]);
-  const CAT_STYLE = { ujian: "bg-[#eee7ff] text-[#7b51d6]", survey: "bg-[#eaf2ff] text-[#246de0]", default: "bg-[#e6f9ed] text-[#25af67]" };
+  const CAT_STYLE = { ujian: "bg-[#eee7ff] text-[#7b51d6]", survey: "bg-[#eaf2ff] text-[#246de0]", survei: "bg-[#eaf2ff] text-[#246de0]", default: "bg-[#e6f9ed] text-[#25af67]" };
 
   useEffect(() => {
     try {
@@ -103,11 +103,11 @@ function HistoryPengerjaan({ loading: parentLoading }) {
           const cat = form.category ?? "default";
           const style = CAT_STYLE[cat] ?? CAT_STYLE.default;
           return (
-            <article key={i} onClick={() => navigate(`/fill/${form.form_slug}`)}
+            <article key={i} onClick={() => navigate(`/fill/${form.slug ?? form.form_slug}`)}
               className="flex items-center gap-3 py-[14px] cursor-pointer hover:bg-[#f7faff] transition-colors first:pt-0 last:pb-0">
               <div className={`w-[38px] h-[38px] flex items-center justify-center rounded-lg shrink-0 ${style}`}><FileText size={17} /></div>
               <div className="flex-1 min-w-0">
-                <p className="text-[12px] font-semibold text-[#17366d] truncate">{form.form_title}</p>
+                <p className="text-[12px] font-semibold text-[#17366d] truncate">{form.title ?? form.form_title}</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="text-[10px] text-[#8ba0bb]">{cat}</span>
                   <span className="text-[10px] text-[#c5d2de]">·</span>
@@ -246,7 +246,7 @@ function FetchFormsGrid({ search, category }) {
         const map = { Quiz: "ujian", Survey: "survei" };
         res = await api.get("/form/category", { params: { category: map[category] ?? category.toLowerCase() } });
       }
-      setForms(res.data?.data ?? []);
+      setForms((res.data?.data ?? []).map(flattenForm));
     } catch { setForms([]); }
     finally { setLoading(false); }
   }
@@ -399,7 +399,7 @@ export default function Home() {
     setMyLoading(true);
     try {
       const res  = await api.get("/form/user");
-      setMyForms(res.data?.data?.forms ?? []);
+      setMyForms((res.data?.data?.forms ?? []).map(flattenForm));
     } catch { setMyForms([]); }
     finally { setMyLoading(false); }
   }

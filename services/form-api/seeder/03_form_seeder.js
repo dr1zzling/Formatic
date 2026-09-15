@@ -6,14 +6,14 @@ const crypto = require("crypto");
  * @returns { Promise<void> } 
  */
 exports.seed = async function(knex) {
-  // Deletes ALL existing entries
+  // Hapus data lama di tabel forms
   await knex('forms').del();
 
   const dummyData = [
     {
       title: 'Soal Matematika 2026',
       status: 'public',
-      category: 'ujian',
+      kategori_id: 1, // Sains
       banner: '/uploads/banner/soal-1.jpg',
       is_random: true,
       duration: 120,
@@ -22,7 +22,7 @@ exports.seed = async function(knex) {
     {
       title: 'Soal Pendidikan Pancasila 2026',
       status: 'private',
-      category: 'ujian',
+      kategori_id: 3, // Bahasa & Umum
       banner: '/uploads/banner/soal-2.jpg',
       is_random: true,
       duration: 90,
@@ -31,7 +31,7 @@ exports.seed = async function(knex) {
     {
       title: 'Soal Bahasa Asing 2026',
       status: 'public',
-      category: 'ujian',
+      kategori_id: 3, // Bahasa & Umum
       banner: '/uploads/banner/soal-3.jpg',
       is_random: false,
       duration: 60,
@@ -40,7 +40,7 @@ exports.seed = async function(knex) {
     {
       title: 'Soal Fisika Dasar 2026',
       status: 'public',
-      category: 'ujian',
+      kategori_id: 1, // Sains
       banner: '/uploads/banner/soal-4.jpg',
       is_random: false,
       duration: 90,
@@ -49,7 +49,7 @@ exports.seed = async function(knex) {
     {
       title: 'Survei Kepuasan Siswa 2026',
       status: 'public',
-      category: 'survei',
+      kategori_id: 4, // Evaluasi Sekolah
       banner: '/uploads/banner/soal-5.jpg',
       is_random: true,
       duration: null,
@@ -58,7 +58,7 @@ exports.seed = async function(knex) {
     {
       title: 'Soal Kimia Organik 2026',
       status: 'private',
-      category: 'ujian',
+      kategori_id: 1, // Sains
       banner: '/uploads/banner/soal-6.jpg',
       is_random: true,
       duration: 100,
@@ -67,7 +67,7 @@ exports.seed = async function(knex) {
     {
       title: 'Survei Ekstrakurikuler yang diminati 2026',
       status: 'public',
-      category: 'survei',
+      kategori_id: 5, // Minat & Bakat
       banner: '/uploads/banner/soal-7.jpg',
       is_random: false,
       duration: null,
@@ -76,7 +76,7 @@ exports.seed = async function(knex) {
     {
       title: 'Soal Biologi Umum 2026',
       status: 'public',
-      category: 'ujian',
+      kategori_id: 1, // Sains
       banner: '/uploads/banner/soal-8.jpg',
       is_random: false,
       duration: 75,
@@ -85,7 +85,7 @@ exports.seed = async function(knex) {
     {
       title: 'Kuesioner Fasilitas Sekolah 2026',
       status: 'private',
-      category: 'survei',
+      kategori_id: 4, // Evaluasi Sekolah
       banner: '/uploads/banner/soal-9.jpg',
       is_random: true,
       duration: null,
@@ -94,7 +94,7 @@ exports.seed = async function(knex) {
     {
       title: 'Soal Sejarah Indonesia 2026',
       status: 'public',
-      category: 'ujian',
+      kategori_id: 2, // Soshum
       banner: '/uploads/banner/soal-10.jpg',
       is_random: true,
       duration: 90,
@@ -103,7 +103,7 @@ exports.seed = async function(knex) {
     {
       title: 'Soal Geografi Indonesia 2026',
       status: 'public',
-      category: 'ujian',
+      kategori_id: 2, // Soshum
       banner: '/uploads/banner/soal-11.jpg',
       is_random: true,
       duration: 80,
@@ -112,7 +112,7 @@ exports.seed = async function(knex) {
     {
       title: 'Soal Bahasa Indonesia 2026',
       status: 'private',
-      category: 'ujian',
+      kategori_id: 3, // Bahasa & Umum
       banner: '/uploads/banner/soal-12.jpg',
       is_random: false,
       duration: 90,
@@ -121,7 +121,7 @@ exports.seed = async function(knex) {
     {
       title: 'Survei Kegiatan Belajar Mengajar 2026',
       status: 'public',
-      category: 'survei',
+      kategori_id: 4, // Evaluasi Sekolah
       banner: '/uploads/banner/soal-13.jpg',
       is_random: true,
       duration: null,
@@ -130,7 +130,7 @@ exports.seed = async function(knex) {
     {
       title: 'Soal Ekonomi Dasar 2026',
       status: 'public',
-      category: 'ujian',
+      kategori_id: 2, // Soshum
       banner: '/uploads/banner/soal-14.jpg',
       is_random: false,
       duration: 90,
@@ -139,7 +139,7 @@ exports.seed = async function(knex) {
     {
       title: 'Kuesioner Minat Baca Siswa 2026',
       status: 'private',
-      category: 'survei',
+      kategori_id: 5, // Minat & Bakat
       banner: '/uploads/banner/soal-15.jpg',
       is_random: true,
       duration: null,
@@ -151,7 +151,7 @@ exports.seed = async function(knex) {
     title: item.title,
     slug: slugify(item.title, { lower: true, strict: true }),
     status: item.status,
-    category: item.category,
+    kategori_id: item.kategori_id, // Foreign Key mengarah ke sub_kategori.id
     token_respon: crypto.randomBytes(4).toString('hex'),
     token_collab: crypto.randomBytes(8).toString('hex'),
     is_random: item.is_random,
