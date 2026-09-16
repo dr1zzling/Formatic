@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:path/path.dart' as path;
@@ -70,9 +71,15 @@ class FormService {
           final catLower = category.toLowerCase();
           final filtered = allForms.where((f) {
             if (f is! Map) return false;
-            return (f['category'] as String? ?? '')
-                .toLowerCase()
-                .trim() == catLower;
+            // Backend menaruh kategori di f.kategori.{primary_kategori,sub_kategori}
+            final kategori = f['kategori'];
+            final fCat = kategori is Map
+                ? (kategori['primary_kategori'] ??
+                        kategori['sub_kategori'] ??
+                        '')
+                    .toString()
+                : (f['category'] ?? '').toString();
+            return fCat.toLowerCase().trim() == catLower;
           }).toList();
           return {'success': true, 'data': {'data': filtered}};
         }
@@ -104,10 +111,13 @@ class FormService {
   /// of what the file picker reports.
   static Future<Map<String, dynamic>> createForm({
     required String title,
-    required String category,
     required Uint8List bannerBytes,
+    int? subKategoriId,
     String? tokenRespon,
     int? duration,
+    String? themeColor,
+    // Legacy — kept for backward compat, not sent to backend
+    String? category,
   }) async {
     try {
       final imageExt = _detectImageExt(bannerBytes);
@@ -127,12 +137,18 @@ class FormService {
       final headers = await _getAuthHeaders();
       request.headers.addAll(headers);
       request.fields['title'] = title;
-      request.fields['category'] = category.trim().toLowerCase();
+      // Backend membutuhkan sub_kategori sebagai ID integer dari tabel sub_kategori
+      if (subKategoriId != null) {
+        request.fields['sub_kategori'] = subKategoriId.toString();
+      }
       if (tokenRespon != null && tokenRespon.trim().isNotEmpty) {
         request.fields['token_respon'] = tokenRespon.trim();
       }
       if (duration != null && duration > 0) {
         request.fields['duration'] = duration.toString();
+      }
+      if (themeColor != null && themeColor.trim().isNotEmpty) {
+        request.fields['theme_color'] = themeColor.trim();
       }
       request.files.add(
         http.MultipartFile.fromBytes(
@@ -253,71 +269,53 @@ class FormService {
     }
   }
 
-  /// Update form settings: duration (minutes), start_at, is_random.
-  /// Calls PATCH /form/setting?form_slug=<slug>
-  /// Backend body: { duration: number, start_at: number, is_random: boolean }
-  /// Pass null for fields you don't want to change — they will be sent as
-  /// their current/default values (0 / false) because the backend replaces
-  /// the whole setting row.
-  /// Update token_respon for a form.
-  /// Backend PATCH /form/setting hanya support duration/start_at/is_random.
-  /// Kita kirim token_respon sebagai field tambahan — backend mungkin ignore
-  /// tapi tidak error. Sebagai fallback, kita update via status endpoint
-  /// dengan body { token_respon } yang backend mungkin handle via knex update.
+  /// Update token_respon untuk form.
+  /// Mengirim semua field setting sekaligus ke PATCH /form/setting
+  /// agar tidak ada field yang ter-overwrite dengan null.
   static Future<Map<String, dynamic>> updateTokenRespon({
     required String slug,
     required String tokenRespon,
+    int? durationMinutes,
+    int? startAtMillis,
+    bool isRandom = false,
+    String? themeColor,
   }) async {
-    try {
-      // Coba PATCH /form/setting dengan token_respon tambahan
-      final url = Uri.parse(
-        '${ApiConfig.formApiBaseUrl}${ApiConfig.formSettingEndpoint}?form_slug=$slug',
-      );
-      final headers = await _getHeaders();
-      final body = jsonEncode({
-        'token_respon': tokenRespon.trim(),
-      });
-      final response = await http
-          .patch(url, headers: headers, body: body)
-          .timeout(ApiConfig.timeout);
-
-      _handle401(response.statusCode);
-      final data = await _decodeResponse(response);
-
-      if (response.statusCode == 200) {
-        return {
-          'success': true,
-          'message': data['message'] ?? 'Token diperbarui',
-        };
-      }
-
-      return {
-        'success': false,
-        'message': data['message'] ?? 'Gagal memperbarui token',
-      };
-    } catch (e) {
-      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
-    }
+    return updateFormSetting(
+      slug: slug,
+      tokenRespon: tokenRespon.isEmpty ? null : tokenRespon.trim(),
+      durationMinutes: durationMinutes,
+      startAtMillis: startAtMillis,
+      isRandom: isRandom,
+      themeColor: themeColor,
+    );
   }
 
+  /// Update form settings: duration, start_at, is_random, token_respon, theme_color.
+  /// Calls PATCH /form/setting?form_slug=<slug>
+  /// Backend body: { duration, start_at, is_random, token_respon, theme_color }
+  /// Backend contract (verified): semua field nullable, dikirim bersamaan.
   static Future<Map<String, dynamic>> updateFormSetting({
     required String slug,
-    int? durationMinutes,     // null → 0 (no timer)
-    int? startAtMillis,       // null → 0 (no start restriction)
+    int? durationMinutes,   // null → kirim null (hapus timer)
+    int? startAtMillis,     // null → kirim null (hapus start_at)
     bool isRandom = false,
+    String? tokenRespon,    // null → kirim null (hapus token)
+    String? themeColor,     // null → tidak dikirim (biarkan backend tidak mengubah)
   }) async {
     try {
       final url = Uri.parse(
         '${ApiConfig.formApiBaseUrl}${ApiConfig.formSettingEndpoint}?form_slug=$slug',
       );
       final headers = await _getHeaders();
-      final body = jsonEncode({
-        'duration': durationMinutes ?? 0,
-        'start_at': startAtMillis ?? 0,
+      final bodyMap = <String, dynamic>{
+        'duration': durationMinutes,
+        'start_at': startAtMillis,
         'is_random': isRandom,
-      });
+        'token_respon': tokenRespon,
+      };
+      if (themeColor != null) bodyMap['theme_color'] = themeColor;
       final response = await http
-          .patch(url, headers: headers, body: body)
+          .patch(url, headers: headers, body: jsonEncode(bodyMap))
           .timeout(ApiConfig.timeout);
 
       _handle401(response.statusCode);
@@ -326,19 +324,22 @@ class FormService {
       if (response.statusCode == 200) {
         return {
           'success': true,
-          'message': data['message'] ?? 'Settings updated',
+          'message': data['message'] ?? 'Pengaturan berhasil disimpan',
+          'data': data['data'],
         };
       }
 
       return {
         'success': false,
-        'message': data['message'] ?? 'Failed to update settings',
+        'message': data['message'] ?? 'Gagal menyimpan pengaturan',
       };
     } catch (e) {
       return {'success': false, 'message': 'Connection error: ${e.toString()}'};
     }
   }
 
+  /// Ubah status form ke public/private.
+  /// Backend: PUT /form?form_slug=<slug> body { status }
   static Future<Map<String, dynamic>> updateFormStatus({
     required String slug,
     required String status,
@@ -349,7 +350,7 @@ class FormService {
       );
       final headers = await _getHeaders();
       final response = await http
-          .patch(url, headers: headers, body: jsonEncode({'status': status}))
+          .put(url, headers: headers, body: jsonEncode({'status': status}))
           .timeout(ApiConfig.timeout);
 
       _handle401(response.statusCode);
@@ -358,13 +359,13 @@ class FormService {
       if (response.statusCode == 200) {
         return {
           'success': true,
-          'message': data['message'] ?? 'Status updated',
+          'message': data['message'] ?? 'Status berhasil diperbarui',
         };
       }
 
       return {
         'success': false,
-        'message': data['message'] ?? 'Failed to update status',
+        'message': data['message'] ?? 'Gagal memperbarui status',
       };
     } catch (e) {
       return {'success': false, 'message': 'Connection error: ${e.toString()}'};
@@ -560,21 +561,49 @@ class FormService {
           .timeout(ApiConfig.timeout);
 
       _handle401(response.statusCode);
+
+      // _decodeResponse sudah try-catch; body kosong/tidak valid → data = {}
       final data = await _decodeResponse(response);
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
+      // Debug: log full response untuk keperluan diagnosa (tidak ditampilkan ke user)
+      assert(() {
+        debugPrint(
+          '[checkToken] status=${response.statusCode} '
+          'slug=$formSlug '
+          'body=${response.body.length > 500 ? response.body.substring(0, 500) : response.body}',
+        );
+        return true;
+      }());
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // Backend response check-token mengembalikan form_submit record di data.data
+        // yang berisi: { id, user_id, user_username, form_id, status, attemps, start_at }
+        // start_at dibutuhkan untuk hitung timer end ketika form.start_at tidak tersedia.
+        final responseData = data['data'];
         return {
           'success': true,
           'message': data['message'] ?? 'Token validated',
+          'data': responseData, // form_submit record (bisa Map atau null)
         };
       }
 
+      // Semua status non-200/201 → success: false
+      // statusCode disertakan agar caller bisa membedakan 400 (token salah)
+      // dari 500 (server error) tanpa melihat pesan.
+      // rawMessage menyertakan seluruh body error untuk keperluan diagnostik
+      // (tidak ditampilkan mentah ke user — UI memetakan ke pesan yang lebih baik).
+      final rawMessage = data['message'] ?? data['error'] ?? data['statusCode']?.toString();
       return {
         'success': false,
-        'message': data['message'] ?? 'Token validation failed',
+        'statusCode': response.statusCode,
+        'message': rawMessage ?? 'Token validation failed (HTTP ${response.statusCode})',
       };
     } catch (e) {
-      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
+      return {
+        'success': false,
+        'statusCode': 0, // 0 = network/timeout error
+        'message': 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.',
+      };
     }
   }
 
@@ -972,6 +1001,154 @@ class FormService {
       return {
         'success': false,
         'message': data['message'] ?? 'Failed to update question',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
+    }
+  }
+
+  /// GET /kategori/primary — list semua primary kategori dari backend.
+  /// Response: { message, data: [{ id, name }] }
+  static Future<Map<String, dynamic>> getPrimaryCategories() async {
+    try {
+      final url = Uri.parse('${ApiConfig.formApiBaseUrl}${ApiConfig.primaryCategoriesEndpoint}');
+      final headers = await _getAuthHeaders();
+      final response = await http.get(url, headers: headers).timeout(ApiConfig.timeout);
+      final data = await _decodeResponse(response);
+
+      if (response.statusCode == 200) {
+        final list = data['data'] is List
+            ? data['data'] as List
+            : (data['categories'] is List ? data['categories'] as List : []);
+        final items = list.whereType<Map>().map((e) {
+          return {
+            'id': (e['id'] as num?)?.toInt() ?? 0,
+            'name': (e['name'] ?? e['category_name'] ?? '').toString(),
+          };
+        }).toList();
+        return {'success': true, 'data': items};
+      }
+
+      return {
+        'success': false,
+        'message': _extractErrorMessage(data, 'Gagal memuat kategori'),
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
+    }
+  }
+
+  /// GET /kategori/sub/:primaryId — list sub-kategori berdasarkan primary kategori id.
+  /// Response: { message, data: [{ id, name }] }
+  static Future<Map<String, dynamic>> getSubCategories(int primaryId) async {
+    try {
+      final url = Uri.parse('${ApiConfig.formApiBaseUrl}${ApiConfig.subCategoriesEndpoint}/$primaryId');
+      final headers = await _getAuthHeaders();
+      final response = await http.get(url, headers: headers).timeout(ApiConfig.timeout);
+      final data = await _decodeResponse(response);
+
+      if (response.statusCode == 200) {
+        final list = data['data'] is List
+            ? data['data'] as List
+            : (data['categories'] is List ? data['categories'] as List : []);
+        final items = list.whereType<Map>().map((e) {
+          return {
+            'id': (e['id'] as num?)?.toInt() ?? 0,
+            'name': (e['name'] ?? e['category_name'] ?? '').toString(),
+          };
+        }).toList();
+        return {'success': true, 'data': items};
+      }
+
+      return {
+        'success': false,
+        'message': _extractErrorMessage(data, 'Gagal memuat sub-kategori'),
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
+    }
+  }
+
+  /// Hanya mengambil pesan error dari body response tanpa menampilkan
+  /// credential/hash/secret apapun. Untuk envelope error NestJS
+  /// ({ statusCode, message }) maupun pesan custom backend.
+  static String _extractErrorMessage(Map<String, dynamic> data, String fallback) {
+    final msg = data['message'];
+    if (msg is String && msg.trim().isNotEmpty) return msg.trim();
+    if (msg is List && msg.isNotEmpty) return msg.join(', ');
+    final err = data['error'];
+    if (err is String && err.trim().isNotEmpty) return err.trim();
+    return fallback;
+  }
+
+  /// GET monitoring status submit semua user untuk satu form.
+  /// Endpoint: GET /form/monitoring?form_slug=<slug>
+  /// Response: { message, status: [{ user_id, user_username, start_at, submitted_at, status, attemps }] }
+  /// Hanya Creator/Collaborator yang dapat mengakses.
+  static Future<Map<String, dynamic>> getMonitoringStatus(String formSlug) async {
+    try {
+      final url = Uri.parse(
+        '${ApiConfig.formApiBaseUrl}${ApiConfig.monitoringEndpoint}?form_slug=$formSlug',
+      );
+      final headers = await _getHeaders();
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(ApiConfig.timeout);
+
+      _handle401(response.statusCode);
+      final data = await _decodeResponse(response);
+
+      if (response.statusCode == 200) {
+        // Response: { message, status: [...] }
+        final List<dynamic> statusList =
+            data['status'] is List ? data['status'] as List : [];
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Berhasil mendapatkan status submit',
+          'status': statusList,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Gagal memuat data monitoring',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
+    }
+  }
+
+  /// Reset status pengerjaan user ke kondisi awal.
+  /// Endpoint: PUT /form/monitoring/reset?form_slug=<slug>
+  /// Body: { user_id: number }
+  /// Hanya bisa reset user dengan status "progress".
+  /// Response: { message: "Berhasil Reset" }
+  static Future<Map<String, dynamic>> resetMonitoringUser({
+    required String formSlug,
+    required int userId,
+  }) async {
+    try {
+      final url = Uri.parse(
+        '${ApiConfig.formApiBaseUrl}${ApiConfig.monitoringResetEndpoint}?form_slug=$formSlug',
+      );
+      final headers = await _getHeaders();
+      final response = await http
+          .put(url, headers: headers, body: jsonEncode({'user_id': userId}))
+          .timeout(ApiConfig.timeout);
+
+      _handle401(response.statusCode);
+      final data = await _decodeResponse(response);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Berhasil Reset',
+        };
+      }
+
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Gagal melakukan reset',
       };
     } catch (e) {
       return {'success': false, 'message': 'Connection error: ${e.toString()}'};

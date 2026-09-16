@@ -9,6 +9,7 @@ import '../../forms/screens/form_editor_screen.dart';
 import '../../forms/screens/form_viewer_screen.dart';
 import '../../profile/screens/profile_screen.dart';
 import '../../scanner/screens/qr_scanner_screen.dart';
+import '../../discovery/screens/discovery_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,6 +20,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  final GlobalKey<MyFormsScreenState> _myFormsKey =
+      GlobalKey<MyFormsScreenState>();
 
   void _navigateToCreateForm() async {
     final result = await Navigator.of(context).push(
@@ -28,6 +31,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _handleCreateResult(Object? result) {
     if (result is Map && result['success'] == true && mounted) {
+      // Muat ulang daftar My Forms agar form yang baru dibuat langsung muncul.
+      _myFormsKey.currentState?.reload();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(result['message'] ?? 'Form berhasil dibuat'),
@@ -51,11 +56,13 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     // Map nav index → stack index
-    // Nav:   0=Home, 1=MyForms, 2=QR(center), 3=Add, 4=Profile (index 3 di _buildNavItem)
-    // Stack: 0=Home, 1=MyForms, 2=Profile
+    // Nav:   0=Home, 1=MyForms, 2=QR(center), 3=Discovery, 4=Profile
+    // Stack: 0=Home, 1=MyForms, 2=Discovery, 3=Profile
     int stackIndex;
-    if (_selectedIndex == 3) {
-      stackIndex = 2; // Profile
+    if (_selectedIndex == 4) {
+      stackIndex = 3; // Profile
+    } else if (_selectedIndex == 3) {
+      stackIndex = 2; // Discovery
     } else if (_selectedIndex == 1) {
       stackIndex = 1; // My Forms
     } else {
@@ -67,12 +74,24 @@ class _HomeScreenState extends State<HomeScreen> {
       extendBody: true,
       body: IndexedStack(
         index: stackIndex,
-        children: const [
-          _HomeContent(),
-          MyFormsScreen(),
-          ProfileScreen(),
+        children: [
+          const _HomeContent(),
+          MyFormsScreen(key: _myFormsKey),
+          const DiscoveryScreen(),
+          const ProfileScreen(),
         ],
       ),
+      // FAB create form — hanya tampil di tab Home dan My Forms
+      floatingActionButton: (stackIndex == 0 || stackIndex == 1)
+          ? FloatingActionButton(
+              onPressed: _navigateToCreateForm,
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              tooltip: 'Buat Form',
+              child: const Icon(Icons.add, size: 26),
+            )
+          : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: _buildBottomNav(),
     );
   }
@@ -100,13 +119,9 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildNavItem(1, Icons.description_outlined,
                 Icons.description_rounded, 'My Forms'),
             _buildNavCenter(),
-            _buildNavItemIcon(
-                Icons.add_circle_outline_rounded,
-                Icons.add_circle_rounded,
-                'Add',
-                () => _navigateToCreateForm()),
+            _buildNavItem(3, Icons.explore_outlined, Icons.explore_rounded, 'Discovery'),
             _buildNavItem(
-                3, Icons.person_outline_rounded, Icons.person_rounded, 'Profile'),
+                4, Icons.person_outline_rounded, Icons.person_rounded, 'Profile'),
           ],
         ),
       ),
@@ -116,12 +131,17 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildNavItem(
       int index, IconData icon, IconData activeIcon, String label) {
     final isSelected = _selectedIndex == index;
-    // Map nav index ke IndexedStack index
-    final stackIndex = index == 3 ? 2 : index;
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => setState(() => _selectedIndex = index),
+        onTap: () {
+          setState(() => _selectedIndex = index);
+          if (index == 1) {
+            // Muat ulang My Forms setiap kali tab dibuka agar data terbaru
+            // (termasuk form baru) selalu tampil.
+            _myFormsKey.currentState?.reload();
+          }
+        },
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -139,27 +159,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: isSelected ? Colors.white : Colors.white.withOpacity(0.5),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItemIcon(
-      IconData icon, IconData activeIcon, String label, VoidCallback onTap) {
-    return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 22, color: Colors.white.withOpacity(0.5)),
-            const SizedBox(height: 3),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.white.withOpacity(0.5))),
           ],
         ),
       ),
@@ -253,17 +252,31 @@ class _HomeContentState extends State<_HomeContent>
               ? (result['data'] as Map)['data'] as List
               : [];
       setState(() {
-        _allForms = forms.map<Map<String, dynamic>>((form) => {
-              'id': (form['id'] ?? '').toString(),
-              'form_id': form['id'],
-              'title': form['title'] ?? form['form_title'] ?? 'Untitled Form',
-              'slug': form['slug'] ?? form['form_slug'] ?? '',
-              'status': form['status'] ?? form['form_status'] ?? 'private',
-              'category': form['category'] ?? '',
-              'questions': 0,
-              'responses': '0',
-              'banner': form['banner'] ?? '',
-            }).toList();
+        _allForms = forms.map<Map<String, dynamic>>((form) {
+          final kategori = form is Map ? form['kategori'] : null;
+          final setting = form is Map ? form['setting'] : null;
+          return {
+            'id': (form['id'] ?? '').toString(),
+            'form_id': form['id'],
+            'title': form['title'] ?? form['form_title'] ?? 'Untitled Form',
+            'slug': form['slug'] ?? form['form_slug'] ?? '',
+            // Backend menaruh status di form.setting.status (bukan top-level)
+            'status': setting is Map
+                ? ((setting['status'] ?? 'private')).toString()
+                : ((form['status'] ?? form['form_status'] ?? 'private'))
+                    .toString(),
+            // Backend menaruh kategori di form.kategori.*
+            'category': kategori is Map
+                ? ((kategori['primary_kategori'] ??
+                        kategori['sub_kategori'] ??
+                        '')
+                    .toString())
+                : (form['category'] ?? '').toString(),
+            'questions': 0,
+            'responses': '0',
+            'banner': form['banner'] ?? '',
+          };
+        }).toList();
         _applyFilter();
         _isLoading = false;
       });

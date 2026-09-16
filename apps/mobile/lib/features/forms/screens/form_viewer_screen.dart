@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
@@ -7,7 +7,9 @@ import 'package:flutter_quill/flutter_quill.dart' as quill;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/form_service.dart';
 import '../../../core/config/api_config.dart';
+import '../../../core/utils/html_utils.dart';
 import '../widgets/form_audio_player.dart';
+import '../../history/screens/history_screen.dart';
 
 class FormViewerScreen extends StatefulWidget {
   final String slug;
@@ -28,11 +30,25 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
   String _category = '';
   String _tokenRespon = '';
 
+  // Quiz / survey mode
+  bool _isQuiz = false;
+  bool _isRandom = false;
+  // Per-page groups untuk quiz mode (List<{page, soal:[]}>)
+  List<Map<String, dynamic>> _pageGroups = [];
+  int _currentPageIndex = 0;
+  // Set of soal IDs yang ditandai ragu-ragu
+  final Set<int> _doubtfulIds = {};
+
   // Timer state
-  int? _durationSeconds;
-  int? _remainingSeconds;
+  int? _durationSeconds;        // durasi dalam detik (duration menit * 60)
+  int? _remainingSeconds;       // sisa waktu countdown
+  int? _timerEndMillis;         // absolute end timestamp (ms), persisted
   Timer? _countdownTimer;
   bool _hasShownWarning = false;
+
+  // Timestamps dari backend (digunakan untuk hitung timer end)
+  int? _formStartAtMillis;      // form.start_at (form settings) — ms
+  int? _submitStartAtMillis;    // form_submit.start_at (dari check-token response) — ms
 
   bool _tokenValidated = false;
   bool _tokenNeeded = false;
@@ -73,28 +89,89 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
         final rawSoal = data['soal'] is List ? data['soal'] as List : [];
         final List<dynamic> listSoal = rawSoal.expand<dynamic>((pageGroup) {
           if (pageGroup is Map && pageGroup['soal'] is List) {
-            return pageGroup['soal'] as List;
+            final pageNum = pageGroup['page'] is num
+                ? (pageGroup['page'] as num).toInt()
+                : 1;
+            return (pageGroup['soal'] as List).map((s) {
+              if (s is Map && s['page'] == null) {
+                return {...s, 'page': pageNum};
+              }
+              return s;
+            });
           }
           return [pageGroup];
         }).toList();
 
         setState(() {
-          _formTitle = data['title'] ?? data['form_title'] ?? 'Untitled Form';
-          _category = data['category'] ?? '';
-          _tokenRespon = data['token_respon']?.toString() ?? '';
+          // Backend getFormBySlug returns: data: { form: formPayload, soal: [...] }.
+          // Nilai setting berada di dalam form.setting, form.token, form.kategori.
+          final Map<String, dynamic> form =
+              data['form'] is Map
+                  ? Map<String, dynamic>.from(data['form'] as Map)
+                  : <String, dynamic>{};
+          final Map<String, dynamic> setting =
+              form['setting'] is Map
+                  ? Map<String, dynamic>.from(form['setting'] as Map)
+                  : form;
+          final Map<String, dynamic> token =
+              form['token'] is Map
+                  ? Map<String, dynamic>.from(form['token'] as Map)
+                  : form;
+          final Map<String, dynamic> kategori =
+              form['kategori'] is Map
+                  ? Map<String, dynamic>.from(form['kategori'] as Map)
+                  : <String, dynamic>{};
+
+          _formTitle = form['title']?.toString() ??
+              data['title']?.toString() ??
+              'Untitled Form';
+          _category = (kategori['primary_kategori'] ??
+              data['category'] ??
+              '')
+              .toString();
+          _tokenRespon = (token['token_respon'] ??
+              data['token_respon'])
+              ?.toString() ?? '';
           _tokenNeeded = _tokenRespon.trim().isNotEmpty;
           _tokenValidated = false;
-          _formBanner = data['banner']?.toString() ?? '';
+          _formBanner = form['banner']?.toString() ??
+              data['banner']?.toString() ??
+              '';
 
-          final rawDur = data['duration'] ??
-              (data['setting'] is Map ? (data['setting'] as Map)['duration'] : null);
+          // Parse duration dari backend (integer menit)
+          final rawDur = setting['duration'] ?? data['duration'];
           final int? duration = rawDur == null
               ? null
               : (rawDur is num ? rawDur.toInt() : int.tryParse(rawDur.toString()));
-          if (duration != null && duration > 0) {
-            _durationSeconds = duration * 60;
-            _remainingSeconds = _durationSeconds;
+          _durationSeconds = (duration != null && duration > 0) ? duration * 60 : null;
+
+          // Parse form.start_at (timestamp milliseconds dari form settings)
+          final rawStartAt = setting['start_at'] ?? data['start_at'];
+          if (rawStartAt != null) {
+            if (rawStartAt is num && rawStartAt > 0) {
+              _formStartAtMillis = rawStartAt.toInt();
+            } else if (rawStartAt is String) {
+              // Bisa ISO string atau numeric string
+              final asInt = int.tryParse(rawStartAt);
+              if (asInt != null && asInt > 0) {
+                _formStartAtMillis = asInt;
+              } else {
+                final parsed = DateTime.tryParse(rawStartAt);
+                _formStartAtMillis = parsed?.millisecondsSinceEpoch;
+              }
+            }
           }
+
+          // Parse is_random — bisa bool atau int dari backend
+          final rawRandom = setting['is_random'] ?? data['is_random'];
+          _isRandom = rawRandom == true ||
+              rawRandom == 1 ||
+              rawRandom?.toString() == 'true' ||
+              rawRandom?.toString() == '1';
+
+          // Tentukan mode quiz berdasarkan primary_kategori
+          final primaryKat = _category.toLowerCase();
+          _isQuiz = primaryKat.contains('ujian');
 
           _questions = listSoal.asMap().entries.map((entry) {
             final index = entry.key;
@@ -109,9 +186,17 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
               'options': soal['options'] ?? [],
               'image': soal['image']?.toString(),
               'audio': soal['audio']?.toString(),
+              // page diambil dari soal item langsung (sudah di-flatten dari groups)
+              'page': soal['page'] is num ? (soal['page'] as num).toInt() : 1,
+              'is_required': soal['is_required'],
               'answer': null,
             };
           }).toList();
+
+          // Build page groups dari rawSoal (format [{page, soal:[]}])
+          // Digunakan untuk quiz mode step-by-step
+          _pageGroups = _buildPageGroups(rawSoal, _isRandom, _isQuiz);
+          _currentPageIndex = 0;
           _isLoading = false;
         });
       } else {
@@ -146,17 +231,99 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
       if (!mounted) return;
       setState(() => _isCheckingToken = false);
       if (!check['success']) {
-        setState(() => _tokenError = check['message'] ??
-            'Token yang Anda masukkan salah. Silakan periksa kembali.');
+        final statusCode = check['statusCode'] as int? ?? 0;
+        final backendMessage = check['message'] as String? ?? '';
+        final String displayError;
+        if (statusCode >= 500) {
+          // HTTP 5xx — masalah server/database, bukan token salah.
+          // Sertakan pesan backend asli untuk membantu diagnosa.
+          // Jangan tampilkan raw stack trace — hanya message level saja.
+          final serverDetail = backendMessage.isNotEmpty
+              ? backendMessage
+              : 'HTTP $statusCode';
+          displayError =
+              'Server mengalami gangguan saat memproses token ($serverDetail). '
+              'Coba beberapa saat lagi atau hubungi penyelenggara form.';
+        } else if (statusCode == 0) {
+          // Network / timeout error.
+          displayError = backendMessage.isNotEmpty
+              ? backendMessage
+              : 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.';
+        } else {
+          // HTTP 4xx — token salah, expired, atau form private.
+          // Tampilkan pesan dari backend langsung karena sudah actionable.
+          displayError = backendMessage.isNotEmpty
+              ? backendMessage
+              : 'Token yang Anda masukkan salah. Silakan periksa kembali.';
+        }
+        setState(() => _tokenError = displayError);
         return;
+      }
+      // Ambil form_submit.start_at dari response check-token
+      // Backend: form_submit table memiliki kolom start_at (timestamp default now())
+      // Response check-token mengembalikan record form_submit: { id, user_id,
+      //   user_username, form_id, status, attemps, start_at }
+      final checkData = check['data'];
+      if (checkData is Map) {
+        final rawSubmitStartAt = checkData['start_at'];
+        if (rawSubmitStartAt != null) {
+          if (rawSubmitStartAt is num && rawSubmitStartAt > 0) {
+            _submitStartAtMillis = rawSubmitStartAt.toInt();
+          } else if (rawSubmitStartAt is String) {
+            final asInt = int.tryParse(rawSubmitStartAt);
+            if (asInt != null && asInt > 0) {
+              _submitStartAtMillis = asInt;
+            } else {
+              final parsed = DateTime.tryParse(rawSubmitStartAt);
+              _submitStartAtMillis = parsed?.millisecondsSinceEpoch;
+            }
+          }
+        }
       }
       setState(() => _tokenValidated = true);
     }
 
     setState(() => _preStartCompleted = true);
     if (_durationSeconds != null && _durationSeconds! > 0) {
-      _startTimer();
+      _initAndStartTimer();
     }
+  }
+
+  /// Hitung dan mulai timer. Hanya dipanggil sekali saat user memulai pengerjaan.
+  /// Logic (sesuai contract backend & Web FE):
+  ///   1. form.start_at tersedia → endTime = form.start_at + duration * 1000
+  ///   2. form_submit.start_at tersedia → endTime = form_submit.start_at + duration * 1000
+  ///   3. Fallback (tidak ada timestamp backend) → endTime = now + duration * 1000
+  void _initAndStartTimer() {
+    if (_timerEndMillis != null) {
+      // Timer sudah diinisialisasi sebelumnya (hindari reset saat rebuild)
+      _startTimer();
+      return;
+    }
+    final durationMs = (_durationSeconds ?? 0) * 1000;
+    if (durationMs <= 0) return;
+
+    if (_formStartAtMillis != null && _formStartAtMillis! > 0) {
+      // Prioritas 1: gunakan form.start_at dari form settings
+      _timerEndMillis = _formStartAtMillis! + durationMs;
+    } else if (_submitStartAtMillis != null && _submitStartAtMillis! > 0) {
+      // Prioritas 2: gunakan form_submit.start_at dari response check-token
+      _timerEndMillis = _submitStartAtMillis! + durationMs;
+    } else {
+      // Fallback: tidak ada timestamp backend — gunakan waktu device saat mulai
+      _timerEndMillis = DateTime.now().millisecondsSinceEpoch + durationMs;
+    }
+
+    // Hitung remaining saat ini
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final remaining = ((_timerEndMillis! - now) / 1000).ceil();
+    setState(() => _remainingSeconds = remaining.clamp(0, _durationSeconds!));
+
+    if (remaining <= 0) {
+      _handleAutoSubmit();
+      return;
+    }
+    _startTimer();
   }
 
   String _mapQuestionType(String type) {
@@ -176,6 +343,175 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
     }
   }
 
+  /// Build page groups dari raw soal response backend.
+  /// Backend format: [{page: 1, soal: [...]}, {page: 2, soal: [...]}]
+  /// Survey: semua soal dalam 1 halaman.
+  /// Quiz: step-by-step per page, page 1 = identitas (tidak diacak),
+  ///   page 2+ = soal ujian (diacak jika is_random).
+  List<Map<String, dynamic>> _buildPageGroups(
+      List rawSoal, bool isRandom, bool isQuiz) {
+    if (!isQuiz) {
+      // Survey: satu page saja dengan semua soal
+      return [
+        {
+          'page': 1,
+          'soal': List<Map<String, dynamic>>.from(
+            _questions,
+          ),
+        }
+      ];
+    }
+
+    // Quiz: gunakan page grouping dari backend
+    final Map<int, List<Map<String, dynamic>>> pageMap = {};
+    for (final pg in rawSoal) {
+      if (pg is Map && pg['soal'] is List) {
+        final pageNum = pg['page'] is num ? (pg['page'] as num).toInt() : 1;
+        final soalList = (pg['soal'] as List).map((s) {
+          // Cari di _questions berdasarkan id untuk dapat answer state
+          final id = s['id'];
+          final found = _questions.firstWhere(
+            (q) => q['id'] == id,
+            orElse: () {
+              final type = s['type']?.toString() ?? 'text';
+              return {
+                'id': id,
+                'number': 0,
+                'question': s['question']?.toString() ?? '',
+                'type': type,
+                'typeDisplay': _mapQuestionType(type),
+                'options': s['options'] ?? [],
+                'image': s['image']?.toString(),
+                'audio': s['audio']?.toString(),
+                'page': pageNum,
+                'is_required': s['is_required'],
+                'answer': null,
+              };
+            },
+          );
+          return found;
+        }).toList();
+        pageMap[pageNum] = soalList;
+      }
+    }
+
+    // Jika rawSoal bukan format groups (flat array), build dari _questions
+    if (pageMap.isEmpty) {
+      for (final q in _questions) {
+        final p = q['page'] as int? ?? 1;
+        pageMap.putIfAbsent(p, () => []).add(q);
+      }
+    }
+
+    final sortedPages = pageMap.keys.toList()..sort();
+    final groups = sortedPages.map((p) {
+      var soal = pageMap[p]!;
+      // Shuffle soal di page 2+ jika is_random (page 1 = identitas, tidak diacak)
+      if (isRandom && p > 1) {
+        soal = List<Map<String, dynamic>>.from(soal)..shuffle();
+      }
+      return {'page': p, 'soal': soal};
+    }).toList();
+
+    return groups.isEmpty
+        ? [
+            {'page': 1, 'soal': List<Map<String, dynamic>>.from(_questions)}
+          ]
+        : groups;
+  }
+
+  /// Ambil semua soal dari page groups (flattened) — untuk keperluan submit
+  List<Map<String, dynamic>> get _allSoal {
+    if (_pageGroups.isEmpty) return _questions;
+    return _pageGroups
+        .expand<Map<String, dynamic>>((pg) =>
+            (pg['soal'] as List? ?? []).cast<Map<String, dynamic>>())
+        .toList();
+  }
+
+  /// Soal di page aktif (untuk quiz step-by-step)
+  List<Map<String, dynamic>> get _currentPageSoal {
+    if (_pageGroups.isEmpty) return _questions;
+    if (_currentPageIndex >= _pageGroups.length) return [];
+    return (_pageGroups[_currentPageIndex]['soal'] as List? ?? [])
+        .cast<Map<String, dynamic>>();
+  }
+
+  bool _hasAnswered(Map<String, dynamic> q) {
+    final type = q['type'] as String? ?? '';
+    final answer = q['answer'];
+    if (type == 'file') return answer != null;
+    if (type == 'checkbox') return answer is List && answer.isNotEmpty;
+    return answer != null && answer.toString().isNotEmpty;
+  }
+
+  /// Wajib diisi jika is_required == true.
+  /// is_required null (legacy soal, backend belum mengembalikan field ini)
+  ///   tetap dianggap wajib untuk menjaga perilaku lama (semua soal wajib).
+  /// is_required explicit false → opsional.
+  bool _isRequiredSoal(Map<String, dynamic> q) {
+    final raw = q['is_required'];
+    if (raw == null) return true;
+    if (raw is bool) return raw;
+    if (raw is num) return raw != 0;
+    final s = raw.toString().toLowerCase();
+    return s == 'true' || s == '1';
+  }
+
+  int get _answeredCount =>
+      _allSoal.where(_hasAnswered).length;
+
+  double get _progressValue {
+    final total = _allSoal.length;
+    if (total == 0) return 0;
+    return _answeredCount / total;
+  }
+
+  /// Validasi halaman saat ini sebelum lanjut ke halaman berikutnya.
+  /// Hanya soal wajib diisi (is_required true, atau null untuk legacy) yang
+  /// dicek belum dijawab; soal opsional (explicit false) boleh dilewati.
+  bool _validateCurrentPage() {
+    for (final q in _currentPageSoal) {
+      if (!_isRequiredSoal(q)) continue;
+      if (!_hasAnswered(q)) {
+        final qText = stripHtmlTags(q['question']?.toString() ?? '');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+            '"${qText.isEmpty ? 'Soal ini' : (qText.length > 40 ? '${qText.substring(0, 40)}...' : qText)}" '
+            'belum dijawab.',
+          ),
+          backgroundColor: AppColors.error,
+          duration: const Duration(seconds: 2),
+        ));
+        return false;
+      }
+    }
+    return true;
+  }
+
+  void _goToNextPage() {
+    if (!_validateCurrentPage()) return;
+    if (_currentPageIndex < _pageGroups.length - 1) {
+      setState(() => _currentPageIndex++);
+    }
+  }
+
+  void _goToPreviousPage() {
+    if (_currentPageIndex > 0) {
+      setState(() => _currentPageIndex--);
+    }
+  }
+
+  void _toggleDoubt(int soalId) {
+    setState(() {
+      if (_doubtfulIds.contains(soalId)) {
+        _doubtfulIds.remove(soalId);
+      } else {
+        _doubtfulIds.add(soalId);
+      }
+    });
+  }
+
   void _startTimer() {
     _countdownTimer?.cancel();
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -183,7 +519,12 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
         timer.cancel();
         return;
       }
-      final remaining = (_remainingSeconds ?? 0) - 1;
+      // Hitung sisa waktu berdasarkan endTimestamp absolut (bukan decrement)
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final remaining = _timerEndMillis != null
+          ? ((_timerEndMillis! - now) / 1000).ceil()
+          : ((_remainingSeconds ?? 0) - 1);
+
       if (remaining <= 0) {
         timer.cancel();
         setState(() => _remainingSeconds = 0);
@@ -304,7 +645,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
       final List<Map<String, dynamic>> answers = [];
       final List<({Uint8List bytes, String filename})> uploadFiles = [];
 
-      for (final question in _questions) {
+      for (final question in _allSoal) {
         final soalId = question['id'];
         final type = question['type'];
         final answer = question['answer'];
@@ -448,11 +789,28 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
     if (check['success']) {
       setState(() => _tokenValidated = true);
     } else {
+      final statusCode = check['statusCode'] as int? ?? 0;
+      final backendMessage = check['message'] as String? ?? '';
+      final String displayMsg;
+      if (statusCode >= 500) {
+        displayMsg =
+            'Server mengalami gangguan. Coba beberapa saat lagi.';
+      } else if (statusCode == 0) {
+        displayMsg = backendMessage.isNotEmpty
+            ? backendMessage
+            : 'Tidak dapat terhubung ke server.';
+      } else {
+        displayMsg = backendMessage.isNotEmpty ? backendMessage : 'Token salah.';
+      }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(check['message'] ?? 'Token salah'),
+        content: Text(displayMsg),
         backgroundColor: AppColors.error,
       ));
-      _promptToken();
+      // Hanya ulangi dialog untuk error 4xx (token salah).
+      // Error 5xx/network: biarkan user memutuskan sendiri untuk mencoba lagi.
+      if (statusCode > 0 && statusCode < 500) {
+        _promptToken();
+      }
     }
   }
 
@@ -473,15 +831,32 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
       return;
     }
 
-    bool hasUnanswered = _questions.any((q) {
-      final type = q['type'];
-      if (type == 'file') return false;
-      return q['answer'] == null;
-    });
+    // Cek soal yang ragu-ragu
+    if (_doubtfulIds.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+          'Ada ${_doubtfulIds.length} soal yang ditandai ragu-ragu. '
+          'Periksa kembali sebelum submit.',
+        ),
+        backgroundColor: AppColors.warning,
+        duration: const Duration(seconds: 3),
+      ));
+      return;
+    }
 
-    if (hasUnanswered) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Please answer all questions before submitting'),
+    // Validasi soal wajib diisi (is_required true / null legacy); soal
+    // opsional (explicit false) boleh dilewati
+    final unanswered = _allSoal.where((q) {
+      return _isRequiredSoal(q) && !_hasAnswered(q);
+    }).toList();
+
+    if (unanswered.isNotEmpty) {
+      final qText = stripHtmlTags(unanswered.first['question']?.toString() ?? '');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+          '"${qText.isEmpty ? 'Beberapa soal' : (qText.length > 40 ? '${qText.substring(0, 40)}...' : qText)}" '
+          'belum dijawab.',
+        ),
         backgroundColor: AppColors.error,
       ));
       return;
@@ -493,7 +868,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
       final List<Map<String, dynamic>> answers = [];
       final List<({Uint8List bytes, String filename})> uploadFiles = [];
 
-      for (final question in _questions) {
+      for (final question in _allSoal) {
         final soalId = question['id'];
         final type = question['type'];
         final answer = question['answer'];
@@ -554,6 +929,12 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
 
       if (result['success'] && mounted) {
         setState(() => _isSubmitted = true);
+        // Simpan ke riwayat lokal (SharedPreferences) sesuai Web FE behavior
+        await saveHistoryEntry(
+          formSlug: widget.slug,
+          formTitle: _formTitle,
+          category: _category,
+        );
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Form submitted successfully!'),
           backgroundColor: AppColors.success,
@@ -741,6 +1122,9 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: _tokenController,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      textCapitalization: TextCapitalization.characters,
                       decoration: InputDecoration(
                         labelText: 'Token Responden',
                         hintText: 'Masukkan token yang diberikan',
@@ -872,122 +1256,290 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
           ),
         ),
       ],
-      body: _buildContent(),
+      body: _isQuiz ? _buildQuizContent() : _buildSurveyContent(),
     );
   }
 
-  Widget _buildContent() {
-    return Column(
-      children: [
-        Container(
-          width: double.infinity,
-          color: Colors.white,
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  // ── Progress bar ──────────────────────────────────────────────────────────
+  Widget _buildProgressBar() {
+    final total = _allSoal.length;
+    final answered = _answeredCount;
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(_formTitle,
-                  style: const TextStyle(
-                      fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8)),
-                    child: Text(_category,
-                        style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w600)),
-                  ),
-                  const SizedBox(width: 12),
-                  Text('${_questions.length} Questions',
-                      style: const TextStyle(fontSize: 14, color: AppColors.textSecondary)),
-                ],
+              Text(
+                '$answered/$total dijawab',
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary),
+              ),
+              Text(
+                '${(_progressValue * 100).round()}%',
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 16),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: _progressValue,
+              minHeight: 6,
+              backgroundColor: AppColors.primary.withOpacity(0.1),
+              valueColor:
+                  const AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Survey mode: semua soal tampil sekaligus, scroll ─────────────────────
+  Widget _buildSurveyContent() {
+    return Column(
+      children: [
+        _buildProgressBar(),
         Expanded(
           child: _questions.isEmpty
               ? _buildEmptyState()
               : ListView.builder(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
                   itemCount: _questions.length,
-                  itemBuilder: (context, index) => Padding(
+                  itemBuilder: (ctx, i) => Padding(
                     padding: const EdgeInsets.only(bottom: 16),
-                    child: _buildQuestionCard(_questions[index], index),
+                    child: _buildQuestionCard(_questions[i], i,
+                        globalIndex: i),
                   ),
                 ),
         ),
-        if (_questions.isNotEmpty)
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, -4))
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (_tokenNeeded && !_tokenValidated)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: InkWell(
-                      onTap: _promptToken,
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                            color: AppColors.info.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8)),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.key, size: 18, color: AppColors.info),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                  'Form ini memerlukan token responden. Ketuk untuk memasukkan token.',
-                                  style: TextStyle(fontSize: 12, color: AppColors.info)),
-                            ),
-                          ],
-                        ),
+        _buildSubmitBar(),
+      ],
+    );
+  }
+
+  // ── Quiz mode: navigasi per halaman ──────────────────────────────────────
+  Widget _buildQuizContent() {
+    if (_pageGroups.isEmpty) return _buildSurveyContent();
+
+    final totalPages = _pageGroups.length;
+    final currentSoal = _currentPageSoal;
+    final isLastPage = _currentPageIndex == totalPages - 1;
+
+    return Column(
+      children: [
+        // Progress header
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Halaman ${_currentPageIndex + 1} dari $totalPages',
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary),
+                  ),
+                  Text(
+                    '${_answeredCount}/${_allSoal.length} dijawab',
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: ((_currentPageIndex + 1) / totalPages),
+                  minHeight: 6,
+                  backgroundColor: AppColors.primary.withOpacity(0.1),
+                  valueColor:
+                      const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Soal list untuk halaman ini
+        Expanded(
+          child: currentSoal.isEmpty
+              ? _buildEmptyState()
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                  itemCount: currentSoal.length,
+                  itemBuilder: (ctx, i) {
+                    final q = currentSoal[i];
+                    // Cari global index di _questions untuk update answer
+                    final globalIdx = _questions
+                        .indexWhere((gq) => gq['id'] == q['id']);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _buildQuestionCard(
+                        q,
+                        globalIdx >= 0 ? globalIdx : i,
+                        globalIndex: globalIdx >= 0 ? globalIdx : i,
                       ),
+                    );
+                  },
+                ),
+        ),
+
+        // Nav bar
+        Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, -4)),
+            ],
+          ),
+          child: Row(
+            children: [
+              if (_currentPageIndex > 0)
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _goToPreviousPage,
+                    icon: const Icon(Icons.arrow_back, size: 16),
+                    label: const Text('Kembali'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                     ),
                   ),
-                ElevatedButton(
-                  onPressed: _isSubmitting ? null : _handleSubmit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    elevation: 0,
-                  ),
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white)))
-                      : const Text('Submit Form',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
+                )
+              else
+                const Expanded(child: SizedBox.shrink()),
+              const SizedBox(width: 12),
+              Expanded(
+                child: isLastPage
+                    ? ElevatedButton.icon(
+                        onPressed: _isSubmitting ? null : _handleSubmit,
+                        icon: _isSubmitting
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white))
+                            : const Icon(Icons.send, size: 16),
+                        label: Text(
+                            _isSubmitting ? 'Mengirim...' : 'Submit'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ),
+                      )
+                    : ElevatedButton.icon(
+                        onPressed: _goToNextPage,
+                        icon: const Icon(Icons.arrow_forward, size: 16),
+                        label: const Text('Lanjut'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+              ),
+            ],
           ),
+        ),
       ],
+    );
+  }
+
+  Widget _buildSubmitBar() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -4))
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_doubtfulIds.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border:
+                      Border.all(color: AppColors.warning.withOpacity(0.4)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.help_outline,
+                        size: 16, color: AppColors.warning),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${_doubtfulIds.length} soal ditandai ragu-ragu',
+                      style: const TextStyle(
+                          fontSize: 12, color: AppColors.warning),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ElevatedButton(
+            onPressed: _isSubmitting ? null : _handleSubmit,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+            ),
+            child: _isSubmitting
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Colors.white)))
+                : const Text('Submit Form',
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1009,15 +1561,22 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
     );
   }
 
-  Widget _buildQuestionCard(Map<String, dynamic> question, int index) {
+  Widget _buildQuestionCard(Map<String, dynamic> question, int index, {int? globalIndex}) {
     final options = question['options'] as List? ?? [];
     final type = question['type'] as String;
+    final soalId = question['id'];
+    final isDoubtful = soalId != null && _doubtfulIds.contains(soalId);
+    // Gunakan globalIndex untuk update state jika tersedia
+    final updateIndex = globalIndex ?? index;
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        border: isDoubtful
+            ? Border.all(color: AppColors.warning, width: 1.5)
+            : null,
         boxShadow: [
           BoxShadow(
               color: Colors.black.withOpacity(0.05),
@@ -1048,10 +1607,64 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
                     style: const TextStyle(
                         fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
               ),
+              if (_isRequiredSoal(question))
+                const Padding(
+                  padding: EdgeInsets.only(left: 6),
+                  child: Text(
+                    '*',
+                    style: TextStyle(
+                      color: AppColors.error,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              const Spacer(),
+              // Tombol ragu-ragu
+              if (soalId != null)
+                GestureDetector(
+                  onTap: () => _toggleDoubt(soalId as int),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isDoubtful
+                          ? AppColors.warning.withOpacity(0.15)
+                          : AppColors.background,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: isDoubtful
+                            ? AppColors.warning
+                            : AppColors.inputBorder,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isDoubtful ? Icons.help : Icons.help_outline,
+                          size: 14,
+                          color: isDoubtful
+                              ? AppColors.warning
+                              : AppColors.textHint,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Ragu',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDoubtful
+                                ? AppColors.warning
+                                : AppColors.textHint,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 16),
-          // ── Render question text (Delta JSON or plain/HTML) ──
           QuillRichText(
             content: question['question'] as String? ?? '',
             baseStyle: const TextStyle(
@@ -1071,15 +1684,15 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
             ),
           const SizedBox(height: 20),
           if (type == 'radio' && options.isNotEmpty)
-            _buildRadioOptions(question, options, index)
+            _buildRadioOptions(question, options, updateIndex)
           else if (type == 'checkbox' && options.isNotEmpty)
-            _buildCheckboxOptions(question, options, index)
+            _buildCheckboxOptions(question, options, updateIndex)
           else if (type == 'text')
-            _buildTextInput(question, index)
+            _buildTextInput(question, updateIndex)
           else if (type == 'file')
-            _buildFileUpload(question, index)
+            _buildFileUpload(question, updateIndex)
           else if (type == 'rating')
-            _buildRatingInput(question, index),
+            _buildRatingInput(question, updateIndex),
         ],
       ),
     );
@@ -1110,11 +1723,13 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
                     size: 20),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(optionValue,
-                      style: TextStyle(
-                          fontSize: 14,
-                          color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal)),
+                  child: QuillRichText(
+                    content: optionValue.toString(),
+                    baseStyle: TextStyle(
+                        fontSize: 14,
+                        color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal),
+                  ),
                 ),
               ],
             ),
@@ -1161,11 +1776,13 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
                     color: isSelected ? AppColors.primary : AppColors.textSecondary, size: 20),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(optionValue,
-                      style: TextStyle(
-                          fontSize: 14,
-                          color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal)),
+                  child: QuillRichText(
+                    content: optionValue.toString(),
+                    baseStyle: TextStyle(
+                        fontSize: 14,
+                        color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal),
+                  ),
                 ),
               ],
             ),

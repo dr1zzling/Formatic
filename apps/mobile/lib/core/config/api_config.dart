@@ -4,13 +4,13 @@ class ApiConfig {
   // Base URLs:
   // Web browser -> localhost
   // Android physical device -> IP WiFi komputer
-  static String get userApiBaseUrl => kIsWeb
-      ? 'http://localhost:3000'
-      : 'http://10.10.18.201:3000';
+ static String get userApiBaseUrl => kIsWeb
+    ? 'http://localhost:3000'
+    : 'http://10.10.18.254:3000';
 
-  static String get formApiBaseUrl => kIsWeb
-      ? 'http://localhost:3002'
-      : 'http://10.10.18.201:3002';
+static String get formApiBaseUrl => kIsWeb
+    ? 'http://localhost:3002'
+    : 'http://10.10.18.254:3002';
 
   // User API Endpoints
   static const String loginEndpoint = '/user/login';
@@ -31,10 +31,14 @@ class ApiConfig {
   static const String submitCheckTokenEndpoint = '/form/submit/check-token';
   static const String soalImportEndpoint = '/form/soal/import';
   static const String categoryEndpoint = '/form/category';
+  static const String primaryCategoriesEndpoint = '/kategori/primary';
+  static const String subCategoriesEndpoint = '/kategori/sub';
   static const String shareEndpoint = '/form/share';
   static const String qrCodeJsonEndpoint = '/qrcode/json';
   static const String qrCodeImageEndpoint = '/qrcode/image';
   static const String submitExportExcelEndpoint = '/form/submit/export-excel';
+  static const String monitoringEndpoint = '/form/monitoring';
+  static const String monitoringResetEndpoint = '/form/monitoring/reset';
 
   // Request timeout
   static const Duration timeout = Duration(seconds: 30);

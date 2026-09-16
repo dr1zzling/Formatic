@@ -1,6 +1,42 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_colors.dart';
-import '../widgets/history_card.dart';
+import '../../forms/screens/form_viewer_screen.dart';
+
+/// History Screen — stores and displays form submission history locally
+/// (SharedPreferences), matching Web FE behavior (localStorage).
+/// No backend endpoint exists for per-user history.
+/// Simpan entry riwayat ke SharedPreferences setelah form disubmit.
+/// Dipanggil dari FormViewerScreen.
+Future<void> saveHistoryEntry({
+  required String formSlug,
+  required String formTitle,
+  String? category,
+}) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('formatic_history');
+    List<Map<String, dynamic>> list = [];
+    if (raw != null) {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        list = decoded
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      }
+    }
+    list.insert(0, {
+      'slug': formSlug,
+      'title': formTitle,
+      'category': category ?? '',
+      'submittedAt': DateTime.now().toIso8601String(),
+    });
+    if (list.length > 50) list = list.sublist(0, 50);
+    await prefs.setString('formatic_history', jsonEncode(list));
+  } catch (_) {}
+}
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -10,8 +46,12 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  List<Map<String, dynamic>> _historyItems = [];
+  static const _storageKey = 'formatic_history';
+  static const _maxEntries = 50;
+
+  List<Map<String, dynamic>> _items = [];
   bool _isLoading = true;
+  String _search = '';
 
   @override
   void initState() {
@@ -20,67 +60,189 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Future<void> _loadHistory() async {
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_storageKey);
+      if (raw != null) {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          setState(() {
+            _items = decoded
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList();
+          });
+        }
+      }
+    } catch (_) {}
+    setState(() => _isLoading = false);
+  }
 
-    await Future.delayed(const Duration(milliseconds: 500));
+  Future<void> _removeEntry(int index) async {
+    final updated = List<Map<String, dynamic>>.from(_items)..removeAt(index);
+    setState(() => _items = updated);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_storageKey, jsonEncode(updated));
+    } catch (_) {}
+  }
 
-    setState(() {
-      _historyItems = [];
-      _isLoading = false;
-    });
+  List<Map<String, dynamic>> get _filtered {
+    if (_search.isEmpty) return _items;
+    final q = _search.toLowerCase();
+    return _items
+        .where((e) => (e['title'] as String? ?? '').toLowerCase().contains(q))
+        .toList();
+  }
+
+  String _relativeTime(String? iso) {
+    if (iso == null) return '';
+    final dt = DateTime.tryParse(iso);
+    if (dt == null) return '';
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'Baru saja';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} menit lalu';
+    if (diff.inHours < 24) return '${diff.inHours} jam lalu';
+    if (diff.inDays < 30) return '${diff.inDays} hari lalu';
+    return '${(diff.inDays / 30).floor()} bulan lalu';
   }
 
   @override
   Widget build(BuildContext context) {
+    final filtered = _filtered;
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
+            // Header
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
               child: Row(
                 children: [
                   const Text(
-                    'History',
+                    'Riwayat',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
-                      fontFamily: 'Plus Jakarta Sans',
                     ),
                   ),
                   const Spacer(),
-                  IconButton(
-                    onPressed: _showInfoDialog,
-                    icon: Icon(Icons.info_outline, color: AppColors.blueButton),
-                  ),
+                  if (_items.isNotEmpty)
+                    TextButton(
+                      onPressed: () async {
+                        final ok = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16)),
+                            title: const Text('Hapus Semua Riwayat'),
+                            content: const Text(
+                                'Seluruh riwayat pengisian form akan dihapus. Lanjutkan?'),
+                            actions: [
+                              TextButton(
+                                  onPressed: () =>
+                                      Navigator.of(ctx).pop(false),
+                                  child: const Text('Batal')),
+                              TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(true),
+                                style: TextButton.styleFrom(
+                                    foregroundColor: AppColors.error),
+                                child: const Text('Hapus'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (ok == true && mounted) {
+                          setState(() => _items = []);
+                          final prefs =
+                              await SharedPreferences.getInstance();
+                          await prefs.remove(_storageKey);
+                        }
+                      },
+                      child: const Text(
+                        'Hapus semua',
+                        style: TextStyle(
+                            color: AppColors.error, fontSize: 13),
+                      ),
+                    ),
                 ],
               ),
             ),
+
+            // Search
+            if (_items.isNotEmpty)
+              Padding(
+                padding:
+                    const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                child: TextField(
+                  onChanged: (v) => setState(() => _search = v),
+                  style: const TextStyle(fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Cari riwayat...',
+                    prefixIcon: const Icon(Icons.search,
+                        size: 18, color: AppColors.textHint),
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding:
+                        const EdgeInsets.symmetric(vertical: 0),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide:
+                          const BorderSide(color: AppColors.inputBorder),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide:
+                          const BorderSide(color: AppColors.inputBorder),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                          color: AppColors.primary, width: 1.5),
+                    ),
+                  ),
+                ),
+              ),
+
             const SizedBox(height: 16),
+
+            // List
             Expanded(
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: AppColors.blueAccent))
-                  : _historyItems.isEmpty
-                      ? _buildEmptyState(context)
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                          color: AppColors.primary))
+                  : filtered.isEmpty
+                      ? _buildEmpty()
                       : RefreshIndicator(
                           onRefresh: _loadHistory,
-                          child: ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            itemCount: _historyItems.length,
-                            itemBuilder: (context, index) {
-                              final item = _historyItems[index];
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: HistoryCard(
-                                  title: item['title'],
-                                  date: item['date'],
-                                  type: item['type'],
-                                  responses: item['responses'],
+                          color: AppColors.primary,
+                          child: ListView.separated(
+                            padding:
+                                const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                            itemCount: filtered.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 10),
+                            itemBuilder: (ctx, i) {
+                              final item = filtered[i];
+                              final realIndex = _items
+                                  .indexWhere((e) =>
+                                      e['submittedAt'] ==
+                                      item['submittedAt']);
+                              return _HistoryItem(
+                                item: item,
+                                relativeTime: _relativeTime(
+                                    item['submittedAt'] as String?),
+                                onTap: () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => FormViewerScreen(
+                                        slug: item['slug'] as String),
+                                  ),
                                 ),
+                                onDelete: () => _removeEntry(realIndex),
                               );
                             },
                           ),
@@ -92,38 +254,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  void _showInfoDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.info_outline, color: AppColors.blueAccent),
-            SizedBox(width: 12),
-            Text('History Feature'),
-          ],
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        content: const Text(
-          'Riwayat pengisian form per pengguna belum tersedia karena backend tidak '
-          'menyediakan endpoint pengambilan riwayat by-user.\n\n'
-          'Endpoint yang tersedia saat ini:\n'
-          '• GET /form/submit?form_slug= (kurasi hasil per form)\n'
-          '• GET /form/submit/detail?form_slug= (detail jawaban, khusus pemilik)\n\n'
-          'Anda dapat melihat respons per form dari tab My Forms (lihat detail form).\n'
-          'Status: blocker backend — bukan dapat diperbaiki dari sisi aplikasi.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('Got it', style: TextStyle(color: AppColors.blueAccent)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(BuildContext context) {
+  Widget _buildEmpty() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(40),
@@ -131,48 +262,148 @@ class _HistoryScreenState extends State<HistoryScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 120,
-              height: 120,
+              width: 80,
+              height: 80,
               decoration: BoxDecoration(
-                color: AppColors.blueAccent.withOpacity(0.1),
+                color: AppColors.primary.withOpacity(0.08),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                Icons.history,
-                size: 60,
-                color: AppColors.blueAccent,
-              ),
+              child: const Icon(Icons.history,
+                  size: 40, color: AppColors.primary),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             const Text(
-              'No History Yet',
+              'Belum ada riwayat',
               style: TextStyle(
-                fontSize: 24,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textPrimary,
-                fontFamily: 'Plus Jakarta Sans',
               ),
             ),
-            const SizedBox(height: 12),
-            Text(
-              'Your form submission history will\nappear here once backend endpoints\nare available',
-              style: TextStyle(
-                fontSize: 15,
-                color: AppColors.textSecondary,
-                fontFamily: 'Plus Jakarta Sans',
-              ),
+            const SizedBox(height: 8),
+            const Text(
+              'Riwayat pengisian form akan muncul\ndi sini setelah kamu submit form.',
               textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 14, color: AppColors.textSecondary),
             ),
-            const SizedBox(height: 24),
-            OutlinedButton.icon(
-              onPressed: _showInfoDialog,
-              icon: const Icon(Icons.info_outline),
-              label: const Text('Learn More'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.blueAccent,
-                side: const BorderSide(color: AppColors.blueAccent),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HistoryItem extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final String relativeTime;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  const _HistoryItem({
+    required this.item,
+    required this.relativeTime,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final category = item['category'] as String? ?? '';
+    final isQuiz = category.toLowerCase().contains('ujian') ||
+        category.toLowerCase().contains('quiz');
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: isQuiz
+                    ? AppColors.primary.withOpacity(0.1)
+                    : AppColors.success.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(11),
               ),
+              child: Icon(
+                isQuiz ? Icons.quiz_outlined : Icons.poll_outlined,
+                size: 22,
+                color: isQuiz ? AppColors.primary : AppColors.success,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item['title'] as String? ?? 'Form',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      if (category.isNotEmpty) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            category,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      const Icon(Icons.check_circle_outline,
+                          size: 12, color: AppColors.success),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Selesai · $relativeTime',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              onPressed: onDelete,
+              icon: const Icon(Icons.close,
+                  size: 18, color: AppColors.textHint),
+              padding: EdgeInsets.zero,
+              constraints:
+                  const BoxConstraints(minWidth: 32, minHeight: 32),
             ),
           ],
         ),

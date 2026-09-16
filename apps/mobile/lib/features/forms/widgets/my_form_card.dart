@@ -9,6 +9,7 @@ class MyFormCard extends StatelessWidget {
   final String? visibility;
   final String? lastUpdated;
   final VoidCallback onTap;
+  final VoidCallback? onDelete;
 
   const MyFormCard({
     super.key,
@@ -19,6 +20,7 @@ class MyFormCard extends StatelessWidget {
     this.visibility,
     this.lastUpdated,
     required this.onTap,
+    this.onDelete,
   });
 
   @override
@@ -65,7 +67,20 @@ class MyFormCard extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                Icon(
+                if (onDelete != null)
+                  GestureDetector(
+                    onTap: onDelete,
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(
+                        Icons.delete_outline,
+                        color: AppColors.error.withOpacity(0.7),
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 4),
+                const Icon(
                   Icons.more_vert,
                   color: AppColors.textHint,
                   size: 20,

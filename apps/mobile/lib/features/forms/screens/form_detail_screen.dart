@@ -3,6 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/services/form_service.dart';
 import 'add_question_screen.dart';
 import 'qr_code_screen.dart';
+import 'form_viewer_screen.dart';
 import '../../../core/utils/html_utils.dart';
 
 class FormDetailScreen extends StatefulWidget {
@@ -599,9 +600,11 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        option['value'] ?? option['option_value'] ?? '',
-                        style: TextStyle(
+                      child: QuillRichText(
+                        content:
+                            (option['value'] ?? option['option_value'] ?? '')
+                                .toString(),
+                        baseStyle: const TextStyle(
                           fontSize: 14,
                           color: AppColors.textPrimary,
                         ),

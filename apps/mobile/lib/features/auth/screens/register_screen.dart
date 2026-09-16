@@ -277,8 +277,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             if (value == null || value.isEmpty) {
                               return 'Please enter a password';
                             }
-                            if (value.length < 6) {
-                              return 'Password must be at least 6 characters';
+                            if (value.length < 8) {
+                              return 'Password minimal 8 karakter';
+                            }
+                            if (!value.contains(RegExp(r'[A-Z]'))) {
+                              return 'Password harus mengandung 1 huruf kapital';
+                            }
+                            if (!value.contains(RegExp(r'[a-z]'))) {
+                              return 'Password harus mengandung 1 huruf kecil';
+                            }
+                            if (!value.contains(RegExp(r'[0-9]'))) {
+                              return 'Password harus mengandung 1 angka';
                             }
                             return null;
                           },

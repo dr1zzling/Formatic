@@ -10,11 +10,16 @@ import '../../../core/services/form_service.dart';
 class ImportWordScreen extends StatefulWidget {
   final String formSlug;
   final String formTitle;
+  /// Halaman yang sedang aktif di Questions Tab saat tombol Import Word ditekan.
+  /// Semua soal hasil import akan di-assign ke page ini.
+  /// Default 1 bila tidak diteruskan (backward-compat).
+  final int targetPage;
 
   const ImportWordScreen({
     super.key,
     required this.formSlug,
     required this.formTitle,
+    this.targetPage = 1,
   });
 
   @override
@@ -130,24 +135,89 @@ class _ImportWordScreenState extends State<ImportWordScreen> {
 
     if (!mounted) return;
 
-    setState(() {
-      _isLoading = false;
-    });
-
     if (result['success']) {
       final data = result['data'] is Map ? result['data']['data'] : null;
       final listSoal = data is Map && data['list_soal'] is List
           ? data['list_soal'] as List
           : <dynamic>[];
       final count = listSoal.length;
+
+      // ── Reassign page: backend selalu menetapkan page berurutan mulai
+      // dari 2 (atau 1 bila tidak ada soal identitas). Kita PATCH semua
+      // soal yang baru diimport ke targetPage yang dipilih pengguna.
+      // Ini menggunakan PATCH /form/soal/:id dengan payload minimal
+      // {soal: {question, type, page}, options: [...]}.
+      if (widget.targetPage > 0 && listSoal.isNotEmpty) {
+        await _reassignPageForImportedSoal(listSoal, widget.targetPage);
+      }
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
       await _showSuccessDialog(count);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } else {
       setState(() {
+        _isLoading = false;
         _errorMessage =
             result['message'] ?? 'Gagal mengimpor soal. ${_formatTemplateHint()}';
       });
+    }
+  }
+
+  /// PATCH setiap soal yang baru diimport ke [targetPage].
+  /// Response backend dari importDocx: list_soal berupa array item dengan
+  /// dua format yang mungkin:
+  ///   Format A: { soal: { id, question, type, page, score, ... }, options: [...] }
+  ///   Format B: { id, question, type, page, ... } (flat, bila createSoalAndOption return flat)
+  /// Method ini menangani keduanya.
+  Future<void> _reassignPageForImportedSoal(List<dynamic> listSoal, int targetPage) async {
+    for (final item in listSoal) {
+      if (item is! Map) continue;
+
+      // Ekstrak soal object dan options dari dua kemungkinan format
+      final Map<String, dynamic> soalMap;
+      final List<dynamic> optionsList;
+
+      if (item['soal'] is Map) {
+        // Format A: { soal: {...}, options: [...] }
+        soalMap = Map<String, dynamic>.from(item['soal'] as Map);
+        optionsList = item['options'] is List ? item['options'] as List : [];
+      } else {
+        // Format B: flat — item sendiri adalah soal
+        soalMap = Map<String, dynamic>.from(item);
+        optionsList = item['options'] is List ? item['options'] as List : [];
+      }
+
+      // Sudah di target page — skip (tidak perlu PATCH)
+      final currentPage = soalMap['page'];
+      final currentPageInt = currentPage is num ? currentPage.toInt() : 1;
+      if (currentPageInt == targetPage) continue;
+
+      final soalId = soalMap['id'];
+      if (soalId == null) continue;
+      final id = soalId is num ? soalId.toInt() : int.tryParse(soalId.toString());
+      if (id == null) continue;
+
+      // Bangun payload PATCH minimal sesuai backend contract:
+      // { soal: { question, type, page, score }, options: [{ id, value, is_correct }] }
+      final payload = <String, dynamic>{
+        'soal': {
+          'question': soalMap['question'] ?? '',
+          'type': soalMap['type'] ?? 'text',
+          'page': targetPage,
+          'score': soalMap['score'],
+        },
+        'options': optionsList.whereType<Map>().map((o) => {
+          if (o['id'] != null) 'id': o['id'],
+          'value': o['value'] ?? o['option_value'] ?? '',
+          'is_correct': o['is_correct'] ?? false,
+        }).toList(),
+      };
+
+      // Fire-and-forget per soal; jika satu gagal, lanjut ke berikutnya.
+      await FormService.updateQuestion(soalId: id, payload: payload);
     }
   }
 

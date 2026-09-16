@@ -4,15 +4,17 @@ import '../../../core/services/storage_service.dart';
 import '../../../core/services/form_service.dart';
 import '../widgets/my_form_card.dart';
 import 'form_editor_screen.dart';
+import '../../trash/screens/trash_screen.dart';
+import '../../collaborate/screens/collaborate_screen.dart';
 
 class MyFormsScreen extends StatefulWidget {
   const MyFormsScreen({super.key});
 
   @override
-  State<MyFormsScreen> createState() => _MyFormsScreenState();
+  State<MyFormsScreen> createState() => MyFormsScreenState();
 }
 
-class _MyFormsScreenState extends State<MyFormsScreen>
+class MyFormsScreenState extends State<MyFormsScreen>
     with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
@@ -45,6 +47,12 @@ class _MyFormsScreenState extends State<MyFormsScreen>
     }
   }
 
+  /// Muat ulang daftar form milik user (dipanggil dari luar untuk
+  /// merefresh saat tab My Forms dibuka atau setelah membuat form baru).
+  void reload() {
+    _loadForms();
+  }
+
   Future<void> _loadForms() async {
     setState(() => _isLoading = true);
 
@@ -69,22 +77,34 @@ class _MyFormsScreenState extends State<MyFormsScreen>
       }
 
       setState(() {
-        _myForms = forms
-            .map(
-              (form) => {
-                'id': (form['form_id'] ?? form['id'] ?? '').toString(),
-                'title': form['form_title'] ?? form['title'] ?? 'Untitled Form',
-                'slug': form['form_slug'] ?? form['slug'] ?? '',
-                'questions': 0,
-                'responses': 0,
-                'role': (form['access_type'] ?? 'CREATOR')
-                    .toString()
-                    .toUpperCase(),
-                'visibility': form['form_status'] ?? form['status'] ?? 'private',
-                'category': form['category'] ?? '',
-              },
-            )
-            .toList();
+        _myForms = forms.map((form) {
+          final kategori =
+              form is Map ? form['kategori'] : null;
+          final setting =
+              form is Map ? form['setting'] : null;
+          return {
+            'id': (form['form_id'] ?? form['id'] ?? '').toString(),
+            'title': form['form_title'] ?? form['title'] ?? 'Untitled Form',
+            'slug': form['form_slug'] ?? form['slug'] ?? '',
+            'questions': 0,
+            'responses': 0,
+            'role': (form['access_type'] ?? 'CREATOR')
+                .toString()
+                .toUpperCase(),
+            // Backend menaruh status di form.setting.status (bukan top-level)
+            'visibility': setting is Map
+                ? ((setting['status'] ?? 'private')).toString()
+                : ((form['form_status'] ?? form['status'] ?? 'private'))
+                    .toString(),
+            // Backend menaruh kategori di form.kategori.{primary_kategori,sub_kategori}
+            'category': kategori is Map
+                ? ((kategori['primary_kategori'] ??
+                        kategori['sub_kategori'] ??
+                        '')
+                    .toString())
+                : (form['category'] ?? '').toString(),
+          };
+        }).toList();
         _applyFilters();
         _isLoading = false;
       });
@@ -165,6 +185,190 @@ class _MyFormsScreenState extends State<MyFormsScreen>
     });
   }
 
+  /// Parse collaboration link format: .../form/{slug}/collaborate?token={token_collab}
+  /// atau slug dan token manual
+  void _showJoinCollaborateDialog() {
+    final linkController = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Join Kolaborasi',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Tempelkan link undangan yang diberikan pemilik form:',
+              style:
+                  TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: linkController,
+              style: const TextStyle(fontSize: 14),
+              decoration: InputDecoration(
+                hintText:
+                    '.../form/{slug}/collaborate?token=...',
+                hintStyle:
+                    const TextStyle(color: AppColors.textHint, fontSize: 13),
+                filled: true,
+                fillColor: AppColors.background,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      const BorderSide(color: AppColors.inputBorder),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      const BorderSide(color: AppColors.inputBorder),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                      color: AppColors.primary, width: 1.5),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  final link = linkController.text.trim();
+                  Navigator.of(ctx).pop();
+                  _handleJoinLink(link);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Bergabung'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _handleJoinLink(String link) {
+    if (link.isEmpty) return;
+    // Parse: /form/{slug}/collaborate?token={token}
+    // atau hanya slug?token=...
+    String slug = '';
+    String token = '';
+    try {
+      Uri uri;
+      if (link.startsWith('http')) {
+        uri = Uri.parse(link);
+      } else {
+        uri = Uri.parse('http://x/$link');
+      }
+      final segments = uri.pathSegments;
+      // Pattern: form / {slug} / collaborate
+      final collabIdx = segments.indexOf('collaborate');
+      if (collabIdx > 0) {
+        slug = segments[collabIdx - 1];
+      }
+      token = uri.queryParameters['token'] ?? '';
+    } catch (_) {}
+
+    if (slug.isEmpty || token.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text(
+            'Link tidak valid. Pastikan link undangan lengkap.'),
+        backgroundColor: AppColors.error,
+      ));
+      return;
+    }
+
+    Navigator.of(context)
+        .push(MaterialPageRoute(
+      builder: (_) => CollaborateScreen(
+        formSlug: slug,
+        tokenCollab: token,
+      ),
+    ))
+        .then((_) => _loadForms());
+  }
+
+  Future<void> _confirmDeleteToTrash(Map<String, dynamic> form) async {
+    final title = form['title'] as String? ?? 'Form';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_outline, color: AppColors.error),
+            SizedBox(width: 8),
+            Text('Hapus Form'),
+          ],
+        ),
+        content: Text(
+          'Form "$title" akan dipindahkan ke Trash. '
+          'Kamu bisa memulihkannya dalam 30 hari.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Batal')),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await addFormToTrash(
+      slug: form['slug'] as String? ?? '',
+      title: title,
+      category: form['category'] as String?,
+      status: form['visibility'] as String?,
+    );
+    setState(() {
+      _myForms.removeWhere(
+          (f) => f['slug'] == form['slug']);
+      _applyFilters();
+    });
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Form dipindahkan ke Trash.'),
+        backgroundColor: AppColors.success,
+        duration: Duration(seconds: 2),
+      ));
+    }
+  }
+
   void _applyFilters() {
     _filteredForms = _myForms.where((form) {
       final matchesSearch =
@@ -206,6 +410,36 @@ class _MyFormsScreenState extends State<MyFormsScreen>
                     ),
                   ),
                   const Spacer(),
+                  // Join Kolaborasi
+                  GestureDetector(
+                    onTap: _showJoinCollaborateDialog,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFD9E6F6)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.group_add_outlined,
+                              size: 15, color: AppColors.primary),
+                          SizedBox(width: 5),
+                          Text(
+                            'Join',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
                   Container(
                     width: 38,
                     height: 38,
@@ -404,6 +638,9 @@ class _MyFormsScreenState extends State<MyFormsScreen>
                                     )
                                     .then((_) => _loadForms());
                               },
+                              onDelete: form['role'] == 'CREATOR'
+                                  ? () => _confirmDeleteToTrash(form)
+                                  : null,
                             ),
                           );
                         },

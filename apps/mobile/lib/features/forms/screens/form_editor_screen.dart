@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data' show Uint8List;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +9,7 @@ import 'add_question_screen.dart';
 import 'form_viewer_screen.dart';
 import 'form_qr_screen.dart';
 import 'import_word_screen.dart';
+import 'monitoring_screen.dart';
 import '../../../core/utils/html_utils.dart';
 
 class FormEditorScreen extends StatefulWidget {
@@ -39,6 +41,10 @@ class _FormEditorScreenState extends State<FormEditorScreen>
   int _durationMinutes = 0; // loaded from backend via getFormBySlug
   bool _isRandom = false;   // loaded from backend via getFormBySlug
   String _tokenRespon = ''; // loaded from backend via getFormBySlug
+  int? _startAtMillis;      // loaded from backend via getFormBySlug
+  String? _themeColor;      // loaded from backend via getFormBySlug
+  bool _isSavingChanges = false;
+  final GlobalKey<_SettingsTabState> _settingsKey = GlobalKey<_SettingsTabState>();
 
   @override
   void initState() {
@@ -65,22 +71,48 @@ class _FormEditorScreenState extends State<FormEditorScreen>
       if (result['success']) {
         final data = result['data']['data'];
         // Backend returns soal grouped by page: [{page:1, soal:[...]}, ...]
-        // Flatten all page groups into a single list of soal items.
+        // Flatten all page groups into a single list of soal items,
+        // propagate group-level page ke setiap item (soal['page'] tidak ada
+        // di response item soal).
         final rawSoal = data['soal'] is List ? data['soal'] as List : [];
         final List<dynamic> listSoal = rawSoal.expand<dynamic>((pageGroup) {
           if (pageGroup is Map && pageGroup['soal'] is List) {
-            return pageGroup['soal'] as List;
+            final pageNum = pageGroup['page'] is num
+                ? (pageGroup['page'] as num).toInt()
+                : 1;
+            return (pageGroup['soal'] as List).map((s) {
+              if (s is Map && s['page'] == null) {
+                return {...s, 'page': pageNum};
+              }
+              return s;
+            });
           }
           // Fallback: item is already a soal (flat list, old format)
           return [pageGroup];
         }).toList();
 
         setState(() {
+          // Backend getFormBySlug returns: data: { form: formPayload, soal: [...] }.
+          // Nilai setting berada di dalam form.setting dan form.token (nested),
+          // bukan di top-level. Dukung juga bentuk flat (fallback) bila ada.
+          final Map<String, dynamic> form =
+              data['form'] is Map
+                  ? Map<String, dynamic>.from(data['form'] as Map)
+                  : <String, dynamic>{};
+          final Map<String, dynamic> setting =
+              form['setting'] is Map
+                  ? Map<String, dynamic>.from(form['setting'] as Map)
+                  : form;
+          final Map<String, dynamic> token =
+              form['token'] is Map
+                  ? Map<String, dynamic>.from(form['token'] as Map)
+                  : form;
+
           _isPublic =
-              (data['form_status'] ?? data['status'] ?? 'private') == 'public';
+              (setting['status'] ?? form['status'] ?? 'private') == 'public';
 
           // Parse duration from backend (integer minutes, nullable)
-          final rawDur = data['duration'];
+          final rawDur = setting['duration'] ?? form['duration'];
           _durationMinutes = rawDur == null
               ? 0
               : (rawDur is num
@@ -88,19 +120,48 @@ class _FormEditorScreenState extends State<FormEditorScreen>
                     : int.tryParse(rawDur.toString()) ?? 0);
 
           // Parse is_random from backend (bool/int, nullable)
-          final rawRandom = data['is_random'];
+          final rawRandom = setting['is_random'] ?? form['is_random'];
           _isRandom = rawRandom == true ||
               rawRandom == 1 ||
               rawRandom?.toString() == 'true' ||
               rawRandom?.toString() == '1';
 
-          // Parse token_respon
-          _tokenRespon = data['token_respon']?.toString() ?? '';
+          // Parse token_respon (nested di form.token)
+          _tokenRespon = (token['token_respon'] ?? form['token_respon'])
+                  ?.toString() ??
+              '';
+
+          // Parse start_at (timestamp milliseconds, nullable)
+          final rawStartAt = setting['start_at'] ?? form['start_at'];
+          if (rawStartAt != null) {
+            if (rawStartAt is num) {
+              _startAtMillis = rawStartAt.toInt();
+            } else {
+              // Jika string ISO timestamp, parse ke milliseconds
+              final parsed = DateTime.tryParse(rawStartAt.toString());
+              _startAtMillis = parsed?.millisecondsSinceEpoch;
+            }
+          } else {
+            _startAtMillis = null;
+          }
+
+          // Parse theme_color
+          final rawTheme = setting['theme_color'] ?? form['theme_color'];
+          _themeColor = rawTheme?.toString().isNotEmpty == true
+              ? rawTheme.toString()
+              : null;
 
           _questions = listSoal.asMap().entries.map((entry) {
             final index = entry.key;
             final soal = entry.value;
             final type = soal['type']?.toString() ?? 'text';
+            // Parse score — DECIMAL(10,2) nullable dari backend
+            final rawScore = soal['score'];
+            final double? score = rawScore == null
+                ? null
+                : (rawScore is num
+                    ? rawScore.toDouble()
+                    : double.tryParse(rawScore.toString()));
             return {
               'id': soal['id']?.toString() ?? '',
               'number': index + 1,
@@ -109,6 +170,9 @@ class _FormEditorScreenState extends State<FormEditorScreen>
               'typeDisplay': _mapQuestionType(type),
               'options': soal['options'] ?? [],
               'audio': soal['audio']?.toString(),
+              'page': soal['page'] is num ? (soal['page'] as num).toInt() : 1,
+              'is_required': soal['is_required'],
+              'score': score,
             };
           }).toList();
           _isLoading = false;
@@ -126,6 +190,40 @@ class _FormEditorScreenState extends State<FormEditorScreen>
         _errorMessage = 'Error: ${e.toString()}';
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _saveAllChanges() async {
+    if (_isSavingChanges) return;
+
+    final settingsState = _settingsKey.currentState;
+    if (settingsState == null) return;
+
+    setState(() => _isSavingChanges = true);
+
+    try {
+      final result = await settingsState.saveAll();
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        await _loadForm();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] as String? ?? 'Perubahan berhasil disimpan.'),
+            backgroundColor: const Color(0xFF10B981),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] as String? ?? 'Gagal menyimpan perubahan.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSavingChanges = false);
     }
   }
 
@@ -232,16 +330,6 @@ class _FormEditorScreenState extends State<FormEditorScreen>
         );
       }
     }
-  }
-
-  void _copyShareLink() {
-    Clipboard.setData(ClipboardData(text: widget.formSlug));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Form slug copied to clipboard!'),
-        backgroundColor: AppColors.success,
-      ),
-    );
   }
 
   @override
@@ -369,6 +457,7 @@ class _FormEditorScreenState extends State<FormEditorScreen>
                         totalSubmissions: _totalSubmissions,
                       ),
                       _SettingsTab(
+                        key: _settingsKey,
                         isPublic: _isPublic,
                         formSlug: widget.formSlug,
                         onToggleStatus: _toggleStatus,
@@ -376,6 +465,8 @@ class _FormEditorScreenState extends State<FormEditorScreen>
                         initialDurationMinutes: _durationMinutes,
                         initialIsRandom: _isRandom,
                         initialTokenRespon: _tokenRespon,
+                        initialStartAtMillis: _startAtMillis,
+                        initialThemeColor: _themeColor,
                       ),
                     ],
                   ),
@@ -389,29 +480,40 @@ class _FormEditorScreenState extends State<FormEditorScreen>
               color: Colors.transparent,
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               child: Material(
-                color: const Color(0xFF1B4A5E),
+                color: _isSavingChanges
+                    ? const Color(0xFF1B4A5E).withValues(alpha: 0.6)
+                    : const Color(0xFF1B4A5E),
                 borderRadius: BorderRadius.circular(16),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(16),
-                  onTap: _loadForm,
+                  onTap: _isSavingChanges ? null : _saveAllChanges,
                   child: Container(
                     height: 52,
                     alignment: Alignment.center,
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.check_rounded, color: Colors.white, size: 18),
-                        SizedBox(width: 8),
-                        Text(
-                          'Save Changes',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
+                    child: _isSavingChanges
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.check_rounded, color: Colors.white, size: 18),
+                              SizedBox(width: 8),
+                              Text(
+                                'Save Changes',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
                   ),
                 ),
               ),
@@ -447,7 +549,7 @@ class _FormEditorScreenState extends State<FormEditorScreen>
 
 // ============ QUESTIONS TAB ============
 
-class _QuestionsTab extends StatelessWidget {
+class _QuestionsTab extends StatefulWidget {
   final List<Map<String, dynamic>> questions;
   final String formTitle;
   final String formSlug;
@@ -460,15 +562,37 @@ class _QuestionsTab extends StatelessWidget {
     required this.onRefresh,
   });
 
+  @override
+  State<_QuestionsTab> createState() => _QuestionsTabState();
+}
+
+class _QuestionsTabState extends State<_QuestionsTab> {
+  int _selectedPage = 1;
+
+  /// Page numbers yang muncul di daftar soal. Halaman kosong (belum ada soal)
+  /// tetap muncul via tombol "+" sehingga bisa ditambahkan soal di sana.
+  List<int> get _pageNumbers {
+    final nums = <int>{};
+    for (final q in widget.questions) {
+      final p = q['page'] is num ? (q['page'] as num).toInt() : 1;
+      nums.add(p);
+    }
+    if (nums.isEmpty) nums.add(1);
+    return nums.toList()..sort();
+  }
+
   Future<void> _openImportWord(BuildContext context) async {
     final result = await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) =>
-            ImportWordScreen(formSlug: formSlug, formTitle: formTitle),
+        builder: (context) => ImportWordScreen(
+          formSlug: widget.formSlug,
+          formTitle: widget.formTitle,
+          targetPage: _selectedPage,
+        ),
       ),
     );
     if (result == true) {
-      onRefresh();
+      widget.onRefresh();
     }
   }
 
@@ -479,14 +603,15 @@ class _QuestionsTab extends StatelessWidget {
     final result = await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => AddQuestionScreen(
-          formTitle: formTitle,
-          formSlug: formSlug,
+          formTitle: widget.formTitle,
+          formSlug: widget.formSlug,
           questionToEdit: questionToEdit,
+          initialPage: _selectedPage,
         ),
       ),
     );
     if (result == true) {
-      onRefresh();
+      widget.onRefresh();
     }
   }
 
@@ -536,12 +661,44 @@ class _QuestionsTab extends StatelessWidget {
       ),
     );
     if (result['success']) {
-      onRefresh();
+      widget.onRefresh();
     }
+  }
+
+  Future<void> _openScoreSheet(BuildContext context) async {
+    final allQuestions = widget.questions;
+    if (allQuestions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tambahkan soal terlebih dahulu.'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+      return;
+    }
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ScoreSheet(
+        questions: allQuestions,
+        formSlug: widget.formSlug,
+        onSaved: widget.onRefresh,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final questions = widget.questions;
+    final formSlug = widget.formSlug;
+    final formTitle = widget.formTitle;
+    final pageNumbers = _pageNumbers;
+    final filteredQuestions = questions.where((q) {
+      final p = q['page'] is num ? (q['page'] as num).toInt() : 1;
+      return p == _selectedPage;
+    }).toList();
+
     return Column(
       children: [
         // ── Slug banner ──────────────────────────────────────────
@@ -615,64 +772,183 @@ class _QuestionsTab extends StatelessWidget {
           ),
         ),
 
+        // ── Page selector ───────────────────────────────────────
+        Container(
+          margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          height: 42,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            children: [
+              for (final p in pageNumbers) ...[
+                GestureDetector(
+                  onTap: () => setState(() => _selectedPage = p),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: BoxDecoration(
+                      color: _selectedPage == p
+                          ? AppColors.primary
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _selectedPage == p
+                            ? AppColors.primary
+                            : const Color(0xFFBDE8E0),
+                      ),
+                    ),
+                    child: Text(
+                      'Halaman $p',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _selectedPage == p
+                            ? Colors.white
+                            : AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              // Tambah halaman baru (max + 1)
+              GestureDetector(
+                onTap: () {
+                  final next = pageNumbers.isEmpty ? 1 : (pageNumbers.last + 1);
+                  setState(() => _selectedPage = next);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFFBDE8E0),
+                      style: BorderStyle.solid,
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.add_rounded,
+                          size: 16, color: AppColors.primary),
+                      SizedBox(width: 4),
+                      Text(
+                        'Tambah Halaman',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
         // ── Questions header ─────────────────────────────────────
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
           child: Row(
             children: [
-              Text(
-                'Questions (${questions.length})',
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const Spacer(),
-              GestureDetector(
-                onTap: () => _openImportWord(context),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFBDE8E0)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.upload_file_rounded,
-                          size: 14, color: AppColors.primary),
-                      const SizedBox(width: 4),
-                      Text('Import Word',
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w600)),
-                    ],
+              Expanded(
+                child: Text(
+                  filteredQuestions.isEmpty
+                      ? 'Halaman $_selectedPage kosong'
+                      : 'Halaman $_selectedPage (${filteredQuestions.length})',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ),
               const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () => _openAddQuestion(context),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFBDE8E0)),
-                  ),
+              // Buttons row — scrollable horizontal jika perlu
+              Flexible(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.add_rounded, size: 16, color: AppColors.primary),
-                      const SizedBox(width: 2),
-                      Text('Add',
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w700)),
+                      // Tombol Atur Skor
+                      GestureDetector(
+                        onTap: () => _openScoreSheet(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFBDE8E0)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.star_outline_rounded, size: 14, color: AppColors.warning),
+                              const SizedBox(width: 4),
+                              Text('Skor',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.warning,
+                                      fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () => _openImportWord(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFBDE8E0)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.upload_file_rounded,
+                                  size: 14, color: AppColors.primary),
+                              const SizedBox(width: 4),
+                              Text('Import Word',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () => _openAddQuestion(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFBDE8E0)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.add_rounded, size: 16, color: AppColors.primary),
+                              const SizedBox(width: 2),
+                              Text('Add',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w700)),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -684,7 +960,7 @@ class _QuestionsTab extends StatelessWidget {
         const SizedBox(height: 12),
 
         Expanded(
-          child: questions.isEmpty
+          child: filteredQuestions.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -693,20 +969,21 @@ class _QuestionsTab extends StatelessWidget {
                           size: 56,
                           color: AppColors.textSecondary.withOpacity(0.4)),
                       const SizedBox(height: 14),
-                      const Text('No Questions Yet',
+                      const Text('Belum Ada Soal',
                           style: TextStyle(fontSize: 15, color: AppColors.textSecondary)),
                       const SizedBox(height: 6),
-                      const Text('Tap "+ Add" to create your first question',
+                      const Text('Tap "+ Add" untuk menambahkan soal ke halaman ini',
                           style: TextStyle(fontSize: 13, color: AppColors.textHint)),
                     ],
                   ),
                 )
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                  itemCount: questions.length,
+                  itemCount: filteredQuestions.length,
                   itemBuilder: (context, index) => Padding(
                     padding: const EdgeInsets.only(bottom: 10),
-                    child: _buildQuestionCard(context, questions[index]),
+                    child: _buildQuestionCard(
+                        context, filteredQuestions[index]),
                   ),
                 ),
         ),
@@ -792,21 +1069,79 @@ class _QuestionsTab extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 5, 14, 10),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: const Color(0xFFDFF7EE),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                question['typeDisplay'],
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.3,
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDFF7EE),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    question['typeDisplay'],
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
                 ),
-              ),
+                if (question['is_required'] == true ||
+                    question['is_required'] == 1 ||
+                    question['is_required']?.toString() == 'true' ||
+                    question['is_required']?.toString() == '1') ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'WAJIB',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: AppColors.error,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
+                ],
+                // Score badge
+                if (question['score'] != null) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.star_rounded, size: 11, color: AppColors.warning),
+                        const SizedBox(width: 3),
+                        Text(
+                          () {
+                            final s = question['score'] as double;
+                            return s % 1 == 0
+                                ? '${s.toInt()} pts'
+                                : '${s.toStringAsFixed(2)} pts';
+                          }(),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: AppColors.warning,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           if (options.isNotEmpty) ...[
@@ -846,14 +1181,16 @@ class _QuestionsTab extends StatelessWidget {
                         ),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: Text(val,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: AppColors.textPrimary,
-                                fontWeight: isCorrect
-                                    ? FontWeight.w500
-                                    : FontWeight.normal,
-                              )),
+                          child: QuillRichText(
+                            content: val.toString(),
+                            baseStyle: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textPrimary,
+                              fontWeight: isCorrect
+                                  ? FontWeight.w500
+                                  : FontWeight.normal,
+                            ),
+                          ),
                         ),
                         if (isCorrect)
                           Container(
@@ -880,6 +1217,674 @@ class _QuestionsTab extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+// ============ SCORE SHEET ============
+
+/// Bottom sheet untuk mengatur skor semua soal sekaligus.
+/// Mode Manual: creator memasukkan skor per soal.
+/// Mode Otomatis: creator memasukkan total target, skor dibagi proporsional.
+///
+/// Algoritma pembagian otomatis (bebas pembulatan):
+///   perSoal = floor(total / n)
+///   sisa    = total - perSoal * n
+///   → soal pertama 'sisa' buah mendapat perSoal + 1
+///   Hasilnya: sum(scores) == target selalu tepat.
+class _ScoreSheet extends StatefulWidget {
+  final List<Map<String, dynamic>> questions;
+  final String formSlug;
+  final VoidCallback onSaved;
+
+  const _ScoreSheet({
+    required this.questions,
+    required this.formSlug,
+    required this.onSaved,
+  });
+
+  @override
+  State<_ScoreSheet> createState() => _ScoreSheetState();
+}
+
+class _ScoreSheetState extends State<_ScoreSheet> {
+  // 'manual' | 'auto'
+  String _mode = 'auto';
+  bool _isSaving = false;
+  String _errorMsg = '';
+
+  // Auto mode
+  final _totalController = TextEditingController(text: '100');
+  // Manual mode — satu controller per soal (urutan sesuai widget.questions)
+  late List<TextEditingController> _manualControllers;
+
+  @override
+  void initState() {
+    super.initState();
+    _manualControllers = widget.questions.map((q) {
+      final s = q['score'] as double?;
+      final text = s == null
+          ? ''
+          : (s % 1 == 0 ? s.toInt().toString() : s.toStringAsFixed(2));
+      return TextEditingController(text: text);
+    }).toList();
+  }
+
+  @override
+  void dispose() {
+    _totalController.dispose();
+    for (final c in _manualControllers) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  // Hitung distribusi otomatis bebas float error
+  // Mengembalikan list integer (atau double jika total tidak bulat)
+  List<double> _calcAutoScores(double total, int n) {
+    if (n <= 0) return [];
+    // Jika total habis dibagi n → tiap soal sama
+    if (total % n == 0) {
+      final perSoal = total / n;
+      return List.filled(n, perSoal);
+    }
+    // Integer distribution: base = floor(total/n), sisa soal pertama +1
+    // Untuk total non-integer, gunakan pendekatan floating yang presisi
+    final base = (total / n).floorToDouble();
+    final remainder = total - base * n;
+    // 'remainder' soal pertama mendapat base + 1 (jika total integer)
+    // Untuk distribusi desimal: soal 0..remainder-1 mendapat base + 1
+    final remainderInt = remainder.round();
+    return List.generate(n, (i) => i < remainderInt ? base + 1 : base);
+  }
+
+  double get _currentTotal {
+    if (_mode == 'auto') {
+      return double.tryParse(_totalController.text.trim()) ?? 0;
+    }
+    return _manualControllers.fold<double>(0, (sum, c) {
+      return sum + (double.tryParse(c.text.trim()) ?? 0);
+    });
+  }
+
+  Future<void> _save() async {
+    setState(() { _isSaving = true; _errorMsg = ''; });
+
+    try {
+      final n = widget.questions.length;
+      List<double?> scores;
+
+      if (_mode == 'auto') {
+        final total = double.tryParse(_totalController.text.trim());
+        if (total == null || total <= 0) {
+          setState(() {
+            _errorMsg = 'Masukkan total skor yang valid (> 0).';
+            _isSaving = false;
+          });
+          return;
+        }
+        scores = _calcAutoScores(total, n);
+      } else {
+        // Manual — validasi tidak ada yang negatif
+        scores = <double?>[];
+        for (final c in _manualControllers) {
+          final txt = c.text.trim();
+          if (txt.isEmpty) {
+            scores.add(null);
+          } else {
+            final v = double.tryParse(txt);
+            if (v == null || v < 0) {
+              setState(() {
+                _errorMsg = 'Skor tidak valid. Pastikan semua nilai >= 0.';
+                _isSaving = false;
+              });
+              return;
+            }
+            scores.add(v);
+          }
+        }
+      }
+
+      // PATCH setiap soal: PATCH /form/soal/:id body {soal:{score}, options:[]}
+      // Menggunakan updateQuestion dari FormService (multipart, field 'data')
+      for (var i = 0; i < widget.questions.length; i++) {
+        final q = widget.questions[i];
+        final soalIdStr = q['id']?.toString() ?? '';
+        final soalId = int.tryParse(soalIdStr);
+        if (soalId == null) continue;
+
+        final newScore = scores.length > i ? scores[i] : null;
+
+        // Payload minimal sesuai backend contract PATCH /form/soal/:id
+        // field 'data' berisi JSON: { soal: { question, type, score }, options: [...] }
+        final payload = <String, dynamic>{
+          'soal': {
+            'question': q['question'] ?? '',
+            'type': q['type'] ?? 'text',
+            'score': newScore,
+          },
+          'options': (q['options'] as List? ?? []).whereType<Map>().map((o) => {
+            if (o['id'] != null) 'id': o['id'],
+            'value': o['value'] ?? o['option_value'] ?? '',
+            'is_correct': o['is_correct'] ?? false,
+          }).toList(),
+        };
+
+        final result = await FormService.updateQuestion(
+          soalId: soalId,
+          payload: payload,
+        );
+        if (result['success'] != true) {
+          setState(() {
+            _errorMsg = result['message'] ?? 'Gagal menyimpan skor soal ${i + 1}.';
+            _isSaving = false;
+          });
+          return;
+        }
+      }
+
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      widget.onSaved();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _mode == 'auto'
+                ? 'Skor otomatis berhasil disimpan (total: ${_currentTotal.toStringAsFixed(0)} pts).'
+                : 'Skor manual berhasil disimpan.',
+          ),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (e) {
+      setState(() {
+        _errorMsg = 'Terjadi kesalahan: ${e.toString()}';
+        _isSaving = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final n = widget.questions.length;
+    final maxHeight = MediaQuery.of(context).size.height * 0.85;
+
+    return Container(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: const Color(0xFFDDE5EE),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+            child: Row(
+              children: [
+                const Icon(Icons.star_rounded, color: AppColors.warning, size: 20),
+                const SizedBox(width: 8),
+                const Text(
+                  'Atur Skor Soal',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '$n soal',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Mode selector
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+            child: Row(
+              children: [
+                Expanded(child: _modeTab('auto', 'Otomatis', Icons.auto_fix_high_rounded)),
+                const SizedBox(width: 8),
+                Expanded(child: _modeTab('manual', 'Manual', Icons.edit_note_rounded)),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 4),
+          const Divider(height: 1),
+
+          // Content
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: _mode == 'auto' ? _buildAutoMode(n) : _buildManualMode(),
+            ),
+          ),
+
+          // Error
+          if (_errorMsg.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.error_outline, size: 16, color: AppColors.error),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _errorMsg,
+                        style: const TextStyle(fontSize: 12, color: AppColors.error),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // Save button
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+                20, 8, 20, MediaQuery.of(context).padding.bottom + 16),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _isSaving ? null : _save,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _isSaving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text(
+                        'Simpan Skor',
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w700),
+                      ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _modeTab(String mode, String label, IconData icon) {
+    final selected = _mode == mode;
+    return GestureDetector(
+      onTap: () => setState(() { _mode = mode; _errorMsg = ''; }),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : const Color(0xFFF0F4F8),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 16, color: selected ? Colors.white : AppColors.textSecondary),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAutoMode(int n) {
+    final total = double.tryParse(_totalController.text.trim()) ?? 0;
+    final valid = total > 0;
+    final perSoal = valid && n > 0
+        ? _calcAutoScores(total, n)
+        : <double>[];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Penjelasan
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.info_outline, size: 16, color: AppColors.primary),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Sistem membagi total skor secara merata ke seluruh soal. '
+                  'Jika tidak habis dibagi, soal pertama mendapat 1 poin lebih.',
+                  style: TextStyle(fontSize: 12, color: AppColors.primary),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Input total
+        const Text(
+          'Target Total Skor',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _totalController,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(
+            hintText: 'Contoh: 100 atau 200',
+            suffixText: 'pts',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppColors.inputBorder)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppColors.inputBorder)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+          ),
+          onChanged: (_) => setState(() {}),
+        ),
+
+        if (valid && perSoal.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          const Text(
+            'Distribusi Preview',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Preview distribusi (maks 5 soal ditampilkan)
+          ...List.generate(
+            perSoal.length > 5 ? 5 : perSoal.length,
+            (i) {
+              final s = perSoal[i];
+              final label = s % 1 == 0
+                  ? s.toInt().toString()
+                  : s.toStringAsFixed(2);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${i + 1}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _previewQuestionText(widget.questions[i]),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textPrimary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '$label pts',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.warning,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          if (perSoal.length > 5)
+            Padding(
+              padding: const EdgeInsets.only(top: 2, bottom: 6),
+              child: Text(
+                '... dan ${perSoal.length - 5} soal lainnya',
+                style: const TextStyle(fontSize: 12, color: AppColors.textHint),
+              ),
+            ),
+          const SizedBox(height: 8),
+          // Konfirmasi total
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.success.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.check_circle_outline, size: 16, color: AppColors.success),
+                const SizedBox(width: 8),
+                Text(
+                  'Total: ${perSoal.fold<double>(0, (a, b) => a + b).toStringAsFixed(0)} pts '
+                  '(${perSoal.length} soal)',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.success,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  Widget _buildManualMode() {
+    double total = _manualControllers.fold<double>(
+        0, (s, c) => s + (double.tryParse(c.text.trim()) ?? 0));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Total display
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.calculate_outlined, size: 16, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Total skor saat ini: ${total % 1 == 0 ? total.toInt() : total.toStringAsFixed(2)} pts',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // List soal
+        ...widget.questions.asMap().entries.map((entry) {
+          final i = entry.key;
+          final q = entry.value;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${i + 1}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _previewQuestionText(q),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textPrimary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 72,
+                  child: TextFormField(
+                    controller: _manualControllers[i],
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: '0',
+                      hintStyle: const TextStyle(
+                          color: AppColors.textHint, fontSize: 13),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 8),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                            const BorderSide(color: AppColors.inputBorder),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                            const BorderSide(color: AppColors.inputBorder),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(
+                            color: AppColors.primary, width: 1.5),
+                      ),
+                      suffixText: 'pts',
+                      suffixStyle: const TextStyle(
+                          fontSize: 10, color: AppColors.textHint),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  String _previewQuestionText(Map<String, dynamic> q) {
+    final raw = q['question']?.toString() ?? '';
+    if (raw.isEmpty) return '(Soal tanpa teks)';
+    // Strip HTML dan Quill delta
+    if (raw.startsWith('[')) {
+      try {
+        // Quill Delta — ambil plain text
+        final decoded = jsonDecode(raw) as List;
+        final buf = StringBuffer();
+        for (final op in decoded) {
+          if (op is Map && op['insert'] is String) {
+            buf.write(op['insert']);
+          }
+        }
+        final plain = buf.toString().replaceAll('\n', ' ').trim();
+        return plain.isEmpty ? '(Soal tanpa teks)' : plain;
+      } catch (_) {}
+    }
+    // HTML / plain
+    return raw.replaceAll(RegExp(r'<[^>]*>'), '').trim();
   }
 }
 
@@ -1427,8 +2432,11 @@ class _SettingsTab extends StatefulWidget {
   final int initialDurationMinutes;
   final bool initialIsRandom;
   final String initialTokenRespon;
+  final int? initialStartAtMillis;
+  final String? initialThemeColor;
 
   const _SettingsTab({
+    super.key,
     required this.isPublic,
     required this.formSlug,
     required this.onToggleStatus,
@@ -1436,13 +2444,16 @@ class _SettingsTab extends StatefulWidget {
     this.initialDurationMinutes = 0,
     this.initialIsRandom = false,
     this.initialTokenRespon = '',
+    this.initialStartAtMillis,
+    this.initialThemeColor,
   });
 
   @override
   State<_SettingsTab> createState() => _SettingsTabState();
 }
 
-class _SettingsTabState extends State<_SettingsTab> {
+class _SettingsTabState extends State<_SettingsTab>
+    with AutomaticKeepAliveClientMixin {
   late TextEditingController _durationController;
   late TextEditingController _tokenController;
   bool _isSavingDuration = false;
@@ -1453,11 +2464,35 @@ class _SettingsTabState extends State<_SettingsTab> {
   String? _durationSuccessMsg;
   String? _tokenError;
   String? _tokenSuccessMsg;
+  // start_at disimpan sebagai milliseconds; null = tidak ada
+  int? _startAtMillis;
+  // theme_color dari backend — bisa diubah di Settings
+  String? _themeColor;
+  bool _isSavingTheme = false;
+
+  // Preset warna yang sama dengan create_form_screen
+  static const List<Map<String, dynamic>> _presetColors = [
+    {'hex': '#3B82F6', 'label': 'Biru'},
+    {'hex': '#EF4444', 'label': 'Merah'},
+    {'hex': '#10B981', 'label': 'Hijau'},
+    {'hex': '#8B5CF6', 'label': 'Ungu'},
+    {'hex': '#F59E0B', 'label': 'Kuning'},
+    {'hex': '#EC4899', 'label': 'Pink'},
+    {'hex': '#06B6D4', 'label': 'Cyan'},
+    {'hex': '#6366F1', 'label': 'Indigo'},
+    {'hex': '#64748B', 'label': 'Abu'},
+    {'hex': '#0D9488', 'label': 'Teal'},
+  ];
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
     _isRandom = widget.initialIsRandom;
+    _startAtMillis = widget.initialStartAtMillis;
+    _themeColor = widget.initialThemeColor;
     _durationController = TextEditingController(
       text: widget.initialDurationMinutes > 0
           ? widget.initialDurationMinutes.toString()
@@ -1469,10 +2504,81 @@ class _SettingsTabState extends State<_SettingsTab> {
   }
 
   @override
+  void didUpdateWidget(covariant _SettingsTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Saat induk melakukan reload (mis. selesai Save Changes), sinkronkan
+    // nilai lokal agar menampilkan nilai terbaru dari server.
+    if (oldWidget.initialDurationMinutes != widget.initialDurationMinutes) {
+      _durationController.text = widget.initialDurationMinutes > 0
+          ? widget.initialDurationMinutes.toString()
+          : '';
+    }
+    if (oldWidget.initialIsRandom != widget.initialIsRandom) {
+      _isRandom = widget.initialIsRandom;
+    }
+    if (oldWidget.initialTokenRespon != widget.initialTokenRespon) {
+      _tokenController.text = widget.initialTokenRespon;
+    }
+    if (oldWidget.initialStartAtMillis != widget.initialStartAtMillis) {
+      _startAtMillis = widget.initialStartAtMillis;
+    }
+    if (oldWidget.initialThemeColor != widget.initialThemeColor) {
+      _themeColor = widget.initialThemeColor;
+    }
+  }
+
+  @override
   void dispose() {
     _durationController.dispose();
     _tokenController.dispose();
     super.dispose();
+  }
+
+  /// Dipanggil oleh tombol "Save Changes" pada tab bar induk.
+  /// Menyimpan SEMUA perubahan sekaligus: status (PUT /form) lalu pengaturan
+  /// lain via PATCH /form/setting. Berhasil hanya jika semua request sukses.
+  Future<Map<String, dynamic>> saveAll() async {
+    final raw = _durationController.text.trim();
+    final minutes = raw.isEmpty ? 0 : int.tryParse(raw);
+
+    if (minutes == null || minutes < 0) {
+      return {
+        'success': false,
+        'message': 'Masukkan angka menit yang valid (0 = tanpa batas).',
+      };
+    }
+
+    final status = widget.isPublic ? 'public' : 'private';
+
+    final statusResult = await FormService.updateFormStatus(
+      slug: widget.formSlug,
+      status: status,
+    );
+    if (!statusResult['success']) {
+      return {
+        'success': false,
+        'message': statusResult['message'] ?? 'Gagal menyimpan status form.',
+      };
+    }
+
+    final settingResult = await FormService.updateFormSetting(
+      slug: widget.formSlug,
+      durationMinutes: minutes == 0 ? null : minutes,
+      startAtMillis: _startAtMillis,
+      isRandom: _isRandom,
+      tokenRespon: _tokenController.text.trim().isEmpty
+          ? null
+          : _tokenController.text.trim(),
+      themeColor: _themeColor,
+    );
+    if (!settingResult['success']) {
+      return {
+        'success': false,
+        'message': settingResult['message'] ?? 'Gagal menyimpan pengaturan.',
+      };
+    }
+
+    return {'success': true, 'message': 'Perubahan berhasil disimpan.'};
   }
 
   Future<void> _saveDuration() async {
@@ -1495,8 +2601,13 @@ class _SettingsTabState extends State<_SettingsTab> {
 
     final result = await FormService.updateFormSetting(
       slug: widget.formSlug,
-      durationMinutes: minutes,
+      durationMinutes: minutes == 0 ? null : minutes,
+      startAtMillis: _startAtMillis,
       isRandom: _isRandom,
+      tokenRespon: _tokenController.text.trim().isEmpty
+          ? null
+          : _tokenController.text.trim(),
+      themeColor: _themeColor,
     );
 
     if (!mounted) return;
@@ -1524,6 +2635,12 @@ class _SettingsTabState extends State<_SettingsTab> {
     final result = await FormService.updateTokenRespon(
       slug: widget.formSlug,
       tokenRespon: _tokenController.text.trim(),
+      durationMinutes: _durationController.text.trim().isEmpty
+          ? null
+          : int.tryParse(_durationController.text.trim()),
+      startAtMillis: _startAtMillis,
+      isRandom: _isRandom,
+      themeColor: _themeColor,
     );
 
     if (!mounted) return;
@@ -1552,8 +2669,13 @@ class _SettingsTabState extends State<_SettingsTab> {
 
     final result = await FormService.updateFormSetting(
       slug: widget.formSlug,
-      durationMinutes: minutes,
+      durationMinutes: minutes == 0 ? null : minutes,
+      startAtMillis: _startAtMillis,
       isRandom: value,
+      tokenRespon: _tokenController.text.trim().isEmpty
+          ? null
+          : _tokenController.text.trim(),
+      themeColor: _themeColor,
     );
 
     if (!mounted) return;
@@ -1570,8 +2692,54 @@ class _SettingsTabState extends State<_SettingsTab> {
     }
   }
 
+  Future<void> _saveThemeColor(String? selectedHex) async {
+    setState(() {
+      _themeColor = selectedHex;
+      _isSavingTheme = true;
+    });
+
+    final raw = _durationController.text.trim();
+    final minutes = raw.isEmpty ? 0 : (int.tryParse(raw) ?? 0);
+
+    final result = await FormService.updateFormSetting(
+      slug: widget.formSlug,
+      durationMinutes: minutes == 0 ? null : minutes,
+      startAtMillis: _startAtMillis,
+      isRandom: _isRandom,
+      tokenRespon: _tokenController.text.trim().isEmpty
+          ? null
+          : _tokenController.text.trim(),
+      themeColor: selectedHex,
+    );
+
+    if (!mounted) return;
+    setState(() => _isSavingTheme = false);
+
+    if (!result['success']) {
+      // Rollback ke nilai sebelumnya jika gagal
+      setState(() => _themeColor = selectedHex == null ? null : _themeColor);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? 'Gagal menyimpan warna tema.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(selectedHex == null
+              ? 'Warna tema dihapus.'
+              : 'Warna tema berhasil disimpan.'),
+          backgroundColor: AppColors.success,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
       child: Column(
@@ -1821,6 +2989,121 @@ class _SettingsTabState extends State<_SettingsTab> {
 
           const SizedBox(height: 20),
 
+          // ── WARNA TEMA ────────────────────────────────────────
+          _buildSectionLabel('WARNA TEMA'),
+          const SizedBox(height: 8),
+          _buildCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildCardHeader(
+                  icon: Icons.palette_outlined,
+                  title: 'Warna Tema Form',
+                  subtitle: 'Pilih warna untuk tampilan form.',
+                ),
+                const SizedBox(height: 14),
+                _isSavingTheme
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          // Opsi "Tanpa warna"
+                          GestureDetector(
+                            onTap: () => _saveThemeColor(null),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: _themeColor == null
+                                      ? AppColors.primary
+                                      : AppColors.inputBorder,
+                                  width: _themeColor == null ? 2.5 : 1.5,
+                                ),
+                              ),
+                              child: _themeColor == null
+                                  ? const Icon(Icons.close,
+                                      size: 16,
+                                      color: AppColors.primary)
+                                  : const Icon(Icons.close,
+                                      size: 14,
+                                      color: AppColors.textHint),
+                            ),
+                          ),
+                          ..._presetColors.map((color) {
+                            final hex = color['hex'] as String;
+                            final isSelected = _themeColor == hex;
+                            final colorVal = Color(
+                              int.parse(hex.replaceFirst('#', '0xFF')),
+                            );
+                            return GestureDetector(
+                              onTap: () => _saveThemeColor(hex),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: colorVal,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Colors.transparent,
+                                    width: 3,
+                                  ),
+                                  boxShadow: isSelected
+                                      ? [
+                                          BoxShadow(
+                                            color: colorVal
+                                                .withOpacity(0.6),
+                                            blurRadius: 8,
+                                            spreadRadius: 1,
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                                child: isSelected
+                                    ? const Icon(Icons.check,
+                                        color: Colors.white, size: 18)
+                                    : null,
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
+                if (_themeColor != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    'Warna aktif: $_themeColor',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
           // ── VISIBILITAS ───────────────────────────────────────
           _buildSectionLabel('VISIBILITAS'),
           const SizedBox(height: 8),
@@ -1905,6 +3188,56 @@ class _SettingsTabState extends State<_SettingsTab> {
                               fontWeight: FontWeight.w600,
                               color: AppColors.textPrimary)),
                       Text('Salin slug form untuk dibagikan',
+                          style: TextStyle(
+                              fontSize: 12, color: AppColors.textSecondary)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios,
+                    size: 14, color: AppColors.textSecondary),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── MONITORING ────────────────────────────────────────
+          _buildSectionLabel('MONITORING'),
+          const SizedBox(height: 8),
+          _buildCard(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => MonitoringScreen(
+                    formSlug: widget.formSlug,
+                    formTitle: 'Monitoring Peserta',
+                  ),
+                ),
+              );
+            },
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.people_outline,
+                      color: AppColors.primary, size: 20),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Status Peserta',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary)),
+                      Text('Lihat dan kelola status pengerjaan peserta',
                           style: TextStyle(
                               fontSize: 12, color: AppColors.textSecondary)),
                     ],

@@ -12,12 +12,14 @@ class AddQuestionScreen extends StatefulWidget {
   final String? formSlug;
   final String formTitle;
   final Map<String, dynamic>? questionToEdit;
+  final int initialPage;
 
   const AddQuestionScreen({
     super.key,
     this.formSlug,
     required this.formTitle,
     this.questionToEdit,
+    this.initialPage = 1,
   });
 
   @override
@@ -27,12 +29,16 @@ class AddQuestionScreen extends StatefulWidget {
 class _AddQuestionScreenState extends State<AddQuestionScreen> {
   final _formKey = GlobalKey<FormState>();
   late QuillController _quillController;
-  final List<TextEditingController> _optionControllers = [];
+  final List<QuillController> _optionQuillControllers = [];
+  final List<FocusNode> _optionFocusNodes = [];
+  int _focusedOptionIndex = 0;
 
   String _selectedType = 'radio';
   int? _correctOptionIndex;
   bool _isLoading = false;
   bool _isEditing = false;
+  bool _isRequired = false;
+  int _selectedPage = 1;
 
   // Image upload state
   Uint8List? _selectedImageBytes;
@@ -45,9 +51,12 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
   String? _selectedAudioPath;
   String? _existingAudioUrl;
 
-  // Validation flag — track if question was ever touched
-  bool _questionTouched = false;
+  // Validation flag — track if question was ever submitted empty
   bool _questionEmpty = false;
+  // Score per soal (null = tidak diset, 0 = 0 poin)
+  double? _score;
+  // Controller untuk input skor — diinisialisasi di initState, dispose di dispose()
+  late final TextEditingController _scoreController;
 
   final List<Map<String, dynamic>> _questionTypes = [
     {'value': 'radio',    'label': 'Single Choice',  'icon': Icons.radio_button_checked},
@@ -61,6 +70,8 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
     super.initState();
     _isEditing = widget.questionToEdit != null;
     _quillController = QuillController.basic();
+    _selectedPage = widget.initialPage;
+    _scoreController = TextEditingController();
 
     if (_isEditing) {
       _loadExistingQuestion();
@@ -120,25 +131,96 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
       _existingAudioUrl = audioUrl;
     }
 
+    // Parse is_required (boolean)
+    final rawRequired = question['is_required'];
+    _isRequired = rawRequired == true ||
+        rawRequired == 1 ||
+        rawRequired?.toString() == 'true' ||
+        rawRequired?.toString() == '1';
+
+    // Parse score — kolom DECIMAL(10,2) nullable di backend
+    final rawScore = question['score'];
+    if (rawScore != null) {
+      _score = rawScore is num
+          ? rawScore.toDouble()
+          : double.tryParse(rawScore.toString());
+      if (_score != null) {
+        _scoreController.text = _score! % 1 == 0
+            ? _score!.toInt().toString()
+            : _score!.toString();
+      }
+    }
+
+    // Parse page
+    _selectedPage = question['page'] is num
+        ? (question['page'] as num).toInt()
+        : widget.initialPage;
+
     final options = question['options'] as List? ?? [];
     for (final option in options) {
       if (option is Map) {
-        final controller = TextEditingController(
-          text: option['value']?.toString() ?? '',
-        );
-        _optionControllers.add(controller);
+        final controller = _quillFromRaw(option['value']?.toString() ?? '');
+        _optionQuillControllers.add(controller);
+        _optionFocusNodes.add(_createOptionFocusNode(_optionQuillControllers.length - 1));
         if (option['is_correct'] == true ||
             option['is_correct'] == 1 ||
             option['is_correct'] == '1' ||
             option['is_correct'] == 'true') {
-          _correctOptionIndex = _optionControllers.length - 1;
+          _correctOptionIndex = _optionQuillControllers.length - 1;
         }
       }
     }
-    if (_optionControllers.isEmpty) {
+    if (_optionQuillControllers.isEmpty) {
       _addOption();
       _addOption();
     }
+  }
+
+  /// Build QuillController dari nilai opsi lama (plain text / HTML) atau
+  /// baru (Quill Delta JSON), agar data lama tetap terbaca.
+  QuillController _quillFromRaw(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.startsWith('[')) {
+      try {
+        final decoded = jsonDecode(trimmed);
+        if (decoded is List) {
+          final doc = Document.fromJson(decoded);
+          return QuillController(
+            document: doc,
+            selection: const TextSelection.collapsed(offset: 0),
+          );
+        }
+      } catch (_) {
+        // Bukan Delta valid — lanjut ke plain text
+      }
+    }
+    final doc = Document()..insert(0, _stripHtml(trimmed));
+    return QuillController(
+      document: doc,
+      selection: const TextSelection.collapsed(offset: 0),
+    );
+  }
+
+  FocusNode _createOptionFocusNode(int index) {
+    final node = FocusNode();
+    node.addListener(() {
+      if (!mounted) return;
+      if (node.hasFocus && _focusedOptionIndex != index) {
+        setState(() => _focusedOptionIndex = index);
+      }
+    });
+    return node;
+  }
+
+  /// Get option content as Quill Delta JSON string
+  String _getOptionJson(QuillController controller) {
+    final delta = controller.document.toDelta();
+    return jsonEncode(delta.toJson());
+  }
+
+  bool _isOptionEmpty(QuillController controller) {
+    final text = controller.document.toPlainText().trim();
+    return text.isEmpty;
   }
 
   void _setPlainText(String text) {
@@ -176,21 +258,36 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
   @override
   void dispose() {
     _quillController.dispose();
-    for (var c in _optionControllers) {
+    _scoreController.dispose();
+    for (var c in _optionQuillControllers) {
       c.dispose();
+    }
+    for (var f in _optionFocusNodes) {
+      f.dispose();
     }
     super.dispose();
   }
 
   void _addOption() {
-    setState(() => _optionControllers.add(TextEditingController()));
+    setState(() {
+      _optionQuillControllers.add(QuillController.basic());
+      _optionFocusNodes.add(
+        _createOptionFocusNode(_optionQuillControllers.length - 1),
+      );
+      _focusedOptionIndex = _optionQuillControllers.length - 1;
+    });
   }
 
   void _removeOption(int index) {
-    if (_optionControllers.length > 1) {
+    if (_optionQuillControllers.length > 1) {
       setState(() {
-        _optionControllers[index].dispose();
-        _optionControllers.removeAt(index);
+        _optionQuillControllers[index].dispose();
+        _optionFocusNodes[index].dispose();
+        _optionQuillControllers.removeAt(index);
+        _optionFocusNodes.removeAt(index);
+        if (_focusedOptionIndex >= _optionQuillControllers.length) {
+          _focusedOptionIndex = _optionQuillControllers.length - 1;
+        }
         if (_correctOptionIndex == index) {
           _correctOptionIndex = null;
         } else if (_correctOptionIndex != null && _correctOptionIndex! > index) {
@@ -316,8 +413,6 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
   }
 
   Future<void> _saveQuestion() async {
-    setState(() => _questionTouched = true);
-
     if (_isQuestionEmpty()) {
       setState(() => _questionEmpty = true);
       return;
@@ -336,7 +431,8 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
     }
 
     if (_needsOptions()) {
-      final hasEmpty = _optionControllers.any((c) => c.text.trim().isEmpty);
+      final hasEmpty =
+          _optionQuillControllers.any((c) => _isOptionEmpty(c));
       if (hasEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -356,11 +452,15 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
       final Map<String, dynamic> soalPayload = {
         'question': questionJson,
         'type': _selectedType,
+        'is_required': _isRequired,
+        'page': _selectedPage,
+        // score: null berarti tidak ada skor (nullable, sesuai DB schema)
+        'score': _score,
       };
 
       final List<Map<String, dynamic>> optionValues = _needsOptions()
-          ? _optionControllers.asMap().entries.map((e) => {
-                'value': e.value.text.trim(),
+          ? _optionQuillControllers.asMap().entries.map((e) => {
+                'value': _getOptionJson(e.value),
                 'is_correct': _correctOptionIndex == e.key,
               }).toList()
           : <Map<String, dynamic>>[];
@@ -549,10 +649,13 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                     setState(() {
                       _selectedType = type['value'] as String;
                       if (!_needsOptions()) {
-                        for (var c in _optionControllers) c.dispose();
-                        _optionControllers.clear();
+                        for (var c in _optionQuillControllers) c.dispose();
+                        for (var f in _optionFocusNodes) f.dispose();
+                        _optionQuillControllers.clear();
+                        _optionFocusNodes.clear();
                         _correctOptionIndex = null;
-                      } else if (_optionControllers.isEmpty) {
+                        _focusedOptionIndex = 0;
+                      } else if (_optionQuillControllers.isEmpty) {
                         _addOption();
                         _addOption();
                       }
@@ -609,6 +712,70 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                   ),
                 );
               }).toList(),
+            ),
+
+            const SizedBox(height: 24),
+
+            // ── Halaman ───────────────────────────────────────────
+            _buildSectionLabel('Halaman'),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.inputBorder),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.description_outlined,
+                      size: 20, color: AppColors.primary),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Halaman penempatan soal',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _selectedPage > 1
+                        ? () => setState(() => _selectedPage--)
+                        : null,
+                    icon: const Icon(Icons.remove_circle_outline,
+                        color: AppColors.primary),
+                    tooltip: 'Halaman sebelumnya',
+                  ),
+                  SizedBox(
+                    width: 40,
+                    child: Container(
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _selectedPage.toString(),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => setState(() => _selectedPage++),
+                    icon: const Icon(Icons.add_circle_outline,
+                        color: AppColors.primary),
+                    tooltip: 'Halaman berikutnya',
+                  ),
+                ],
+              ),
             ),
 
             const SizedBox(height: 24),
@@ -728,6 +895,62 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                   ),
                 ),
               ),
+
+            const SizedBox(height: 24),
+
+            // ── Wajib Diisi Toggle ────────────────────────────────
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.inputBorder),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.error_rounded,
+                    size: 20,
+                    color: _isRequired ? AppColors.primary : AppColors.textHint,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Wajib diisi',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          'Responden harus menjawab soal ini',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textHint,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: _isRequired,
+                    onChanged: (val) => setState(() => _isRequired = val),
+                    activeColor: AppColors.primary,
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // ── Skor Soal ─────────────────────────────────────────
+            _buildSectionLabel('Skor Soal (Opsional)'),
+            const SizedBox(height: 10),
+            _buildScoreInput(),
 
             const SizedBox(height: 24),
 
@@ -885,13 +1108,67 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                     style: TextStyle(fontSize: 12, color: AppColors.textHint),
                   ),
                 ),
-                ..._optionControllers.asMap().entries.map((entry) {
+                // ── Toolbar opsi (mengontrol opsi yang sedang aktif) ──
+                if (_optionQuillControllers.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.inputBorder),
+                    ),
+                    child: QuillSimpleToolbar(
+                      controller: _optionQuillControllers[
+                          _focusedOptionIndex.clamp(
+                              0, _optionQuillControllers.length - 1)],
+                      config: QuillSimpleToolbarConfig(
+                        toolbarIconAlignment: WrapAlignment.start,
+                        showDividers: false,
+                        showFontFamily: false,
+                        showFontSize: false,
+                        showBoldButton: true,
+                        showItalicButton: true,
+                        showUnderLineButton: true,
+                        showStrikeThrough: false,
+                        showInlineCode: true,
+                        showColorButton: false,
+                        showBackgroundColorButton: false,
+                        showClearFormat: true,
+                        showAlignmentButtons: false,
+                        showHeaderStyle: false,
+                        showListNumbers: true,
+                        showListBullets: true,
+                        showListCheck: false,
+                        showCodeBlock: false,
+                        showQuote: false,
+                        showIndent: false,
+                        showLink: false,
+                        showUndo: true,
+                        showRedo: true,
+                        showSearchButton: false,
+                        showSubscript: false,
+                        showSuperscript: false,
+                        iconTheme: QuillIconTheme(
+                          iconButtonSelectedData: IconButtonData(
+                            color: AppColors.primary,
+                          ),
+                          iconButtonUnselectedData: IconButtonData(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ..._optionQuillControllers.asMap().entries.map((entry) {
                   final index = entry.key;
                   final controller = entry.value;
+                  final focusNode = _optionFocusNodes[index];
                   final isCorrect = _correctOptionIndex == index;
+                  final isFocused = _focusedOptionIndex == index;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Correct toggle
                         GestureDetector(
@@ -933,62 +1210,41 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                         ),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: TextFormField(
-                            controller: controller,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: AppColors.textPrimary,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: 'Opsi ${index + 1}',
-                              hintStyle: const TextStyle(
-                                color: AppColors.textHint,
-                                fontSize: 14,
-                              ),
-                              filled: true,
-                              fillColor: isCorrect
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 2, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isCorrect
                                   ? AppColors.success.withOpacity(0.05)
                                   : Colors.white,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 12,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isFocused
+                                    ? AppColors.primary
+                                    : (isCorrect
+                                        ? AppColors.success
+                                        : AppColors.inputBorder),
+                                width: isFocused ? 2 : 1,
                               ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide(
-                                  color: isCorrect
-                                      ? AppColors.success
-                                      : AppColors.inputBorder,
+                            ),
+                            child: ExcludeSemantics(
+                              child: QuillEditor.basic(
+                                controller: controller,
+                                focusNode: focusNode,
+                                config: QuillEditorConfig(
+                                  placeholder: 'Opsi ${index + 1}',
+                                  padding:
+                                      const EdgeInsets.all(10),
+                                  autoFocus: false,
+                                  expands: false,
+                                  scrollable: false,
+                                  minHeight: 44,
                                 ),
                               ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide(
-                                  color: isCorrect
-                                      ? AppColors.success
-                                      : AppColors.inputBorder,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide(
-                                  color: isCorrect
-                                      ? AppColors.success
-                                      : AppColors.primary,
-                                  width: 2,
-                                ),
-                              ),
-                              suffixIcon: isCorrect
-                                  ? const Icon(
-                                      Icons.check_circle_rounded,
-                                      color: AppColors.success,
-                                      size: 18,
-                                    )
-                                  : null,
                             ),
                           ),
                         ),
-                        if (_optionControllers.length > 1) ...[
+                        if (_optionQuillControllers.length > 1) ...[
                           const SizedBox(width: 6),
                           IconButton(
                             onPressed: () => _removeOption(index),
@@ -1079,6 +1335,100 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
             const SizedBox(height: 20),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildScoreInput() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.star_outline_rounded,
+            size: 20,
+            color: _score != null ? AppColors.warning : AppColors.textHint,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Skor soal ini',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                Text(
+                  'Kosongkan jika tidak menggunakan skor',
+                  style: TextStyle(fontSize: 12, color: AppColors.textHint),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 80,
+            child: TextFormField(
+              controller: _scoreController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+              decoration: InputDecoration(
+                hintText: '—',
+                hintStyle: TextStyle(color: AppColors.textHint, fontSize: 15),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AppColors.inputBorder),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AppColors.inputBorder),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                ),
+                filled: true,
+                fillColor: AppColors.background,
+              ),
+              onChanged: (val) {
+                final trimmed = val.trim();
+                if (trimmed.isEmpty) {
+                  setState(() => _score = null);
+                } else {
+                  final parsed = double.tryParse(trimmed);
+                  if (parsed != null && parsed >= 0) {
+                    setState(() => _score = parsed);
+                  }
+                }
+              },
+            ),
+          ),
+          if (_score != null) ...[
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () {
+                setState(() => _score = null);
+                _scoreController.clear();
+              },
+              child: const Icon(Icons.close_rounded, size: 18, color: AppColors.textHint),
+            ),
+          ],
+        ],
       ),
     );
   }
