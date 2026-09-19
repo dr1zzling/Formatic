@@ -5,7 +5,7 @@ import api, { FORM_API_URL, flattenForm } from "../../utils/api";
 import AlertModal from "../../components/AlertModal";
 import * as XLSX from "xlsx";
 import { socket } from "../../utils/socket";
-import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical, ImagePlus, X, QrCode, Download, Palette, Info, BookOpen, ChevronRight, IdCard, Eye, EyeOff, Paperclip, Lightbulb, AlertTriangle, Music, Lock, LockOpen, LockKeyhole, Target, Star, Inbox, Users, CheckCircle2, Clock, PieChart, Dices, PenLine, Save, RefreshCw, Timer, Trophy, Shuffle } from "lucide-react";
+import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, FileQuestion, FileText, UploadCloud, GripVertical, ImagePlus, X, QrCode, Download, Palette, Info, BookOpen, ChevronRight, IdCard, Eye, EyeOff, Paperclip, Lightbulb, AlertTriangle, Music, Lock, LockKeyhole, LockOpen, Target, Star, Inbox, Users, CheckCircle2, Clock, PieChart, Dices, PenLine, Save, RefreshCw, Timer, Trophy, Shuffle, Layers, Unlink, FileDown } from "lucide-react";
 import QRCode from "qrcode";
 import QuillEditor from "../../components/QuillEditor";
 import OptionQuillEditor from "../../components/OptionQuillEditor";
@@ -75,7 +75,7 @@ export default function FormEditor() {
       let soalFlat = [];
       if (Array.isArray(data.soal)) {
         if (data.soal.length > 0 && data.soal[0]?.soal) {
-          soalFlat = data.soal.flatMap(p => p.soal ?? []);
+          soalFlat = data.soal.flatMap(p => (p.soal ?? []).map(s => ({ ...s, page: s.page ?? p.page ?? 1 })));
         } else {
           soalFlat = data.soal;
         }
@@ -128,7 +128,7 @@ export default function FormEditor() {
           let soalFlat = [];
           if (Array.isArray(soalData)) {
             if (soalData.length > 0 && soalData[0]?.soal) {
-              soalFlat = soalData.flatMap(p => p.soal ?? []);
+              soalFlat = soalData.flatMap(p => (p.soal ?? []).map(s => ({ ...s, page: s.page ?? p.page ?? 1 })));
             } else {
               soalFlat = soalData;
             }
@@ -165,11 +165,72 @@ export default function FormEditor() {
     finally { setLoading(false); }
   }
 
-  function addQuestion() {
-    setQuestions((prev) => [...prev, {
-      _new: true, question: "", type: "radio", required: true,
-      options: [{ value: "" }, { value: "" }],
-    }]);
+  function addQuestion(targetPage) {
+    setQuestions((prev) => {
+      const lastPage = prev.length > 0 ? (prev[prev.length - 1].page || 1) : 1;
+      const p = targetPage ?? lastPage;
+      return [...prev, {
+        _new: true, question: "", type: "radio", required: true,
+        page: p,
+        options: [{ value: "" }, { value: "" }],
+      }];
+    });
+  }
+
+  function addQuestionAfter(idx) {
+    setQuestions((prev) => {
+      const targetQ = prev[idx];
+      const p = targetQ?.page || 1;
+      const newQ = {
+        _new: true,
+        question: "",
+        type: "radio",
+        required: true,
+        page: p,
+        options: [{ value: "" }, { value: "" }],
+      };
+      const copy = [...prev];
+      copy.splice(idx + 1, 0, newQ);
+      return copy;
+    });
+    showToast("Pertanyaan baru disisipkan!");
+  }
+
+  function addNewPage() {
+    setQuestions((prev) => {
+      const maxPage = prev.length > 0 ? Math.max(...prev.map(q => q.page || 1)) : 0;
+      const nextPage = maxPage + 1;
+      return [...prev, {
+        _new: true, question: "", type: "radio", required: true,
+        page: nextPage,
+        options: [{ value: "" }, { value: "" }],
+      }];
+    });
+    showToast("Halaman baru ditambahkan!");
+  }
+
+  function addPageBreakAfter(idx) {
+    setQuestions((prev) => {
+      if (idx < 0 || idx >= prev.length - 1) return prev;
+      return prev.map((q, i) => {
+        if (i <= idx) return q;
+        return { ...q, page: (q.page || 1) + 1 };
+      });
+    });
+    showToast("Pemisah halaman (Page Break) ditambahkan!");
+  }
+
+  function removePageBreak(pageNum) {
+    if (pageNum <= 1) return;
+    setQuestions((prev) => {
+      return prev.map(q => {
+        const p = q.page || 1;
+        if (p === pageNum) return { ...q, page: Math.max(1, pageNum - 1) };
+        if (p > pageNum) return { ...q, page: p - 1 };
+        return q;
+      });
+    });
+    showToast(`Halaman ${pageNum} digabungkan ke Halaman ${pageNum - 1}!`);
   }
 
   // Template soal identitas — diinsert di posisi AWAL (page 1)
@@ -195,9 +256,14 @@ export default function FormEditor() {
         question: t.question,
         type: "text",
         required: t.required,
+        page: 1,
         options: [],
       }));
-      return [...newSoal, ...prev];
+      const shiftedPrev = prev.map(q => ({
+        ...q,
+        page: (q.page || 1) + 1,
+      }));
+      return [...newSoal, ...shiftedPrev];
     });
     showToast("Template identitas ditambahkan di halaman 1!");
   }
@@ -263,14 +329,22 @@ export default function FormEditor() {
     setQuestions((prev) => {
       const arr = [...prev];
       const [item] = arr.splice(from, 1);
-      arr.splice(to, 0, item);
+      let targetPage = item.page || 1;
+      if (to > 0 && to < arr.length) {
+        targetPage = arr[to].page || arr[to - 1]?.page || 1;
+      } else if (to === 0 && arr.length > 0) {
+        targetPage = arr[0].page || 1;
+      } else if (to >= arr.length && arr.length > 0) {
+        targetPage = arr[arr.length - 1].page || 1;
+      }
+      arr.splice(to, 0, { ...item, page: targetPage });
       return arr;
     });
   }
   function duplicateQ(idx) {
     setQuestions((prev) => {
       const c = [...prev];
-      c.splice(idx + 1, 0, { ...prev[idx], _new: true, id: undefined });
+      c.splice(idx + 1, 0, { ...prev[idx], _new: true, id: undefined, page: prev[idx].page || 1 });
       return c;
     });
   }
@@ -292,22 +366,8 @@ export default function FormEditor() {
     setSaving(true); setError("");
     isSavingRef.current = true;
 
-    // Survey: semua soal di page 1. Ujian: page = urutan soal (1-indexed)
-    // Soal identitas (Nama/Kelas/Absen) selalu page 1 agar tampil bersama
-    const isQuiz = (form?.primary_kategori ?? form?.category) === "ujian";
-    const IDENTITY_LABELS = ["nama lengkap", "kelas", "nomor absen", "nama", "absen"];
-    const isIdentitySoal = (q) => {
-      const txt = (q.question ?? "").replace(/<[^>]*>/g, "").trim().toLowerCase();
-      return IDENTITY_LABELS.some(lbl => txt === lbl || txt.startsWith(lbl));
-    };
-    const getPage = (globalIdx, q) => {
-      if (!isQuiz) return 1;
-      if (isIdentitySoal(q)) return 1;
-      // Hitung berapa soal identitas di depan soal ini
-      const identityCount = questions.slice(0, globalIdx).filter(isIdentitySoal).length;
-      // Page = index non-identitas + 2 (karena page 1 = identitas)
-      const nonIdentityBefore = globalIdx - identityCount;
-      return nonIdentityBefore + 2;
+    const getPage = (q) => {
+      return Math.max(1, parseInt(q.page) || 1);
     };
 
     try {
@@ -331,8 +391,7 @@ export default function FormEditor() {
       if (existingOnes.length > 0) {
         await Promise.all(
           existingOnes.map((q) => {
-            const idx = questions.findIndex(x => x.id === q.id);
-            const pageVal = getPage(idx, q);
+            const pageVal = getPage(q);
             const hasOpts = ["radio", "checkbox", "rating"].includes(q.type);
             const payload = {
               soal: { question: q.question, type: q.type, page: pageVal, score: q.score ?? null,
@@ -386,8 +445,7 @@ export default function FormEditor() {
         const fd = new FormData();
         const payload = newOnes.map((q, i) => {
           const hasOpts = ["radio", "checkbox", "rating"].includes(q.type);
-          const globalIdx = questions.findIndex(x => x === q);
-          const pageVal = getPage(globalIdx, q);
+          const pageVal = getPage(q);
           if (q.attachment instanceof File) {
             fd.append("soal_images", q.attachment, `soal_${i}_${q.attachment.name}`);
           }
@@ -601,6 +659,10 @@ export default function FormEditor() {
             <PertanyaanTab
               form={form} slug={slug} questions={questions} error={error}
               onAddQuestion={addQuestion}
+              onAddQuestionAfter={addQuestionAfter}
+              onAddNewPage={addNewPage}
+              onAddPageBreakAfter={addPageBreakAfter}
+              onRemovePageBreak={removePageBreak}
               onAddIdentityPage={addIdentityPage}
               onUpdateQ={updateQ} onUpdateOpt={updateOpt} onUpdateOptField={updateOptField}
               onAddOpt={addOpt} onRemoveOpt={removeOpt}
@@ -625,9 +687,7 @@ export default function FormEditor() {
                 if (newOnes.length === 0) return;
                 const fd = new FormData();
                 const payload = newOnes.map((q, i) => {
-                  const globalIdx = questions.findIndex(x => x === q);
-                  const isQuiz = (form?.primary_kategori ?? form?.category) === "ujian";
-                  const pageVal = isQuiz ? (globalIdx + 1) : 1;
+                  const pageVal = Math.max(1, parseInt(q.page) || 1);
                   return {
                     soal: { question: q.question, type: q.type || "text", page: pageVal, score: q.score ?? null },
                     options: [],
@@ -694,7 +754,7 @@ export default function FormEditor() {
 }
 
 /* ── Pertanyaan Tab ─────────────────────────────────────────── */
-function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onAddIdentityPage, onUpdateQ, onUpdateOpt, onUpdateOptField, onAddOpt, onRemoveOpt, onRemoveQ, onDuplicateQ, onToggleCorrect, onReorder, onCopyLink, onShowToast, onImported, onImportedSilent, onImportGuard, hasUnsaved, onSaveFirst }) {
+function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onAddQuestionAfter, onAddNewPage, onAddPageBreakAfter, onRemovePageBreak, onAddIdentityPage, onUpdateQ, onUpdateOpt, onUpdateOptField, onAddOpt, onRemoveOpt, onRemoveQ, onDuplicateQ, onToggleCorrect, onReorder, onCopyLink, onShowToast, onImported, onImportedSilent, onImportGuard, hasUnsaved, onSaveFirst }) {
   const [dragFrom, setDragFrom] = useState(null);
   const [dragOver, setDragOver] = useState(null);
   // Baca scoreType dari localStorage supaya badge score realtime ikut berubah
@@ -726,13 +786,38 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onAddIdent
     const key = `score_type_${form?.slug ?? slug}`;
     const stored = localStorage.getItem(key) ?? "none";
     setScoreType(stored);
-    // Listen storage changes (ketika user ganti di Setelan tab)
     const handler = (e) => { if (e.key === key) setScoreType(e.newValue ?? "none"); };
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);
   }, [form?.slug, slug]);
+
+  const [exportingDocx, setExportingDocx] = useState(false);
+  async function onExportDocx() {
+    setExportingDocx(true);
+    try {
+      const res = await fetch(`${FORM_API_URL}/form/soal/export?form_slug=${slug}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.message || "Gagal mengekspor soal.");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Soal_${slug}.docx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      onShowToast?.("Soal berhasil diekspor ke Word!");
+    } catch (e) {
+      onShowToast?.(e.message || "Gagal mengekspor soal.");
+    } finally {
+      setExportingDocx(false);
+    }
+  }
   return (
-    <div className="max-w-3xl mx-auto py-8 px-4 md:px-6 xl:px-8 space-y-5" style={{ paddingBottom: 80 }}>
+    <div className="max-w-3xl mx-auto py-8 px-4 md:px-6 xl:px-8 space-y-5 relative" style={{ paddingBottom: 80 }}>
       {/* Form header card */}
       <div className="bg-white rounded-2xl shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-7 border border-[#e5eef7]">
         <h2 className="text-[22px] font-extrabold text-[#102f56] mb-1 tracking-tight leading-snug">
@@ -762,67 +847,224 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onAddIdent
             <FileQuestion size={30} />
           </div>
           <p className="text-[#102f56] font-bold text-[16px] mb-1">Belum ada pertanyaan</p>
-          <p className="text-gray-400 text-[13.5px]">Tambahkan pertanyaan pertama untuk memulai.</p>
+          <p className="text-gray-400 text-[13.5px] mb-4">Tambahkan pertanyaan pertama untuk memulai.</p>
+          <button
+            type="button"
+            onClick={() => onAddQuestion()}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1a4fa0] text-white text-[13.5px] font-semibold hover:opacity-90 shadow-md cursor-pointer"
+          >
+            <Plus size={16} strokeWidth={2.5} /> Tambah Pertanyaan Pertama
+          </button>
         </div>
       )}
 
-      {questions.map((q, qIdx) => (
-        <div
-          key={q.id ?? `new-${qIdx}`}
-          onDragOver={(e) => { e.preventDefault(); if (dragFrom !== null) setDragOver(qIdx); }}
-          onDrop={(e) => {
-            e.preventDefault();
-            if (dragFrom !== null && dragFrom !== qIdx) onReorder(dragFrom, qIdx);
-            setDragFrom(null);
-            setDragOver(null);
-          }}
-          className={`transition-all rounded-2xl ${dragOver === qIdx && dragFrom !== null && dragFrom !== qIdx ? "ring-2 ring-[#1a4fa0]/50 translate-y-0.5" : ""}`}
-        >
-          <QuestionCard
-            question={q}
-            index={qIdx}
-            onUpdate={(f, v) => onUpdateQ(qIdx, f, v)}
-            onUpdateOpt={(oIdx, v) => onUpdateOpt(qIdx, oIdx, v)}
-            onUpdateOptField={(oIdx, field, v) => onUpdateOptField(qIdx, oIdx, field, v)}
-            onAddOpt={() => onAddOpt(qIdx)}
-            onRemoveOpt={(oIdx) => onRemoveOpt(qIdx, oIdx)}
-            onToggleCorrect={(oIdx) => onToggleCorrect(qIdx, oIdx)}
-            onRemove={() => onRemoveQ(qIdx)}
-            onDuplicate={() => onDuplicateQ(qIdx)}
-            onDragHandleStart={() => setDragFrom(qIdx)}
-            onDragHandleEnd={() => { setDragFrom(null); setDragOver(null); }}
-            onShowToast={onShowToast}
-            scoreType={scoreType}
-            totalSoal={questions.length}
-            isLocked={lockedIds.has(q.id)}
-            onToggleLock={() => toggleLock(q.id)}
-          />
-        </div>
-      ))}
+      {questions.map((q, qIdx) => {
+        const currPage = q.page || 1;
+        const prevQ = qIdx > 0 ? questions[qIdx - 1] : null;
+        const prevPage = prevQ ? (prevQ.page || 1) : null;
+        const isNewPage = qIdx === 0 || currPage !== prevPage;
+        const questionsOnThisPage = questions.filter(x => (x.page || 1) === currPage).length;
 
-      <button
-        onClick={onAddQuestion}
-        className="w-full py-4 rounded-2xl border-2 border-dashed border-[#c7d8e8] text-[#1a4fa0] hover:border-[#1a4fa0] hover:bg-white text-[15px] font-semibold transition-all flex items-center justify-center gap-2"
-      >
-        <ListPlus size={20} /> Tambah Pertanyaan
-      </button>
+        return (
+          <div key={q.id ?? `new-${qIdx}`} className="space-y-4">
+            {isNewPage && (
+              <div className="pt-2">
+                {currPage === 1 ? (
+                  <div className="bg-[#f8fafc] rounded-2xl border border-[#e2e8f0] p-4 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-[#1a4fa0] text-white flex items-center justify-center font-black text-[14px] shadow-2xs">
+                        1
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-[14.5px] font-extrabold text-[#102f56]">Halaman 1</h3>
+                          <span className="px-2 py-0.5 rounded-md bg-white border border-[#d4e5fa] text-[11px] font-bold text-[#1a4fa0]">
+                            {questionsOnThisPage} Pertanyaan
+                          </span>
+                        </div>
+                        <p className="text-[12px] text-gray-400">Halaman awal formulir / identitas</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onAddQuestion(1)}
+                      className="px-3 py-1.5 rounded-xl bg-white border border-[#d4e5fa] text-[#1a4fa0] hover:bg-[#eef5fb] text-[12px] font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                    >
+                      <Plus size={13} strokeWidth={2.5} /> Tambah Soal di Hal. 1
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative pt-3 pb-1">
+                    <div className="flex items-center gap-4 mb-3">
+                      <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent via-[#1a4fa0]/20 to-[#1a4fa0]/40 rounded-full" />
+                      <div className="flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#1a4fa0] text-white text-[11.5px] font-extrabold shadow-sm tracking-wide">
+                        <Layers size={13} /> PEMISAH HALAMAN (PAGE BREAK)
+                      </div>
+                      <div className="flex-1 h-[2px] bg-gradient-to-l from-transparent via-[#1a4fa0]/20 to-[#1a4fa0]/40 rounded-full" />
+                    </div>
+
+                    <div className="bg-gradient-to-r from-[#f0f6fe] to-[#e8f1fd] rounded-2xl border border-[#cbe0f8] p-4 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-white text-[#1a4fa0] flex items-center justify-center font-black text-[14px] shadow-2xs border border-[#d4e5fa]">
+                          {currPage}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-[14.5px] font-extrabold text-[#102f56]">Halaman {currPage}</h3>
+                            <span className="px-2 py-0.5 rounded-md bg-white border border-[#d4e5fa] text-[11px] font-bold text-[#1a4fa0]">
+                              {questionsOnThisPage} Pertanyaan
+                            </span>
+                          </div>
+                          <p className="text-[12px] text-[#64779d]">
+                            Responden akan diarahkan ke halaman ini setelah menekan &quot;Selanjutnya&quot;.
+                          </p>
+        </div>
+      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => onAddQuestion(currPage)}
+                          className="px-3 py-1.5 rounded-xl bg-[#1a4fa0] text-white hover:opacity-90 text-[12px] font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                        >
+                          <Plus size={13} strokeWidth={2.5} /> Tambah Soal di Hal. {currPage}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onRemovePageBreak(currPage)}
+                          className="px-3 py-1.5 rounded-xl bg-white border border-[#d4e5fa] text-gray-600 hover:text-red-600 hover:border-red-200 hover:bg-red-50 text-[12px] font-semibold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                          title={`Gabungkan Halaman ${currPage} ke Halaman ${currPage - 1}`}
+                        >
+                          <Unlink size={13} /> Gabung ke Halaman {currPage - 1}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div
+              onDragOver={(e) => { e.preventDefault(); if (dragFrom !== null) setDragOver(qIdx); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (dragFrom !== null && dragFrom !== qIdx) onReorder(dragFrom, qIdx);
+                setDragFrom(null);
+                setDragOver(null);
+              }}
+              className={`transition-all rounded-2xl ${dragOver === qIdx && dragFrom !== null && dragFrom !== qIdx ? "ring-2 ring-[#1a4fa0]/50 translate-y-0.5" : ""}`}
+            >
+              <QuestionCard
+                question={q}
+                index={qIdx}
+                onUpdate={(f, v) => onUpdateQ(qIdx, f, v)}
+                onUpdateOpt={(oIdx, v) => onUpdateOpt(qIdx, oIdx, v)}
+                onUpdateOptField={(oIdx, field, v) => onUpdateOptField(qIdx, oIdx, field, v)}
+                onAddOpt={() => onAddOpt(qIdx)}
+                onRemoveOpt={(oIdx) => onRemoveOpt(qIdx, oIdx)}
+                onToggleCorrect={(oIdx) => onToggleCorrect(qIdx, oIdx)}
+                onRemove={() => onRemoveQ(qIdx)}
+                onDuplicate={() => onDuplicateQ(qIdx)}
+                onAddQuestionAfter={() => onAddQuestionAfter(qIdx)}
+                onAddPageBreakAfter={qIdx < questions.length - 1 ? () => onAddPageBreakAfter(qIdx) : undefined}
+                onDragHandleStart={() => setDragFrom(qIdx)}
+                onDragHandleEnd={() => { setDragFrom(null); setDragOver(null); }}
+                onShowToast={onShowToast}
+                scoreType={scoreType}
+                totalSoal={questions.length}
+                isLocked={lockedIds.has(q.id)}
+                onToggleLock={() => toggleLock(q.id)}
+              />
+            </div>
+          </div>
+        );
+      })}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+        <button
+          type="button"
+          onClick={onExportDocx}
+          disabled={exportingDocx}
+          className="w-full py-4 rounded-2xl border-2 border-dashed text-[15px] font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
+          style={{ borderColor: "var(--fm-card-border)", color: exportingDocx ? "var(--fm-text-3)" : "var(--fm-text-2)", backgroundColor: "transparent", opacity: exportingDocx ? 0.6 : 1 }}
+          onMouseEnter={e => { if (!exportingDocx) { e.currentTarget.style.borderColor = "#10b981"; e.currentTarget.style.color = "#10b981"; }}}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--fm-card-border)"; e.currentTarget.style.color = "var(--fm-text-2)"; }}
+        >
+          {exportingDocx ? (
+            <>
+              <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+              Mengekspor...
+            </>
+          ) : (
+            <>
+              <FileDown size={20} /> Ekspor Soal (.docx)
+            </>
+          )}
+        </button>
+
+        <ImportDocxButton slug={slug} onImported={onImported} onImportedSilent={onImportedSilent} onImportGuard={onImportGuard} hasUnsaved={hasUnsaved} onSaveFirst={onSaveFirst} />
+      </div>
 
       {/* Tombol template identitas */}
       <button
         onClick={onAddIdentityPage}
-        className="w-full py-4 rounded-2xl border-2 border-dashed border-emerald-200 text-emerald-600 hover:border-emerald-400 hover:bg-emerald-50 text-[14px] font-semibold transition-all flex items-center justify-center gap-2"
+        className="w-full py-4 rounded-2xl border-2 border-dashed text-[14px] font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
+        style={{ borderColor: "var(--fm-card-border)", color: "var(--fm-text-2)", backgroundColor: "transparent" }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = "#10b981"; e.currentTarget.style.color = "#10b981"; }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--fm-card-border)"; e.currentTarget.style.color = "var(--fm-text-2)"; }}
       >
         <IdCard size={18} /> Tambah Halaman Identitas (Nama, Kelas, dst.)
       </button>
 
-      {/* Import dari Word */}
-      <ImportDocxButton slug={slug} onImported={onImported} onImportedSilent={onImportedSilent} onImportGuard={onImportGuard} hasUnsaved={hasUnsaved} onSaveFirst={onSaveFirst} />
+      {/* Floating Quick Action Dock */}
+      <div className="fixed right-4 md:right-8 bottom-8 z-40 flex flex-col gap-2.5 items-end">
+        <div className="backdrop-blur-md rounded-2xl border shadow-[0_10px_35px_rgba(26,79,160,0.18)] p-1.5 flex flex-col gap-1.5"
+          style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}>
+          <button
+            type="button"
+            onClick={() => onAddQuestion()}
+            className="group relative w-11 h-11 rounded-xl bg-[#1a4fa0] text-white hover:bg-[#133d80] flex items-center justify-center transition-all shadow-sm cursor-pointer"
+            title="Tambah Pertanyaan"
+          >
+            <Plus size={20} strokeWidth={2.5} />
+            <span className="pointer-events-none absolute right-full mr-2.5 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1 text-[11px] font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+              Tambah Pertanyaan
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onAddNewPage}
+            className="group relative w-11 h-11 rounded-xl border flex items-center justify-center transition-all cursor-pointer hover:opacity-80"
+            style={{ backgroundColor: "var(--fm-hover)", color: "#6366f1", borderColor: "#a5b4fc" }}
+            title="Tambah Halaman Baru (Page Break)"
+          >
+            <Layers size={18} />
+            <span className="pointer-events-none absolute right-full mr-2.5 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1 text-[11px] font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+              Tambah Halaman Baru (Page Break)
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onAddIdentityPage}
+            className="group relative w-11 h-11 rounded-xl border flex items-center justify-center transition-all cursor-pointer hover:opacity-80"
+            style={{ backgroundColor: "var(--fm-hover)", color: "#059669", borderColor: "#6ee7b7" }}
+            title="Tambah Halaman Identitas"
+          >
+            <IdCard size={18} />
+            <span className="pointer-events-none absolute right-full mr-2.5 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1 text-[11px] font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+              Tambah Halaman Identitas
+            </span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
 /* ── Question Card ──────────────────────────────────────────── */
-function QuestionCard({ question, index, onUpdate, onUpdateOpt, onUpdateOptField, onAddOpt, onRemoveOpt, onToggleCorrect, onRemove, onDuplicate, onDragHandleStart, onDragHandleEnd, onShowToast, scoreType, totalSoal, isLocked, onToggleLock }) {
+function QuestionCard({ question, index, onUpdate, onUpdateOpt, onUpdateOptField, onAddOpt, onRemoveOpt, onToggleCorrect, onRemove, onDuplicate, onAddQuestionAfter, onAddPageBreakAfter, onDragHandleStart, onDragHandleEnd, onShowToast, scoreType, totalSoal, isLocked, onToggleLock }) {
   const hasOptions = ["radio", "checkbox"].includes(question.type);
   const [showPreview, setShowPreview] = useState(false);
   // Semua soal bisa diedit (tidak hanya yang baru)
@@ -846,9 +1088,9 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onUpdateOptField
           <span className="w-9 h-9 rounded-xl bg-[#eef5fb] text-[#1a4fa0] text-[14px] font-extrabold flex items-center justify-center shrink-0">
             {index + 1}
           </span>
-          {/* Badge halaman otomatis = posisi soal */}
-          <span className="px-2 py-0.5 rounded-lg bg-[#f0f6fe] border border-[#d4e5fa] text-[11px] font-bold text-[#1a4fa0]" title="Halaman otomatis sesuai urutan soal">
-            Hal. {index + 1}
+          {/* Badge halaman */}
+          <span className="px-2 py-0.5 rounded-lg bg-[#f0f6fe] border border-[#d4e5fa] text-[11px] font-bold text-[#1a4fa0] flex items-center gap-1" title={`Pertanyaan berada di Halaman ${question.page || 1}`}>
+            <Layers size={11} /> Hal. {question.page || 1}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -1153,6 +1395,28 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onUpdateOptField
           >
             {isLocked ? <Lock size={16} /> : <LockOpen size={16} />}
           </button>
+          {/* Tombol sisipkan Pertanyaan Baru setelah ini */}
+          {onAddQuestionAfter && (
+            <button
+              type="button"
+              title="Sisipkan pertanyaan baru tepat setelah ini"
+              onClick={onAddQuestionAfter}
+              className="h-10 px-3 rounded-xl flex items-center gap-1.5 text-[12px] font-semibold text-[#1a4fa0] hover:bg-[#eef5fb] border border-dashed border-[#c7d8e8] hover:border-[#1a4fa0] transition-all cursor-pointer"
+            >
+              <Plus size={14} strokeWidth={2.5} /> + Soal Baru
+            </button>
+          )}
+          {/* Tombol sisipkan Page Break */}
+          {onAddPageBreakAfter && (
+            <button
+              type="button"
+              title="Sisipkan Pemisah Halaman setelah pertanyaan ini"
+              onClick={onAddPageBreakAfter}
+              className="h-10 px-3 rounded-xl flex items-center gap-1.5 text-[12px] font-semibold text-gray-500 hover:text-[#1a4fa0] hover:bg-[#eef5fb] border border-dashed border-gray-200 hover:border-[#1a4fa0] transition-all cursor-pointer"
+            >
+              <Layers size={14} className="text-[#1a4fa0]" /> + Page Break
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -1187,6 +1451,7 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onUpdateOptField
 
 /* ── Responses Tab ──────────────────────────────────────────── */
 function ResponsesTab({ formId, form }) {
+  const navigate = useNavigate();
   const formSlug = form?.slug ?? form?.form_slug;
   const [summary, setSummary]           = useState(null);
   const [loading, setLoading]           = useState(true);
@@ -1379,16 +1644,26 @@ function ResponsesTab({ formId, form }) {
       {/* FORM HEADING */}
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
         <div className="flex items-center gap-3 flex-wrap">
-          <h2 className="m-0 text-[17px] font-bold text-[#142d63]">{title}</h2>
-          <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${isPublic ? "bg-[#e3f7ef] text-[#16a66b]" : "bg-[#f1f2f5] text-[#7284a3]"}`}>
+          <h2 className="m-0 text-[17px] font-bold" style={{ color: "var(--fm-text)" }}>{title}</h2>
+          <span className="px-3 py-1 rounded-full text-[11px] font-semibold"
+            style={{ backgroundColor: isPublic ? "rgba(22,166,107,0.12)" : "var(--fm-hover)", color: isPublic ? "#16a66b" : "var(--fm-text-2)" }}>
             {isPublic ? "Aktif" : "Draft"}
           </span>
         </div>
         <div className="flex gap-3">
           <button
+            onClick={() => navigate(`/form/${formSlug}/monitoring`)}
+            className="h-[39px] px-5 rounded-lg text-[12px] font-semibold border cursor-pointer transition-colors flex items-center gap-1.5"
+            style={{ backgroundColor: "rgba(234,88,12,0.1)", color: "#ea580c", borderColor: "rgba(234,88,12,0.3)" }}
+          >
+            <span className="w-2 h-2 rounded-full bg-[#ea580c] animate-pulse inline-block" />
+            Monitoring
+          </button>
+          <button
             onClick={handleExport}
             disabled={exporting || total === 0}
-            className="h-[39px] px-5 rounded-lg bg-[#eef5ff] text-[#075ee0] text-[12px] font-semibold border-none cursor-pointer hover:bg-[#daeaff] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+            className="h-[39px] px-5 rounded-lg text-[12px] font-semibold border-none cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+            style={{ backgroundColor: "rgba(7,94,224,0.1)", color: "#075ee0" }}
           >
             {exporting ? "Mengekspor..." : "↓ Ekspor Excel"}
           </button>
@@ -1402,15 +1677,14 @@ function ResponsesTab({ formId, form }) {
       </div>
 
       {/* RESPONSE CONTAINER */}
-      <div className="bg-white/90 rounded-[13px] border border-[#e5ebf4] shadow-[0_4px_20px_rgba(30,70,120,0.04)] overflow-hidden">
+      <div className="rounded-[13px] border overflow-hidden" style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}>
 
         {/* SUB TABS */}
-        <div className="h-[60px] flex items-center px-[22px] gap-9 border-b border-[#edf1f7] overflow-x-auto">
+        <div className="h-[60px] flex items-center px-[22px] gap-9 border-b overflow-x-auto" style={{ borderColor: "var(--fm-card-border)" }}>
           {["Ringkasan", "Jawaban", "Responden"].map(t => (
             <button key={t} onClick={() => handleSubTab(t)}
-              className={`relative h-[60px] flex items-center text-[13px] font-semibold border-none bg-transparent cursor-pointer transition-colors whitespace-nowrap ${
-                activeSubTab === t ? "text-[#075ee0]" : "text-[#63759b] hover:text-[#075ee0]"
-              }`}>
+              className="relative h-[60px] flex items-center text-[13px] font-semibold border-none bg-transparent cursor-pointer transition-colors whitespace-nowrap"
+              style={{ color: activeSubTab === t ? "#075ee0" : "var(--fm-text-2)" }}>
               {t}
               {activeSubTab === t && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#075ee0] rounded-t" />}
             </button>
@@ -1421,15 +1695,15 @@ function ResponsesTab({ formId, form }) {
         {loading && (
           <div className="flex flex-col items-center gap-3 py-16">
             <div className="w-8 h-8 border-[3px] border-[#dce8f7] border-t-[#075ee0] rounded-full animate-spin" />
-            <span className="text-[12px] text-[#7384a4]">Memuat respons...</span>
+            <span className="text-[12px]" style={{ color: "var(--fm-text-2)" }}>Memuat respons...</span>
           </div>
         )}
 
         {/* EMPTY */}
         {!loading && total === 0 && (
-          <div className="py-16 text-center text-[#7384a4]">
-            <Inbox size={36} className="mx-auto mb-2 text-[#b6c4dc]" />
-            <h4 className="m-0 mb-1 text-[15px] font-bold text-[#142d63]">Belum ada respons</h4>
+          <div className="py-16 text-center" style={{ color: "var(--fm-text-2)" }}>
+            <Inbox size={36} className="mx-auto mb-2" style={{ color: "var(--fm-text-3)" }} />
+            <h4 className="m-0 mb-1 text-[15px] font-bold" style={{ color: "var(--fm-text)" }}>Belum ada respons</h4>
             <p className="m-0 text-[12px]">Bagikan link form untuk mulai mengumpulkan respons.</p>
           </div>
         )}
@@ -1443,17 +1717,19 @@ function ResponsesTab({ formId, form }) {
             {/* STATISTICS */}
             <div className="grid grid-cols-4 gap-[15px] p-[22px] pb-[10px] max-[900px]:grid-cols-2">
               {[
-                { icon: Users,       color: "bg-[#edf4ff] text-[#075ee0]", label: "Total Respon",        value: total,  sub: "responden" },
-                { icon: CheckCircle2, color: "bg-[#eafaf3] text-[#18ae70]", label: "Tingkat Penyelesaian", value: "100%", sub: "selesai" },
-                { icon: Clock,       color: "bg-[#fff5e8] text-[#ee941c]", label: "Rata-rata Waktu",      value: "—",    sub: "menit" },
-                { icon: PieChart,    color: "bg-[#f5edff] text-[#8e4de7]", label: "Selesai Hari Ini",    value: 0,      sub: "responden" },
+                { icon: Users,        iconCls: "text-[#075ee0]", iconBg: "rgba(7,94,224,0.10)",   label: "Total Respon",        value: total,  sub: "responden" },
+                { icon: CheckCircle2, iconCls: "text-[#18ae70]", iconBg: "rgba(24,174,112,0.10)", label: "Tingkat Penyelesaian", value: "100%", sub: "selesai" },
+                { icon: Clock,        iconCls: "text-[#ee941c]", iconBg: "rgba(238,148,28,0.10)", label: "Rata-rata Waktu",      value: "—",    sub: "menit" },
+                { icon: PieChart,     iconCls: "text-[#8e4de7]", iconBg: "rgba(142,77,231,0.10)", label: "Selesai Hari Ini",    value: 0,      sub: "responden" },
               ].map((s, i) => (
-                <div key={i} className="min-h-[110px] border border-[#e7edf6] rounded-xl p-[17px] flex items-center gap-[15px] bg-white">
-                  <div className={`w-[43px] h-[43px] shrink-0 flex items-center justify-center rounded-[9px] ${s.color}`}><s.icon size={20} /></div>
+                <div key={i} className="min-h-[110px] border rounded-xl p-[17px] flex items-center gap-[15px]"
+                  style={{ borderColor: "var(--fm-card-border)", backgroundColor: "var(--fm-hover)" }}>
+                  <div className={`w-[43px] h-[43px] shrink-0 flex items-center justify-center rounded-[9px] ${s.iconCls}`}
+                    style={{ backgroundColor: s.iconBg }}><s.icon size={20} /></div>
                   <div>
-                    <p className="m-0 mb-1 text-[10px] text-[#64779d]">{s.label}</p>
-                    <h3 className="m-0 text-[23px] font-bold text-[#142d63]">{s.value}</h3>
-                    <span className="text-[10px] text-[#8190ad]">{s.sub}</span>
+                    <p className="m-0 mb-1 text-[10px]" style={{ color: "var(--fm-text-2)" }}>{s.label}</p>
+                    <h3 className="m-0 text-[23px] font-bold" style={{ color: "var(--fm-text)" }}>{s.value}</h3>
+                    <span className="text-[10px]" style={{ color: "var(--fm-text-3)" }}>{s.sub}</span>
                   </div>
                 </div>
               ))}
@@ -1466,16 +1742,18 @@ function ResponsesTab({ formId, form }) {
               const maxCount = Math.max(...opts.map(o => o.total_answer ?? 0), 1);
 
               return (
-                <div key={q.id ?? qi} className="mx-[22px] mb-4 border border-[#e7edf6] rounded-xl bg-white overflow-hidden">
+                <div key={q.id ?? qi} className="mx-[22px] mb-4 border rounded-xl overflow-hidden"
+                  style={{ borderColor: "var(--fm-card-border)", backgroundColor: "var(--fm-card)" }}>
                   {/* Header */}
-                  <div className="flex justify-between items-start gap-4 px-5 pt-5 pb-3 border-b border-[#f0f4fa]">
+                  <div className="flex justify-between items-start gap-4 px-5 pt-5 pb-3 border-b" style={{ borderColor: "var(--fm-card-border)" }}>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                        <span className="text-[13px] font-bold text-[#142d63]">{qi + 1}.</span>
+                        <span className="text-[13px] font-bold" style={{ color: "var(--fm-text)" }}>{qi + 1}.</span>
                         <RichTextDisplay content={q.question} />
-                        <span className="px-2 py-0.5 rounded-full bg-[#edf4ff] text-[#075ee0] text-[9px] font-bold capitalize">{q.type}</span>
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold capitalize"
+                          style={{ backgroundColor: "rgba(7,94,224,0.1)", color: "#075ee0" }}>{q.type}</span>
                       </div>
-                      <p className="text-[11px] text-[#7384a4] mt-0.5">{answered} respon</p>
+                      <p className="text-[11px] mt-0.5" style={{ color: "var(--fm-text-2)" }}>{answered} respon</p>
                     </div>
                     <ViewAllBtn q={q} total={total} formSlug={formSlug} />
                   </div>
@@ -1493,12 +1771,12 @@ function ResponsesTab({ formId, form }) {
                               {opt.value ?? opt.option_value ?? `Opsi ${oi+1}`}
                             </span>
                             <div className="flex-1 flex items-center gap-2">
-                              <div className="flex-1 h-2.5 bg-[#edf1f7] rounded-full overflow-hidden">
+                              <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ backgroundColor: "var(--fm-hover)" }}>
                                 <div className="h-full rounded-full transition-all duration-500"
                                   style={{ width: `${barPct}%`, background: CHART_COLORS[oi % CHART_COLORS.length] }} />
                               </div>
-                              <span className="text-[11px] font-bold text-[#142d63] shrink-0 w-[52px] text-right">
-                                {count} <span className="text-[#9aabbd] font-normal">({pctVal}%)</span>
+                              <span className="text-[11px] font-bold shrink-0 w-[52px] text-right" style={{ color: "var(--fm-text)" }}>
+                                {count} <span className="font-normal" style={{ color: "var(--fm-text-3)" }}>({pctVal}%)</span>
                               </span>
                             </div>
                           </div>
@@ -1508,7 +1786,7 @@ function ResponsesTab({ formId, form }) {
                   )}
                   {q.type === "text" && (
                     <div className="px-5 py-4">
-                      <p className="text-[12px] text-[#8ca0ba]">
+                      <p className="text-[12px]" style={{ color: "var(--fm-text-2)" }}>
                         {answered > 0 ? `${answered} jawaban teks masuk — klik "View All" untuk lihat.` : "Belum ada jawaban teks."}
                       </p>
                     </div>
@@ -1539,12 +1817,12 @@ function ResponsesTab({ formId, form }) {
                     });
                   });
                   const respRows = Array.from(respMap.entries());
-                  if (respRows.length === 0) return <p className="text-center text-[13px] text-[#7384a4] py-8">Belum ada jawaban.</p>;
+                  if (respRows.length === 0) return <p className="text-center text-[13px] py-8" style={{ color: "var(--fm-text-2)" }}>Belum ada jawaban.</p>;
                   return (
                     <div className="overflow-x-auto">
                       <table className="w-full text-[12px] border-collapse">
                         <thead>
-                          <tr className="bg-[#1F4E78] text-white">
+                          <tr style={{ backgroundColor: "#1F4E78", color: "white" }}>
                             <th className="px-3 py-2 text-left font-semibold border border-[#2a5f8f] w-10">No</th>
                             {soalAll.map((s, i) => (
                               <th key={s.id ?? i} className="px-3 py-2 text-left font-semibold border border-[#2a5f8f] min-w-[120px] max-w-[200px]">
@@ -1555,8 +1833,8 @@ function ResponsesTab({ formId, form }) {
                         </thead>
                         <tbody>
                           {respRows.map(([sid, data], ri) => (
-                            <tr key={sid} className={ri % 2 === 0 ? "bg-white" : "bg-[#f5f9ff]"}>
-                              <td className="px-3 py-2 border border-[#e7edf6] text-center font-semibold text-[#142d63]">{ri + 1}</td>
+                            <tr key={sid} style={{ backgroundColor: ri % 2 === 0 ? "var(--fm-card)" : "var(--fm-hover)" }}>
+                              <td className="px-3 py-2 border border-[#e7edf6] text-center font-semibold" style={{ color: "var(--fm-text)" }}>{ri + 1}</td>
                               {soalAll.map((s, i) => {
                                 const raw = data.answers[s.id];
                                 let display = "-";
@@ -1567,7 +1845,7 @@ function ResponsesTab({ formId, form }) {
                                   } else display = String(raw);
                                 }
                                 return (
-                                  <td key={s.id ?? i} className="px-3 py-2 border border-[#e7edf6] text-[#364a6e] max-w-[200px]">
+                                  <td key={s.id ?? i} className="px-3 py-2 border border-[#e7edf6] max-w-[200px]" style={{ color: "var(--fm-text)" }}>
                                     <div className="truncate">{display}</div>
                                   </td>
                                 );
@@ -1600,17 +1878,17 @@ function ResponsesTab({ formId, form }) {
                     });
                   });
                   const rows = Array.from(respMap.values());
-                  if (rows.length === 0) return <p className="text-center text-[13px] text-[#7384a4] py-8">Belum ada responden.</p>;
+                  if (rows.length === 0) return <p className="text-center text-[13px] py-8" style={{ color: "var(--fm-text-2)" }}>Belum ada responden.</p>;
                   return (
                     <div className="space-y-3">
                       {rows.map((row, i) => (
-                        <div key={row.sid} className="border border-[#e7edf6] rounded-xl bg-white p-4">
+                        <div key={row.sid} className="border rounded-xl p-4" style={{ borderColor: "var(--fm-card-border)", backgroundColor: "var(--fm-hover)" }}>
                           <div className="flex items-center gap-3 mb-3">
                             <div className="w-8 h-8 rounded-full bg-[#1a4fa0] text-white text-[13px] font-bold flex items-center justify-center shrink-0">
                               {i + 1}
                             </div>
-                            <span className="text-[13px] font-bold text-[#142d63]">Responden #{i + 1}</span>
-                            <span className="text-[11px] text-[#7384a4] ml-auto">ID: {row.sid}</span>
+                            <span className="text-[13px] font-bold" style={{ color: "var(--fm-text)" }}>Responden #{i + 1}</span>
+                            <span className="text-[11px] ml-auto" style={{ color: "var(--fm-text-2)" }}>ID: {row.sid}</span>
                           </div>
                           <div className="space-y-1.5">
                             {soalAll.map((s, si) => {
@@ -1624,11 +1902,11 @@ function ResponsesTab({ formId, form }) {
                               }
                               return (
                                 <div key={s.id ?? si} className="flex items-start gap-2 text-[12px]">
-                                  <span className="text-[#7384a4] shrink-0 w-5">{si + 1}.</span>
-                                  <span className="text-[#364a6e] font-medium shrink-0 max-w-[40%] truncate">
+                                  <span className="shrink-0 w-5" style={{ color: "var(--fm-text-2)" }}>{si + 1}.</span>
+                                  <span className="font-medium shrink-0 max-w-[40%] truncate" style={{ color: "var(--fm-text-2)" }}>
                                     {(s.question ?? "").replace(/<[^>]*>/g, "").slice(0, 35)}:
                                   </span>
-                                  <span className="text-[#142d63] flex-1">{display}</span>
+                                  <span className="flex-1" style={{ color: "var(--fm-text)" }}>{display}</span>
                                 </div>
                               );
                             })}
@@ -1686,23 +1964,26 @@ function ViewAllBtn({ q, total, formSlug }) {
   return (
     <>
       <button onClick={loadDetail}
-        className="shrink-0 px-3 py-1.5 rounded-lg bg-[#eef5ff] text-[#075ee0] text-[11px] font-semibold border-none cursor-pointer hover:bg-[#daeaff] transition-colors whitespace-nowrap">
+        className="shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-semibold border-none cursor-pointer transition-colors whitespace-nowrap"
+        style={{ backgroundColor: "rgba(7,94,224,0.1)", color: "#075ee0" }}>
         View All →
       </button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
           onClick={() => setOpen(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden"
+          <div className="rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden"
+            style={{ backgroundColor: "var(--fm-card)", border: "1px solid var(--fm-card-border)" }}
             onClick={e => e.stopPropagation()}>
             {/* Header */}
-            <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3">
+            <div className="px-5 py-4 border-b flex items-start justify-between gap-3" style={{ borderColor: "var(--fm-card-border)" }}>
               <div className="flex-1 min-w-0">
-                <p className="text-[12px] font-bold text-gray-400 uppercase tracking-wide mb-1">Semua Jawaban</p>
+                <p className="text-[12px] font-bold uppercase tracking-wide mb-1" style={{ color: "var(--fm-text-2)" }}>Semua Jawaban</p>
                 <RichTextDisplay content={q.question} />
               </div>
               <button onClick={() => setOpen(false)}
-                className="text-gray-400 hover:text-gray-600 text-xl leading-none border-none bg-transparent cursor-pointer shrink-0">×</button>
+                className="text-xl leading-none border-none bg-transparent cursor-pointer shrink-0"
+                style={{ color: "var(--fm-text-2)" }}>×</button>
             </div>
 
             {/* Content */}
@@ -1714,13 +1995,14 @@ function ViewAllBtn({ q, total, formSlug }) {
               )}
 
               {!loading && answers.length === 0 && (
-                <p className="text-[13px] text-gray-400 text-center py-8">Belum ada jawaban.</p>
+                <p className="text-[13px] text-center py-8" style={{ color: "var(--fm-text-2)" }}>Belum ada jawaban.</p>
               )}
 
               {!loading && answers.length > 0 && (
                 <div className="space-y-2">
                   {answers.map((ans, i) => (
-                    <div key={i} className="px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[13px] text-[#364a6e]">
+                    <div key={i} className="px-4 py-3 rounded-xl text-[13px]"
+                      style={{ backgroundColor: "var(--fm-hover)", border: "1px solid var(--fm-card-border)", color: "var(--fm-text)" }}>
                       {typeof ans === "string" ? ans : JSON.stringify(ans)}
                     </div>
                   ))}
@@ -1729,7 +2011,7 @@ function ViewAllBtn({ q, total, formSlug }) {
             </div>
 
             {/* Footer */}
-            <div className="px-5 py-3 border-t border-gray-100 text-[12px] text-gray-400 text-right">
+            <div className="px-5 py-3 border-t text-[12px] text-right" style={{ borderColor: "var(--fm-card-border)", color: "var(--fm-text-2)" }}>
               {answers.length} jawaban
             </div>
           </div>
@@ -1966,14 +2248,124 @@ function SettingsTab({ form, onUpdateStatus, slug, onSaved }) {
     window.dispatchEvent(new StorageEvent("storage", { key, newValue: val }));
   }
 
+  // Banner state
+  const [bannerPreview, setBannerPreview] = useState(form?.banner ?? form?.form_banner ?? null);
+  const [bannerUploading, setBannerUploading] = useState(false);
+  const [bannerMsg, setBannerMsg] = useState("");
+  const bannerInputRef = useRef(null);
+
+  async function uploadBanner(file) {
+    if (!file) return;
+    setBannerUploading(true); setBannerMsg("");
+    try {
+      const fd = new FormData();
+      fd.append("banner", file);
+      const res = await fetch(`${FORM_API_URL}/form/banner?form_slug=${form?.slug ?? slug}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setBannerPreview(data?.data?.banner);
+        onSaved?.({ banner: data?.data?.banner, form_banner: data?.data?.banner });
+        setBannerMsg("Banner berhasil diupdate!");
+      } else {
+        setBannerMsg(data?.message || "Gagal upload banner.");
+      }
+    } catch { setBannerMsg("Gagal upload banner."); }
+    finally { setBannerUploading(false); setTimeout(() => setBannerMsg(""), 3000); }
+  }
+
+  async function deleteBanner() {
+    setBannerUploading(true); setBannerMsg("");
+    try {
+      const res = await fetch(`${FORM_API_URL}/form/banner?form_slug=${form?.slug ?? slug}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      if (res.ok) {
+        setBannerPreview(null);
+        onSaved?.({ banner: null, form_banner: null });
+        setBannerMsg("Banner berhasil dihapus.");
+      } else {
+        setBannerMsg("Gagal hapus banner.");
+      }
+    } catch { setBannerMsg("Gagal hapus banner."); }
+    finally { setBannerUploading(false); setTimeout(() => setBannerMsg(""), 3000); }
+  }
+
   return (
     <div className="max-w-2xl mx-auto py-8 px-4 space-y-4">
 
-      {/* Status Publikasi */}
-      <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-sm p-6 flex items-center justify-between gap-4">
+      {/* Banner Form */}
+      <div className="rounded-2xl border shadow-sm p-6 space-y-4" style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}>
         <div>
-          <p className="font-bold text-gray-700 text-[15px]">Status Publikasi</p>
-          <p className="text-[13px] text-gray-400 mt-1">
+          <p className="font-bold text-[15px]" style={{ color: "var(--fm-text)" }}>Banner Form</p>
+          <p className="text-[13px] mt-1" style={{ color: "var(--fm-text-2)" }}>Gambar header yang ditampilkan di atas form. Ukuran optimal 1200×400px.</p>
+        </div>
+
+        {/* Preview banner */}
+        {bannerPreview ? (
+          <div className="relative rounded-xl overflow-hidden border" style={{ borderColor: "var(--fm-card-border)" }}>
+            <img
+              src={bannerPreview.startsWith("http") ? bannerPreview : `${FORM_API_URL}${bannerPreview}`}
+              alt="Banner"
+              className="w-full h-[140px] object-cover"
+            />
+            <button
+              onClick={deleteBanner}
+              disabled={bannerUploading}
+              className="absolute top-2 right-2 w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shadow-md disabled:opacity-60"
+              title="Hapus banner"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ) : (
+          <div
+            className="w-full h-[120px] rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors"
+            style={{ borderColor: "var(--fm-card-border)", backgroundColor: "var(--fm-hover)" }}
+            onClick={() => bannerInputRef.current?.click()}
+          >
+            <ImagePlus size={24} style={{ color: "var(--fm-text-3)" }} />
+            <span className="text-[13px] font-medium" style={{ color: "var(--fm-text-2)" }}>Klik untuk upload banner</span>
+            <span className="text-[11px]" style={{ color: "var(--fm-text-3)" }}>JPG, PNG, WEBP — maks 5MB</span>
+          </div>
+        )}
+
+        <input
+          ref={bannerInputRef}
+          type="file"
+          accept=".jpg,.jpeg,.png,.webp"
+          className="hidden"
+          onChange={e => { if (e.target.files?.[0]) uploadBanner(e.target.files[0]); e.target.value = ""; }}
+        />
+
+        {bannerPreview && (
+          <button
+            onClick={() => bannerInputRef.current?.click()}
+            disabled={bannerUploading}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold border transition-all disabled:opacity-60"
+            style={{ borderColor: "var(--fm-card-border)", color: "var(--fm-text-2)", backgroundColor: "var(--fm-hover)" }}
+          >
+            <ImagePlus size={15} />
+            {bannerUploading ? "Mengupload..." : "Ganti Banner"}
+          </button>
+        )}
+
+        {bannerMsg && (
+          <p className={`text-[12px] font-medium ${bannerMsg.includes("berhasil") ? "text-green-600" : "text-red-500"}`}>
+            {bannerMsg}
+          </p>
+        )}
+      </div>
+
+      {/* Status Publikasi */}
+      <div className="rounded-2xl border shadow-sm p-6 flex items-center justify-between gap-4" style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}>
+        <div>
+          <p className="font-bold text-[15px]" style={{ color: "var(--fm-text)" }}>Status Publikasi</p>
+          <p className="text-[13px] mt-1" style={{ color: "var(--fm-text-2)" }}>
             {isPublic ? "Form dapat diisi oleh siapa saja dengan link." : "Form bersifat privat."}
           </p>
         </div>
@@ -1990,7 +2382,7 @@ function SettingsTab({ form, onUpdateStatus, slug, onSaved }) {
               <p className="font-bold text-gray-700 text-[15px]">Token Responden</p>
               <p className="text-[13px] text-gray-400 mt-0.5">
                 {tokenActive
-                  ? <span>Token aktif — responden wajib memasukkan kode.</span>
+                  ? <span>Token aktif — responden wajib memasukkan kode. <span className="font-mono font-bold text-[#1a4fa0]">{form?.token_respon && `(${form.token_respon})`}</span></span>
                   : "Tidak ada token — form dapat diisi siapa saja."
                 }
               </p>
@@ -2207,50 +2599,31 @@ function Toggle({ value, onChange }) {
   );
 }
 
-/* ── Import Docx Button & Template Download ─────────────────────────────────────── */
+/* ── Import Docx Button ─────────────────────────────────────── */
 function ImportDocxButton({ slug, onImported, onImportedSilent, onImportGuard, hasUnsaved, onSaveFirst }) {
   const [importing, setImporting] = useState(false);
   const [savingFirst, setSavingFirst] = useState(false);
   const [alertState, setAlertState] = useState({ open: false, type: "info", title: "", message: "" });
-  const [toast, setToast] = useState("");
-
-  function showMsg(msg) {
-    setToast(msg);
-    setTimeout(() => { setToast(""); }, 4000);
-  }
 
   async function handleFile(e) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
 
-    // Auto-save soal yang belum tersimpan (identitas dll) sebelum import
     if (hasUnsaved && onSaveFirst) {
       setSavingFirst(true);
       try { await onSaveFirst(); } catch {}
       setSavingFirst(false);
     }
 
-    // Validasi Ekstensi & MIME
     if (!file.name.toLowerCase().endsWith(".docx")) {
-      setAlertState({
-        open: true,
-        type: "error",
-        title: "Format File Tidak Valid",
-        message: "Hanya file berekstensi .docx yang diperbolehkan untuk impor soal.",
-      });
+      setAlertState({ open: true, type: "error", title: "Format File Tidak Valid", message: "Hanya file berekstensi .docx yang diperbolehkan untuk impor soal." });
       return;
     }
 
-    // Validasi Ukuran File (Maksimal 5MB)
     const MAX_SIZE = 5 * 1024 * 1024;
     if (file.size > MAX_SIZE) {
-      setAlertState({
-        open: true,
-        type: "warning",
-        title: "Ukuran File Terlalu Besar",
-        message: `Ukuran file ${(file.size / (1024 * 1024)).toFixed(2)} MB melebihi batas maksimal 5 MB.`,
-      });
+      setAlertState({ open: true, type: "warning", title: "Ukuran File Terlalu Besar", message: `Ukuran file ${(file.size / (1024 * 1024)).toFixed(2)} MB melebihi batas maksimal 5 MB.` });
       return;
     }
 
@@ -2267,83 +2640,41 @@ function ImportDocxButton({ slug, onImported, onImportedSilent, onImportGuard, h
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.message || "Gagal mengimpor file.");
       const count = data?.data?.list_soal?.length ?? 0;
-      setAlertState({
-        open: true,
-        type: "success",
-        title: "Impor Soal Berhasil",
-        message: `Berhasil mengimpor ${count} butir soal dari dokumen Word ke dalam formulir.`,
-      });
+      setAlertState({ open: true, type: "success", title: "Impor Soal Berhasil", message: `Berhasil mengimpor ${count} butir soal dari dokumen Word ke dalam formulir.` });
       setTimeout(() => { onImportedSilent?.(); }, 500);
     } catch (e) {
-      setAlertState({
-        open: true,
-        type: "error",
-        title: "Gagal Impor Soal",
-        message: e.message || "Terjadi kesalahan saat memproses file .docx.",
-      });
+      setAlertState({ open: true, type: "error", title: "Gagal Impor Soal", message: e.message || "Terjadi kesalahan saat memproses file .docx." });
       onImportGuard?.(false);
     } finally {
       setImporting(false);
     }
   }
 
-  const [showGuide, setShowGuide] = useState(false);
-
   return (
-    <div className="space-y-3 pt-2">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {/* Tombol Unduh Template */}
-        <a
-          href="/soal.docx"
-          download="Template_Soal_FormMaker.docx"
-          className="py-3 px-4 rounded-2xl border border-[#c7d8e8] bg-[#f8fbfe] hover:bg-[#eef5fb] text-[#1a4fa0] text-[13.5px] font-semibold flex items-center justify-center gap-2 transition-all shadow-xs"
-        >
-          <Download size={17} /> Unduh Template Soal (.docx)
-        </a>
-
-        {/* Tombol Upload File Docx */}
-        <div className="relative">
-          <label className={`w-full py-3 pl-4 pr-12 rounded-2xl border-2 border-dashed flex items-center justify-center gap-2 text-[13.5px] font-semibold transition-all cursor-pointer shadow-xs ${
-            importing
-              ? "border-gray-200 text-gray-400 cursor-not-allowed bg-gray-50"
-              : "border-[#c7d8e8] bg-white text-gray-600 hover:border-[#1a4fa0] hover:text-[#1a4fa0]"
-          }`}>
-            {savingFirst ? (
-              <>
-                <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                Menyimpan soal dulu...
-              </>
-            ) : importing ? (
-              <>
-                <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                Mengimpor soal...
-              </>
-            ) : (
-              <>
-                <UploadCloud size={17} /> Impor Soal dari Word (.docx)
-              </>
-            )}
-            <input type="file" accept=".docx" onChange={handleFile} disabled={importing || savingFirst} className="hidden" />
-          </label>
-          {/* Info button — panduan struktur template */}
-          <button
-            type="button"
-            onClick={() => setShowGuide(true)}
-            title="Lihat panduan struktur template"
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center text-[#1a4fa0] bg-[#eef5fb] hover:bg-[#daeaf7] transition-colors"
-          >
-            <Info size={15} />
-          </button>
-        </div>
-      </div>
-
-      {toast && (
-        <div className="px-4 py-3 rounded-xl bg-green-50 border border-green-200 text-green-700 text-[13px] text-center">
-          {toast}
-        </div>
-      )}
-
-      {/* Alert Modal untuk Hasil Import / Error Validasi */}
+    <>
+      <label
+        className="w-full py-4 rounded-2xl border-2 border-dashed flex items-center justify-center gap-2 text-[15px] font-semibold transition-all cursor-pointer"
+        style={{ borderColor: "var(--fm-card-border)", color: importing || savingFirst ? "var(--fm-text-3)" : "var(--fm-text-2)", backgroundColor: "transparent", opacity: importing || savingFirst ? 0.6 : 1 }}
+        onMouseEnter={e => { if (!importing && !savingFirst) { e.currentTarget.style.borderColor = "#1a4fa0"; e.currentTarget.style.color = "#1a4fa0"; }}}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--fm-card-border)"; e.currentTarget.style.color = "var(--fm-text-2)"; }}
+      >
+        {savingFirst ? (
+          <>
+            <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+            Menyimpan dulu...
+          </>
+        ) : importing ? (
+          <>
+            <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+            Mengimpor soal...
+          </>
+        ) : (
+          <>
+            <UploadCloud size={20} /> Impor Soal (.docx)
+          </>
+        )}
+        <input type="file" accept=".docx" onChange={handleFile} disabled={importing || savingFirst} className="hidden" />
+      </label>
       <AlertModal
         open={alertState.open}
         type={alertState.type}
@@ -2351,10 +2682,7 @@ function ImportDocxButton({ slug, onImported, onImportedSilent, onImportGuard, h
         message={alertState.message}
         onConfirm={() => setAlertState({ ...alertState, open: false })}
       />
-
-      {/* Modal Panduan Struktur Template */}
-      {showGuide && <TemplateGuideModal onClose={() => setShowGuide(false)} />}
-    </div>
+    </>
   );
 }
 

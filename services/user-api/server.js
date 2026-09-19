@@ -7,17 +7,22 @@ const cors = require("cors")
 const { pool } = require("./db")
 const bcrypt = require("bcrypt")
 const pLimit = require("p-limit")
+const { rateLimit } = require("express-rate-limit")
 
 const limit = pLimit(10)
 
 app.use(express.json())
-app.use(cors())
+app.use(cors({
+    origin: ["https://formatic.commandspes.tech", "http://localhost:5173", "http://localhost:3000"],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    credentials: true
+}))
 
-function jwtToken(payload){
-    return jwt.sign(payload, process.env.SECRET, { expiresIn: '365d'})
+function jwtToken(payload) {
+    return jwt.sign(payload, process.env.SECRET, { expiresIn: '365d' })
 }
 
-function isPasswordStrong(password){
+function isPasswordStrong(password) {
     const minLength = password.length >= 8
     const hasUpperCase = /[A-Z]/.test(password)
     const hasLowerCase = /[a-z]/.test(password)
@@ -26,27 +31,49 @@ function isPasswordStrong(password){
     return minLength && hasLowerCase && hasUpperCase && hasNumber
 }
 
+const loginLimit = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    message: {
+        status: 429,
+        error: "Terlalu Banyak Percobaan Login, Silakan Coba Lagi Nanti"
+    },
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+})
+
+const registerLimit = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 2,
+    message: {
+        status: 429,
+        error: "Terlalu Banyak Percobaan Register, Silakan Coba Lagi Nanti"
+    },
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+})
+
 async function queryWithLimit(text, params) {
     return limit(() => pool.query(text, params))
 }
 
-async function userExist(username){
+async function userExist(username) {
     try {
         const get = await pool.query(
-            `SELECT id, username, password FROM users WHERE username = $1`, 
+            `SELECT id, username, password FROM users WHERE username = $1`,
             [username]
         )
-        
+
         if (get.rows.length === 0) return null
         return get.rows[0]
-    } catch(err) {
+    } catch (err) {
         console.error('userExist error:', err.message)
         return null
     }
 }
 
 // Register
-app.post('/user/register', async (req, res) => {
+app.post('/user/register', registerLimit, async (req, res) => {
     try {
         const { username, password } = req.body
 
@@ -66,7 +93,7 @@ app.post('/user/register', async (req, res) => {
         }
 
         const isSpace = password.trim()
-        if(!isPasswordStrong(isSpace)){
+        if (!isPasswordStrong(isSpace)) {
             return res.status(400).json({
                 status: 400,
                 message: "Password Min 8 Char, 1 Kapital, 1 Lower"
@@ -74,13 +101,13 @@ app.post('/user/register', async (req, res) => {
         }
 
         const hashPassword = await bcrypt.hash(password, 10)
-        
+
         const register = await queryWithLimit(
-            `INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id, username`, 
+            `INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id, username`,
             [username, hashPassword]
         )
 
-        const token = jwtToken({id: register.rows[0].id, username: register.rows[0].username})
+        const token = jwtToken({ id: register.rows[0].id, username: register.rows[0].username })
 
         return res.status(201).json({
             status: 201,
@@ -99,7 +126,7 @@ app.post('/user/register', async (req, res) => {
 })
 
 // Login
-app.post('/user/login', async (req, res) => {
+app.post('/user/login', loginLimit, async (req, res) => {
     try {
         const { username, password } = req.body
         if (!username || !password) {
@@ -163,7 +190,7 @@ app.put('/user/forgot-password', async (req, res) => {
         }
 
         const cleanCode = password.trim()
-        if(!isPasswordStrong(cleanCode)){
+        if (!isPasswordStrong(cleanCode)) {
             return res.status(400).json({
                 status: 400,
                 message: "Password Min 8 Char, 1 Kapital, 1 Lower"

@@ -61,7 +61,7 @@ export class FormController {
           new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
           new CustomFileTypeValidator({ fileType: /^image\/(jpeg|png|webp)$/ })
         ],
-        fileIsRequired: true
+        fileIsRequired: false
       }),
     )
     banner: Express.Multer.File,
@@ -85,7 +85,50 @@ export class FormController {
     return this.formService.postPublic(req.user, form_slug, status)
   }
 
-  // Update Form
+  // Update Banner Form
+  @Patch('/banner')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(
+    FileInterceptor('banner', {
+      storage: diskStorage({
+        destination: './uploads/banner',
+        filename: (req, file, cb) => {
+          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const ext = extname(file.originalname);
+          cb(null, `banner-${uniqueSuffix}${ext}`);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
+        if (allowed.includes(extname(file.originalname).toLowerCase())) {
+          cb(null, true);
+        } else {
+          cb(new BadRequestException('Format file tidak didukung. Gunakan JPG, PNG, atau WEBP.'), false);
+        }
+      },
+      limits: { fileSize: 5 * 1024 * 1024 }, // max 5MB
+    }),
+  )
+  updateBanner(
+    @Request() req,
+    @Query('form_slug', ValidateFormExist) form_slug,
+    @UploadedFile() banner: Express.Multer.File,
+  ) {
+    if (!banner) throw new BadRequestException('File banner wajib diunggah');
+    return this.formService.updateBanner(req.user, form_slug, banner);
+  }
+
+  // Delete Banner Form
+  @Delete('/banner')
+  @UseGuards(JwtAuthGuard)
+  deleteBanner(
+    @Request() req,
+    @Query('form_slug', ValidateFormExist) form_slug,
+  ) {
+    return this.formService.deleteBanner(req.user, form_slug);
+  }
+
+  // Update Form Setting
   @Patch('/setting')
   @UseGuards(JwtAuthGuard)
   updateForm(

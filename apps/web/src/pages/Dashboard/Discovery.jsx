@@ -1,19 +1,19 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { FORM_API_URL, flattenForm } from "../../utils/api";
-import { Search, X, BookOpen, Copy, Check, FileText, ClipboardList } from "lucide-react";
+import { Search, BookOpen, Copy, Check, FileText, ClipboardList, Filter } from "lucide-react";
 import RichTextDisplay from "../../components/RichTextDisplay";
-
-const CATEGORIES = ["Semua", "ujian", "survei"];
-const CHART_COLORS = ["#3d91ef","#19c26b","#31b8b2","#ff626b","#a55be9","#f5a623"];
 
 export default function Discovery() {
   const navigate = useNavigate();
   const [forms, setForms]       = useState([]);
   const [loading, setLoading]   = useState(true);
   const [search, setSearch]     = useState("");
-  const [category, setCategory] = useState("Semua");
-  const [selected, setSelected] = useState(null); // form yang dipilih untuk preview
+  const [primaryFilter, setPrimaryFilter] = useState("Semua"); // ujian / survei / Semua
+  const [subFilter, setSubFilter]         = useState("Semua"); // mata pelajaran
+  const [primaryList, setPrimaryList]     = useState([]);
+  const [subList, setSubList]             = useState([]);
+  const [selected, setSelected] = useState(null);
   const [soal, setSoal]         = useState([]);
   const [soalLoading, setSoalLoading] = useState(false);
   const [copying, setCopying]   = useState(false);
@@ -31,7 +31,24 @@ export default function Discovery() {
       const all = (res.data?.data?.forms ?? []).map(flattenForm);
       setMyForms(all.filter(f => f.access_type === "Creator"));
     }).catch(() => {});
+
+    // Load kategori untuk filter
+    api.get("/kategori/primary").then(res => {
+      setPrimaryList(res.data?.data ?? []);
+    }).catch(() => {});
   }, []);
+
+  // Load sub kategori saat primary berubah
+  useEffect(() => {
+    setSubFilter("Semua");
+    setSubList([]);
+    if (primaryFilter === "Semua") return;
+    const found = primaryList.find(p => p.name === primaryFilter);
+    if (!found) return;
+    api.get(`/kategori/sub/${found.id}`).then(res => {
+      setSubList(res.data?.data ?? []);
+    }).catch(() => {});
+  }, [primaryFilter, primaryList]);
 
   async function openForm(form) {
     setSelected(form);
@@ -85,8 +102,9 @@ export default function Discovery() {
 
   const filtered = forms.filter(f => {
     const matchSearch = (f.title ?? "").toLowerCase().includes(search.toLowerCase());
-    const matchCat    = category === "Semua" || f.category === category;
-    return matchSearch && matchCat;
+    const matchPrimary = primaryFilter === "Semua" || (f.primary_kategori ?? "").toLowerCase() === primaryFilter.toLowerCase();
+    const matchSub     = subFilter === "Semua" || (f.sub_kategori ?? "").toLowerCase() === subFilter.toLowerCase();
+    return matchSearch && matchPrimary && matchSub;
   });
 
   return (
@@ -122,17 +140,47 @@ export default function Discovery() {
                 style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-border)", color: "var(--fm-text)" }}
               />
             </div>
-            <div className="flex gap-2">
-              {CATEGORIES.map(c => (
-                <button key={c} onClick={() => setCategory(c)}
+            <div className="flex flex-wrap gap-2 items-center min-h-[42px]">
+              {/* Primary filter buttons */}
+              {["Semua", ...primaryList.map(p => p.name)].map(p => (
+                <button key={p} onClick={() => setPrimaryFilter(p)}
                   className="px-4 py-2 rounded-xl text-[13px] font-semibold border transition capitalize"
-                  style={category === c
+                  style={primaryFilter === p
                     ? { backgroundColor: "#1a4fa0", color: "#fff", borderColor: "#1a4fa0" }
                     : { backgroundColor: "var(--fm-card)", color: "var(--fm-text-2)", borderColor: "var(--fm-border)" }
                   }>
-                  {c === "Semua" ? "Semua" : c === "ujian" ? "Ujian" : "Survei"}
+                  {p === "Semua" ? "Semua" : p}
                 </button>
               ))}
+
+              {/* Sub kategori — dropdown dengan animasi */}
+              {subList.length > 0 && (
+                <>
+                  <span className="self-center text-gray-400 text-[12px]">•</span>
+                  <div className="relative" style={{ animation: "fadeSlideIn 0.2s ease" }}>
+                    <select
+                      value={subFilter}
+                      onChange={e => setSubFilter(e.target.value)}
+                      className="appearance-none pl-3 pr-8 py-2 rounded-xl border text-[13px] font-semibold outline-none cursor-pointer transition-all duration-200"
+                      style={{
+                        backgroundColor: subFilter !== "Semua" ? "#6366f1" : "var(--fm-card)",
+                        color: subFilter !== "Semua" ? "#fff" : "var(--fm-text-2)",
+                        borderColor: subFilter !== "Semua" ? "#6366f1" : "var(--fm-border)",
+                      }}
+                    >
+                      <option value="Semua">Semua Mapel</option>
+                      {subList.map(s => (
+                        <option key={s.id} value={s.name}>{s.name}</option>
+                      ))}
+                    </select>
+                    {/* Chevron icon */}
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-[11px]"
+                      style={{ color: subFilter !== "Semua" ? "#fff" : "var(--fm-text-2)" }}>
+                      ▾
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 

@@ -28,7 +28,9 @@
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/platform-socket.io": "^11.2.3",
     "@nestjs/websockets": "^11.2.3",
+    "@types/uuid": "^10.0.0",
     "crypto": "^1.0.1",
+    "docx": "^9.7.1",
     "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",
     "fast-xml-parser": "^5.11.1",
@@ -45,7 +47,8 @@
     "slugify": "^1.6.9",
     "socket.io": "^4.8.3",
     "swagger-jsdoc": "^6.3.0",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^14.0.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
@@ -75,7 +78,7 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0",
-    "uuid": "^14.0.2"
+    "uuid": "^10.0.0"
   },
   "jest": {
     "moduleFileExtensions": [

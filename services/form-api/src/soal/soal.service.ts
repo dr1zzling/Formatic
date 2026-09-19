@@ -5,6 +5,7 @@ import JSZip from 'jszip'
 import * as fs from 'fs'
 import * as path from 'path'
 import { v4 as uuidv4 } from 'uuid'
+import { Document, Packer, Paragraph, TextRun } from 'docx'
 
 @Injectable()
 export class SoalService {
@@ -414,6 +415,50 @@ export class SoalService {
         const result = Object.values(grouped) as Array<{ page: number, soal: any[] }>
 
         return result.sort((a, b) => (a.page ?? 1) - (b.page ?? 1))
+    }
+
+    async exportDocx(form: { id: number; title?: string; name?: string }) {
+        const pages = await this.getSoalByForm(form.id)
+        const plainText = (value: unknown) => String(value ?? '')
+            .replace(/<br\s*\/?>/gi, '\n')
+            .replace(/<[^>]+>/g, '')
+            .replace(/&nbsp;/g, ' ')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .trim()
+
+        let questionNumber = 0
+        const paragraphs: Paragraph[] = [
+            new Paragraph({
+                children: [new TextRun({ text: form.title || form.name || 'Soal', bold: true })],
+                spacing: { after: 240 },
+            }),
+        ]
+
+        for (const page of pages as any[]) {
+            for (const item of page.soal || []) {
+                questionNumber += 1
+                paragraphs.push(new Paragraph({
+                    children: [new TextRun(`${questionNumber}. ${plainText(item.question)}`)],
+                    spacing: { after: 100 },
+                }))
+
+                for (const [index, option] of (item.options || []).entries()) {
+                    paragraphs.push(new Paragraph({
+                        children: [new TextRun(`   ${String.fromCharCode(65 + index)}. ${plainText(option.value)}`)],
+                        spacing: { after: 80 },
+                    }))
+                }
+
+                paragraphs.push(new Paragraph({
+                    spacing: { after: 100 },
+                }))
+            }
+        }
+
+        const document = new Document({ sections: [{ children: paragraphs }] })
+        return Packer.toBuffer(document)
     }
 
     // Create Soal And Option

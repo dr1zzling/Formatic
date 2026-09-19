@@ -19,9 +19,12 @@ const SCHEMES = [
 /* ── Trash storage helpers ───────────────────────────────────── */
 export function addToTrash(form) {
   const list = getTrashList();
-  const filtered = list.filter(f => f.form_slug !== form.form_slug);
+  const slug = form.form_slug ?? form.slug;
+  const filtered = list.filter(f => (f.form_slug ?? f.slug) !== slug);
   const entry = {
     ...form,
+    form_slug: slug, // normalize
+    form_title: form.form_title ?? form.title,
     deleted_at: Date.now(),
     expires_at: Date.now() + DAYS_30,
   };
@@ -41,7 +44,7 @@ function getTrashList() {
 }
 
 function removeFromTrash(slug) {
-  const list = getTrashList().filter(f => f.form_slug !== slug);
+  const list = getTrashList().filter(f => (f.form_slug ?? f.slug) !== slug);
   localStorage.setItem(TRASH_KEY, JSON.stringify(list));
 }
 
@@ -78,9 +81,8 @@ export default function Trash() {
 
   async function restore(form) {
     try {
-      // Form masih ada di DB dengan status private — cukup keluarkan dari trash localStorage
-      // Status tetap private, user bisa publish ulang dari MyForms
-      removeFromTrash(form.form_slug);
+      const slug = form.form_slug ?? form.slug;
+      removeFromTrash(slug);
       showToast("Form berhasil dipulihkan ke My Forms!");
       load();
     } catch { showToast("Gagal memulihkan."); }
@@ -92,13 +94,14 @@ export default function Trash() {
 
   async function doDestroy(form) {
     setConfirmDestroy(null);
+    const slug = form.form_slug ?? form.slug;
     try {
-      const res = await fetch(`${FORM_API_URL}/form?form_slug=${form.form_slug}`, {
+      const res = await fetch(`${FORM_API_URL}/form?form_slug=${slug}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       if (!res.ok) throw new Error();
-      removeFromTrash(form.form_slug);
+      removeFromTrash(slug);
       showToast("Form dihapus permanen.");
       load();
     } catch { showToast("Gagal menghapus."); }
@@ -107,10 +110,12 @@ export default function Trash() {
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(""), 3000); }
 
   const visible = forms.filter(f => {
-    const t = (f.form_title ?? "").toLowerCase().includes(search.toLowerCase());
+    const title = (f.form_title ?? f.title ?? "").toLowerCase();
+    const cat   = (f.category ?? f.sub_kategori ?? "").toLowerCase();
+    const t = title.includes(search.toLowerCase());
     if (!t) return false;
-    if (filter === "Survey")    return f.category === "survei" || f.category === "survey";
-    if (filter === "Quiz/Ujian") return f.category === "ujian";
+    if (filter === "Survey")    return cat === "survei" || cat === "survey";
+    if (filter === "Quiz/Ujian") return cat === "ujian";
     return true;
   });
 
@@ -198,7 +203,7 @@ export default function Trash() {
             const days   = daysLeft(form.expires_at);
             const urgent = days <= 3;
             return (
-              <div key={form.form_slug ?? i}
+              <div key={form.form_slug ?? form.slug ?? i}
                 className="rounded-xl border flex items-center gap-0 overflow-hidden hover:shadow-sm transition group"
                 style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
 
@@ -213,9 +218,9 @@ export default function Trash() {
 
                 {/* Info */}
                 <div className="flex-1 min-w-0 px-3 sm:px-4 py-3">
-                  <p className="text-[13px] font-semibold text-gray-800 truncate">{form.form_title ?? "Untitled"}</p>
+                  <p className="text-[13px] font-semibold text-gray-800 truncate">{form.form_title ?? form.title ?? "Untitled"}</p>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                    <span className="text-[11px] text-gray-400">{form.category ?? "—"}</span>
+                    <span className="text-[11px] text-gray-400">{form.category ?? form.sub_kategori ?? "—"}</span>
                     <span className="text-gray-300 text-[10px]">·</span>
                     <span className="text-[11px] text-gray-400">{timeAgoDelete(form.deleted_at)}</span>
                     <span className="text-gray-300 text-[10px]">·</span>
@@ -260,7 +265,7 @@ export default function Trash() {
         open={!!confirmDestroy}
         type="trash"
         title="Hapus Permanen?"
-        message={`Form "${confirmDestroy?.form_title}" akan dihapus selamanya. Tindakan ini tidak bisa dibatalkan.`}
+        message={`Form "${confirmDestroy?.form_title ?? confirmDestroy?.title}" akan dihapus selamanya. Tindakan ini tidak bisa dibatalkan.`}
         confirmLabel="Hapus Permanen"
         cancelLabel="Batal"
         onConfirm={() => doDestroy(confirmDestroy)}

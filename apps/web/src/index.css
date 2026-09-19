@@ -269,6 +269,77 @@ body {
 [data-theme="dark"] .h-px { background-color: var(--fm-border) !important; }
 [data-theme="dark"] .divide-gray-100 > * + * { border-color: var(--fm-border) !important; }
 
+/* ── Dark mode: semua background Tailwind yang belum tertangkap ── */
+[data-theme="dark"] .bg-\[\#f7fafd\],
+[data-theme="dark"] .bg-\[\#f5f9ff\],
+[data-theme="dark"] .bg-\[\#f0f7ff\],
+[data-theme="dark"] .bg-\[\#eef5fb\],
+[data-theme="dark"] .bg-\[\#f4fafd\],
+[data-theme="dark"] .bg-\[\#f7fbff\] { background-color: var(--fm-hover) !important; }
+
+/* ── Dark mode: teks warna spesifik FormEditor/FillForm ─────── */
+[data-theme="dark"] .text-\[\#102f56\],
+[data-theme="dark"] .text-\[\#183056\],
+[data-theme="dark"] .text-\[\#103b86\],
+[data-theme="dark"] .text-\[\#1a4fa0\] { color: #7ab3ef !important; }
+[data-theme="dark"] .text-\[\#17366d\],
+[data-theme="dark"] .text-\[\#142d63\] { color: var(--fm-text) !important; }
+[data-theme="dark"] .text-\[\#4d6a82\],
+[data-theme="dark"] .text-\[\#7290a9\],
+[data-theme="dark"] .text-\[\#55738d\],
+[data-theme="dark"] .text-\[\#87a1b5\] { color: var(--fm-text-2) !important; }
+
+/* ── Dark mode: border warna spesifik ───────────────────────── */
+[data-theme="dark"] .border-\[\#d9e8f1\],
+[data-theme="dark"] .border-\[\#d6e5ee\],
+[data-theme="dark"] .border-\[\#edf3f7\],
+[data-theme="dark"] .border-\[\#d4e5fa\],
+[data-theme="dark"] .border-\[\#c5dce8\],
+[data-theme="dark"] .border-\[\#c7d8e8\] { border-color: var(--fm-card-border) !important; }
+
+/* ── Dark mode: form input spesifik ─────────────────────────── */
+[data-theme="dark"] .bg-\[\#f7fbff\],
+[data-theme="dark"] .focus\:bg-white:focus { background-color: var(--fm-input-bg) !important; }
+
+/* ── Dark mode: shadow & box-shadow tidak berubah (ok) ───────── */
+
+/* ── Dark mode: modal/overlay background ────────────────────── */
+[data-theme="dark"] .bg-\[\#07245a\] { background-color: #0d1117 !important; }
+
+/* ── Dark mode: MyForms card title text ─────────────────────── */
+[data-theme="dark"] .text-\[\#3d91b2\],
+[data-theme="dark"] .text-\[\#2991b1\] { color: #7ab3ef !important; }
+[data-theme="dark"] .text-\[\#193c70\] { color: var(--fm-text) !important; }
+
+/* ── Dark mode: FillForm zoom buttons ───────────────────────── */
+[data-theme="dark"] .border-\[\#d0e3f5\] {
+  border-color: var(--fm-card-border) !important;
+  background-color: var(--fm-card) !important;
+}
+
+/* ── Dark mode: MyForms search bar ──────────────────────────── */
+[data-theme="dark"] .bg-white\/90 { background-color: var(--fm-card) !important; }
+[data-theme="dark"] .border-\[\#d9e8f1\] { border-color: var(--fm-border) !important; }
+
+[data-theme="dark"] .border-\[\#e2e9f1\] { border-color: var(--fm-card-border) !important; }
+[data-theme="dark"] .hover\:bg-\[\#f7fafd\]:hover { background-color: var(--fm-hover) !important; }
+
+/* ── Dark mode: Trash header ─────────────────────────────────── */
+[data-theme="dark"] .text-\[\#183056\] { color: var(--fm-text) !important; }
+
+/* ── Dark mode: Discovery page ──────────────────────────────── */
+[data-theme="dark"] .bg-\[\#e8f0fb\] { background-color: #1e2d45 !important; }
+
+/* ── Dark mode: Profile page inputs ─────────────────────────── */
+[data-theme="dark"] .focus\:border-blue-400:focus,
+[data-theme="dark"] .border-gray-300 { border-color: var(--fm-border) !important; }
+
+/* ── Dark mode: scrollbar ────────────────────────────────────── */
+[data-theme="dark"] ::-webkit-scrollbar { width: 6px; height: 6px; }
+[data-theme="dark"] ::-webkit-scrollbar-track { background: var(--fm-bg-3); }
+[data-theme="dark"] ::-webkit-scrollbar-thumb { background: var(--fm-border); border-radius: 3px; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: var(--fm-text-3); }
+
 
 @layer utilities {
   .scrollbar-hide {
@@ -487,4 +558,58 @@ code.inline-code {
   background: #f0f6fe;
   border-radius: 4px;
   padding: 1px 5px;
+}
+
+/* ── Discovery sub-filter dropdown animation ── */
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── FillForm: soal/opsi panjang tidak overflow keluar container ── */
+.rich-display {
+  overflow-wrap: break-word;
+  word-break: break-word;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.rich-display * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.rich-display pre,
+.rich-display code,
+.rich-display .hljs-pre {
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.rich-display img {
+  max-width: 100%;
+  height: auto;
+}
+
+.rich-display table {
+  width: 100%;
+  table-layout: fixed;
+  overflow-x: auto;
+  display: block;
+}
+
+/* Opsi jawaban teks panjang */
+.fill-option-label {
+  overflow-wrap: break-word;
+  word-break: break-word;
+  min-width: 0;
+  flex: 1;
 }

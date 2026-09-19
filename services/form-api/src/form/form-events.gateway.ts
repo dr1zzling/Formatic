@@ -70,4 +70,55 @@ export class FormEventsGateway implements OnGatewayConnection, OnGatewayDisconne
     }
     this.logger.log(`Broadcasted formUpdated for formId ${formId} / slug ${slug}`)
   }
+
+  /**
+   * Broadcast progress responden ke room monitoring creator.
+   * Dipanggil dari MonitoringService setiap kali PATCH /form/monitoring/progress diterima.
+   * Room: `monitoring_${slug}` — hanya creator yang join room ini.
+   */
+  notifyProgressUpdated(slug: string, progressData: {
+    user_id: number
+    user_username: string
+    current_page: number
+    current_soal: number
+    total_pages: number
+    total_soal: number
+    status: string
+    start_at: string
+  }) {
+    if (!this.server) return
+    const payload = {
+      ...progressData,
+      slug,
+      updatedAt: new Date().toISOString(),
+    }
+    this.server.to(`monitoring_${slug}`).emit('progressUpdated', payload)
+    this.logger.log(`Broadcasted progressUpdated for slug ${slug} — user ${progressData.user_username} halaman ${progressData.current_page}`)
+  }
+
+  /**
+   * Creator join room monitoring untuk form tertentu.
+   * Event: joinMonitoring { slug }
+   */
+  @SubscribeMessage('joinMonitoring')
+  handleJoinMonitoring(
+    @MessageBody() data: { slug: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const room = `monitoring_${data?.slug}`
+    client.join(room)
+    this.logger.log(`Creator ${client.id} joined monitoring room ${room}`)
+    return { event: 'joinedMonitoring', room }
+  }
+
+  @SubscribeMessage('leaveMonitoring')
+  handleLeaveMonitoring(
+    @MessageBody() data: { slug: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const room = `monitoring_${data?.slug}`
+    client.leave(room)
+    this.logger.log(`Creator ${client.id} left monitoring room ${room}`)
+    return { event: 'leftMonitoring', room }
+  }
 }

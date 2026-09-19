@@ -48,7 +48,18 @@ function CreateModal({ onClose, onCreated }) {
       const list = res.data?.data ?? [];
       setPrimaryList(list);
       if (list.length > 0) setSelectedPrimary(String(list[0].id));
-    }).catch(() => {});
+      else {
+        // Fallback jika DB belum ada data kategori
+        const fallback = [{ id: 1, name: "ujian" }, { id: 2, name: "survei" }];
+        setPrimaryList(fallback);
+        setSelectedPrimary("1");
+      }
+    }).catch(() => {
+      // Fallback offline
+      const fallback = [{ id: 1, name: "ujian" }, { id: 2, name: "survei" }];
+      setPrimaryList(fallback);
+      setSelectedPrimary("1");
+    });
   }, []);
 
   // Load sub kategori saat primary dipilih
@@ -58,8 +69,15 @@ function CreateModal({ onClose, onCreated }) {
       const list = res.data?.data ?? [];
       setSubList(list);
       if (list.length > 0) setSubKategoriId(String(list[0].id));
-      else setSubKategoriId("");
-    }).catch(() => setSubList([]));
+      else {
+        // Kalau sub kosong, pakai primary id sebagai fallback
+        setSubKategoriId(selectedPrimary);
+        setSubList([]);
+      }
+    }).catch(() => {
+      setSubList([]);
+      setSubKategoriId(selectedPrimary);
+    });
   }, [selectedPrimary]);
 
   function handleFile(e) {
@@ -71,14 +89,15 @@ function CreateModal({ onClose, onCreated }) {
 
   async function submit() {
     if (!title.trim())    { setError("Judul wajib diisi."); return; }
-    if (!banner)          { setError("Banner wajib diunggah."); return; }
-    if (!subKategoriId)   { setError("Pilih kategori terlebih dahulu."); return; }
+    // subKategoriId bisa dari sub atau primary sebagai fallback
+    const kategoriId = subKategoriId || selectedPrimary;
+    if (!kategoriId)      { setError("Pilih kategori terlebih dahulu."); return; }
     setLoading(true); setError("");
     try {
       const fd = new FormData();
       fd.append("title", title.trim());
-      fd.append("sub_kategori", subKategoriId);
-      fd.append("banner", banner);
+      fd.append("sub_kategori", kategoriId);
+      if (banner) fd.append("banner", banner);
       fd.append("token_respon", tokenRespon.trim());
       const res  = await fetch(`${FORM_API_URL}/form`, {
         method: "POST",
@@ -99,8 +118,8 @@ function CreateModal({ onClose, onCreated }) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-[420px] bg-white rounded-2xl shadow-[0_24px_50px_rgba(10,30,60,0.18)] flex flex-col"
-        style={{ maxHeight: "calc(100dvh - 32px)" }}
+        className="w-full max-w-[420px] rounded-2xl shadow-[0_24px_50px_rgba(10,30,60,0.18)] flex flex-col"
+        style={{ maxHeight: "calc(100dvh - 32px)", backgroundColor: "var(--fm-card)" }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header — sticky */}
@@ -148,7 +167,7 @@ function CreateModal({ onClose, onCreated }) {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-[#4d6a82] uppercase tracking-wider mb-1.5">Banner Form</label>
+            <label className="block text-[11px] font-bold text-[#4d6a82] uppercase tracking-wider mb-1.5">Banner Form <span className="normal-case font-normal text-gray-400">(opsional)</span></label>
             <label className="relative w-full border-2 border-dashed border-[#c5dce8] rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer bg-[#f4fafd] hover:border-[#3d91b2] hover:bg-[#edf6fb] transition-all overflow-hidden" style={{ minHeight: preview ? "auto" : "72px" }}>
               {preview
                 ? <img src={preview} className="w-full h-auto object-contain rounded-lg" alt="preview" style={{ maxHeight: "160px" }} />
@@ -225,7 +244,7 @@ export default function MyForms() {
     const formSlug = form.slug ?? form.form_slug;
     try {
       const response = await fetch(`${FORM_API_URL}/form?form_slug=${formSlug}`, {
-        method: "PATCH",
+        method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: JSON.stringify({ status: "private" }),
       });
@@ -302,8 +321,9 @@ export default function MyForms() {
                 className={`px-[18px] py-2 rounded-full text-[13px] font-medium border transition-all ${
                   activeCategory === c
                     ? "bg-[#183056] border-[#183056] text-white shadow-[0_4px_12px_rgba(24,48,86,0.25)]"
-                    : "bg-white/80 border-[#d6e5ee] text-[#55738d] hover:border-[#3d91b2] hover:text-[#183056]"
+                    : "border-[#d6e5ee] hover:border-[#3d91b2]"
                 }`}
+                style={activeCategory !== c ? { backgroundColor: "var(--fm-card)", color: "var(--fm-text-2)" } : {}}
                 onClick={() => setActive(c)}
               >
                 {c}
@@ -497,7 +517,8 @@ function JoinModal({ onClose, onJoined }) {
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
       onClick={onClose}>
-      <div className="w-full max-w-[420px] bg-white rounded-2xl overflow-hidden shadow-2xl"
+      <div className="w-full max-w-[420px] rounded-2xl overflow-hidden shadow-2xl"
+        style={{ backgroundColor: "var(--fm-card)" }}
         onClick={e => e.stopPropagation()}>
 
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">

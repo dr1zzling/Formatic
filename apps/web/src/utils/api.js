@@ -106,9 +106,9 @@ export const authAPI = {
 
 // Submit API helpers
 export const submitAPI = {
-  // Cek token sebelum isi form: POST /form/submit?form_slug=
+  // Cek token sebelum isi form: POST /form/submit/check-token?form_slug=
   checkToken: (form_slug, token) =>
-    api.post("/form/submit", { token }, { params: { form_slug } }),
+    api.post("/form/submit/check-token", { token }, { params: { form_slug } }),
 
   // Get ringkasan jawaban (untuk creator): GET /form/submit?form_slug=
   getSummary: (form_slug) =>
@@ -117,6 +117,24 @@ export const submitAPI = {
   // Get detail jawaban per responden: GET /form/submit/detail?form_slug=
   getDetail: (form_slug) =>
     api.get("/form/submit/detail", { params: { form_slug } }),
+};
+
+// Monitoring API helpers
+export const monitoringAPI = {
+  // GET /form/monitoring?form_slug= — list semua peserta + status
+  getMonitoring: (form_slug) =>
+    api.get("/form/monitoring", { params: { form_slug } }),
+
+  // PATCH /form/monitoring/progress?form_slug= — responden update posisi halaman/soal
+  updateProgress: (form_slug, current_page, current_soal, total_pages, total_soal) =>
+    api.patch("/form/monitoring/progress",
+      { current_page, current_soal, total_pages, total_soal },
+      { params: { form_slug } }
+    ),
+
+  // PUT /form/monitoring/reset?form_slug= — creator reset user
+  resetUser: (form_slug, user_id) =>
+    api.put("/form/monitoring/reset", { user_id }, { params: { form_slug } }),
 };
 
 export default api;

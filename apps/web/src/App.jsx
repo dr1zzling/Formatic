@@ -2,27 +2,30 @@ import { useRef, useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import { ThemeProvider } from "./context/ThemeContext";
-import Login          from "./pages/auth/Login";
-import Register       from "./pages/auth/Register";
+import Login from "./pages/auth/Login";
+import Register from "./pages/auth/Register";
 import ForgotPassword from "./pages/auth/ForgotPassword";
-import Home           from "./pages/Dashboard/Home";
-import MyForms        from "./pages/Dashboard/MyForms";
-import FormEditor     from "./pages/Dashboard/FormEditor";
-import FillForm       from "./pages/Dashboard/FillForm";
-import Trash          from "./pages/Dashboard/Trash";
-import Profile        from "./pages/Dashboard/Profile";
-import History        from "./pages/Dashboard/History";
-import Collaborate    from "./pages/Dashboard/Collaborate";
-import Discovery      from "./pages/Dashboard/Discovery";
+import Home from "./pages/Dashboard/Home";
+import MyForms from "./pages/Dashboard/MyForms";
+import FormEditor from "./pages/Dashboard/FormEditor";
+import FillForm from "./pages/Dashboard/FillForm";
+import Trash from "./pages/Dashboard/Trash";
+import Profile from "./pages/Dashboard/Profile";
+import History from "./pages/Dashboard/History";
+import Collaborate from "./pages/Dashboard/Collaborate";
+import Discovery from "./pages/Dashboard/Discovery";
+import Monitoring from "./pages/Dashboard/Monitoring";
 
-function ProtectedRoute({ children }) {
+// isAnimating: true berarti halaman ini adalah "prev" yang sedang slide keluar
+// — jangan boleh trigger redirect apapun saat animasi
+function ProtectedRoute({ children, isAnimating }) {
   const token = localStorage.getItem("token");
-  if (!token) return <Navigate to="/login" replace />;
+  if (!token && !isAnimating) return <Navigate to="/login" replace />;
   return children;
 }
-function AuthRoute({ children }) {
+function AuthRoute({ children, isAnimating }) {
   const token = localStorage.getItem("token");
-  if (token) return <Navigate to="/" replace />;
+  if (token && !isAnimating) return <Navigate to="/" replace />;
   return children;
 }
 
@@ -37,17 +40,17 @@ function getNavIndex(pathname) {
   if (i !== -1) return i;
   if (pathname.startsWith("/my-forms")) return 2;
   if (pathname.startsWith("/discovery")) return 3;
-  if (pathname.startsWith("/history"))  return 4;
-  if (pathname.startsWith("/trash"))    return 5;
-  if (pathname.startsWith("/profile"))  return 6;
+  if (pathname.startsWith("/history")) return 4;
+  if (pathname.startsWith("/trash")) return 5;
+  if (pathname.startsWith("/profile")) return 6;
   return -1;
 }
 
 function calcDirection(fromPath, toPath) {
   const fromIdx = getNavIndex(fromPath);
-  const toIdx   = getNavIndex(toPath);
+  const toIdx = getNavIndex(toPath);
   if (fromIdx === -1 || toIdx === -1) return 1;
-  const n    = NAV.length;
+  const n = NAV.length;
   const diff = toIdx - fromIdx;
   if (Math.abs(diff) > n / 2) return diff < 0 ? 1 : -1; // wrap
   return diff > 0 ? 1 : -1;
@@ -57,11 +60,11 @@ function calcDirection(fromPath, toPath) {
 const DURATION = 280;
 
 function AnimatedContent({ children }) {
-  const location     = useLocation();
+  const location = useLocation();
   const containerRef = useRef(null);
-  const prevPathRef  = useRef(location.pathname);
-  const timerRef     = useRef(null);
-  const rafRef       = useRef(null);
+  const prevPathRef = useRef(location.pathname);
+  const timerRef = useRef(null);
+  const rafRef = useRef(null);
 
   const [displayLoc, setDisplayLoc] = useState({
     prev: null,
@@ -88,28 +91,28 @@ function AnimatedContent({ children }) {
         if (kids.length < 2) return;
 
         const outEl = kids[0];
-        const inEl  = kids[1];
+        const inEl = kids[1];
         const isMobile = window.innerWidth < 768;
 
-        const fromPos  = dir === 1 ? "100%"  : "-100%";
-        const toPos    = dir === 1 ? "-25%"  : "25%";
-        const axis     = isMobile ? "translateX" : "translateY";
+        const fromPos = dir === 1 ? "100%" : "-100%";
+        const toPos = dir === 1 ? "-25%" : "25%";
+        const axis = isMobile ? "translateX" : "translateY";
 
         outEl.style.transition = "none";
-        outEl.style.transform  = `${axis}(0) scale(1)`;
-        outEl.style.opacity    = "1";
-        inEl.style.transition  = "none";
-        inEl.style.transform   = `${axis}(${fromPos})`;
-        inEl.style.opacity     = "1";
+        outEl.style.transform = `${axis}(0) scale(1)`;
+        outEl.style.opacity = "1";
+        inEl.style.transition = "none";
+        inEl.style.transform = `${axis}(${fromPos})`;
+        inEl.style.opacity = "1";
 
         void container.offsetHeight;
 
         const ease = `${DURATION}ms cubic-bezier(0.32, 0.72, 0, 1)`;
         outEl.style.transition = `transform ${ease}, opacity ${ease}`;
-        inEl.style.transition  = `transform ${ease}`;
-        outEl.style.transform  = `${axis}(${toPos}) scale(0.97)`;
-        outEl.style.opacity    = "0";
-        inEl.style.transform   = `${axis}(0)`;
+        inEl.style.transition = `transform ${ease}`;
+        outEl.style.transform = `${axis}(${toPos}) scale(0.97)`;
+        outEl.style.opacity = "0";
+        inEl.style.transform = `${axis}(0)`;
 
         timerRef.current = setTimeout(() => {
           setDisplayLoc(d => ({ prev: null, curr: d.curr }));
@@ -158,19 +161,20 @@ function AnimatedContent({ children }) {
 function PageContent({ location }) {
   return (
     <Routes location={location}>
-      <Route path="/login"           element={<AuthRoute><Login /></AuthRoute>} />
-      <Route path="/register"        element={<AuthRoute><Register /></AuthRoute>} />
+      <Route path="/login" element={<AuthRoute><Login /></AuthRoute>} />
+      <Route path="/register" element={<AuthRoute><Register /></AuthRoute>} />
       <Route path="/forgot-password" element={<AuthRoute><ForgotPassword /></AuthRoute>} />
-      <Route path="/"           element={<ProtectedRoute><Home /></ProtectedRoute>} />
-      <Route path="/home"       element={<ProtectedRoute><Home /></ProtectedRoute>} />
-      <Route path="/my-forms"   element={<ProtectedRoute><MyForms /></ProtectedRoute>} />
+      <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+      <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+      <Route path="/my-forms" element={<ProtectedRoute><MyForms /></ProtectedRoute>} />
       <Route path="/form/:slug" element={<ProtectedRoute><FormEditor /></ProtectedRoute>} />
-      <Route path="/fill/:slug"             element={<ProtectedRoute><FillForm /></ProtectedRoute>} />
-      <Route path="/history"                element={<ProtectedRoute><History /></ProtectedRoute>} />
-      <Route path="/discovery"              element={<ProtectedRoute><Discovery /></ProtectedRoute>} />
+      <Route path="/fill/:slug" element={<ProtectedRoute><FillForm /></ProtectedRoute>} />
+      <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
+      <Route path="/discovery" element={<ProtectedRoute><Discovery /></ProtectedRoute>} />
       <Route path="/form/:slug/collaborate" element={<ProtectedRoute><Collaborate /></ProtectedRoute>} />
-      <Route path="/trash"      element={<ProtectedRoute><Trash /></ProtectedRoute>} />
-      <Route path="/profile"    element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+      <Route path="/form/:slug/monitoring" element={<ProtectedRoute><Monitoring /></ProtectedRoute>} />
+      <Route path="/trash" element={<ProtectedRoute><Trash /></ProtectedRoute>} />
+      <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

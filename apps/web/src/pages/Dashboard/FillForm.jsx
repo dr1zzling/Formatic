@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
-import api, { FORM_API_URL, flattenForm } from "../../utils/api";
+import api, { FORM_API_URL, flattenForm, monitoringAPI } from "../../utils/api";
 import { socket } from "../../utils/socket";
 import { ArrowLeft, Send, Check, CheckCircle2, UploadCloud, FileText, Bell, ArrowRight, ZoomIn, ZoomOut, RefreshCw, Flag, LockKeyhole, Music, FileQuestion, AlarmClock } from "lucide-react";
 import { saveToHistory } from "./History";
@@ -59,6 +59,20 @@ export default function FillForm() {
   const [doubtfulIds, setDoubtfulIds] = useState(new Set()); // soal yang ditandai ragu-ragu
   const [theme, setTheme]             = useState(() => getStoredTheme(slug) || DEFAULT_FORM_THEME);
   const soalRefs = useRef({});
+  const progressDebounceRef = useRef(null);
+
+  // Helper: kirim progress ke backend (debounced 400ms, fire-and-forget)
+  const emitProgress = useCallback((nextIdx, pgGroups, totalSoalCount) => {
+    if (!slug) return;
+    if (progressDebounceRef.current) clearTimeout(progressDebounceRef.current);
+    progressDebounceRef.current = setTimeout(() => {
+      const currentPage = nextIdx + 1;
+      const totalPages = pgGroups.length;
+      const soalOnPage = pgGroups[nextIdx]?.soal?.length ?? 0;
+      monitoringAPI.updateProgress(slug, currentPage, soalOnPage, totalPages, totalSoalCount)
+        .catch(() => {}); // fire-and-forget, jangan crash jika gagal
+    }, 400);
+  }, [slug]);
 
   useEffect(() => {
     const saved = getStoredTheme(slug);
@@ -180,7 +194,15 @@ export default function FillForm() {
   useEffect(() => {
     if (form) {
       const needsToken = Boolean(form?.token_respon);
-      if (!needsToken) setTokenVerified(true);
+      if (!needsToken && !tokenVerified) {
+        // Form tidak butuh token — langsung register ke backend supaya monitoring bisa tracking
+        fetch(`${FORM_API_URL}/form/submit/check-token?form_slug=${slug}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+          body: JSON.stringify({ token: null }),
+        }).catch(() => {}); // fire-and-forget, jangan crash
+        setTokenVerified(true);
+      }
     }
   }, [form]);
 
@@ -424,19 +446,10 @@ export default function FillForm() {
   const pageGroups = useMemo(() => {
     if (!form) return [];
 
-    // Survey: tampilkan semua soal dalam 1 halaman
-    // isQuiz: primary_kategori = ujian
-    if ((form?.primary_kategori ?? form?.category) !== "ujian") {
-      const flat = (form?.soal ?? []).length > 0 && (form?.soal ?? [])[0]?.soal
-        ? (form?.soal ?? []).flatMap(p => p.soal ?? [])
-        : (form?.soal ?? []);
-      return [{ page: 1, soal: flat }];
-    }
-
     const raw = form?.soal ?? [];
     const rFlat = raw.length > 0 && raw[0]?.soal ? raw : null;
 
-    // Bangun pages
+    // Bangun pages untuk semua form (ujian maupun survei)
     let pages = [];
     if (rFlat) {
       pages = [...rFlat]
@@ -451,6 +464,10 @@ export default function FillForm() {
       }
       pages = Object.keys(groups).map(Number).sort((a,b) => a - b)
         .map(p => ({ page: p, soal: groups[p] }));
+    }
+
+    if (pages.length === 0 && raw.length > 0) {
+      pages = [{ page: 1, soal: raw }];
     }
 
     if (!form?.is_random) return pages;
@@ -491,8 +508,8 @@ export default function FillForm() {
   const allSoal = soalList;
 
   // ── Manual Zoom Handlers ──
-  function zoomIn()  { setZoomLevel(prev => Math.min(prev + 0.1, 1.5)); }
-  function zoomOut() { setZoomLevel(prev => Math.max(prev - 0.1, 0.7)); }
+  function zoomIn()  { setZoomLevel(prev => Math.min(prev + 0.1, 3.0)); }
+  function zoomOut() { setZoomLevel(prev => Math.max(prev - 0.1, 0.5)); }
   function resetZoom() { setZoomLevel(1); }
 
   // Get banner image with auto-resize (object-fit: contain)
@@ -667,13 +684,21 @@ export default function FillForm() {
       }
       setSubmitError("");
       setErrorSoalId(null);
-      setCurrentIdx(i => Math.min(i + 1, totalPages - 1));
+      setCurrentIdx(i => {
+        const next = Math.min(i + 1, totalPages - 1);
+        emitProgress(next, pageGroups, allSoal.length);
+        return next;
+      });
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
     function goPrev() {
       setSubmitError("");
       setErrorSoalId(null);
-      setCurrentIdx(i => Math.max(i - 1, 0));
+      setCurrentIdx(i => {
+        const next = Math.max(i - 1, 0);
+        emitProgress(next, pageGroups, allSoal.length);
+        return next;
+      });
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
@@ -889,12 +914,20 @@ export default function FillForm() {
       return;
     }
     setErrorSoalId(null);
-    setCurrentIdx(i => Math.min(i + 1, totalPagesS - 1));
+    setCurrentIdx(i => {
+      const next = Math.min(i + 1, totalPagesS - 1);
+      emitProgress(next, pageGroups, allSoal.length);
+      return next;
+    });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
   function goPrevS() {
     setErrorSoalId(null);
-    setCurrentIdx(i => Math.max(i - 1, 0));
+    setCurrentIdx(i => {
+      const next = Math.max(i - 1, 0);
+      emitProgress(next, pageGroups, allSoal.length);
+      return next;
+    });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -1128,14 +1161,14 @@ function SoalItem({ soal, idx, answers, setAnswer, toggleOption, errorSoalId, so
   const isError = errorSoalId === soal.id;
   return (
     <div ref={el => { if (el) soalRefs.current[soal.id] = el; }}
-      className={`rounded-2xl border shadow-sm p-6 mb-4 transition-all ${isError ? "border-red-400 ring-2 ring-red-100" : ""}`}
+      className={`rounded-2xl border shadow-sm p-6 mb-4 transition-all overflow-hidden ${isError ? "border-red-400 ring-2 ring-red-100" : ""}`}
       style={{ backgroundColor: theme.cardBg || "var(--fm-card)", borderColor: isError ? undefined : (theme.borderCard || "var(--fm-card-border)") }}>
       <div className="flex items-start gap-3 mb-5">
         <span className="w-9 h-9 rounded-xl text-[14px] font-extrabold grid place-items-center shrink-0 mt-0.5"
           style={{ backgroundColor: `${theme.accentColor || "#1a4fa0"}15`, color: theme.accentColor || "#1a4fa0" }}>
           {idx + 1}
         </span>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0 overflow-hidden">
           <RichTextDisplay content={soal.question} className="text-[16px] font-bold leading-snug" style={{ color: theme.titleColor || "#102f56" }} />
           <span className="text-[12px] font-medium block mt-1" style={{ color: theme.accentColor || "#1a4fa0" }}>{TYPE_LABEL[soal.type] ?? soal.type}</span>
         </div>

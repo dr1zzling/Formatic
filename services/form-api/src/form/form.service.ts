@@ -151,11 +151,11 @@ export class FormService {
   async create(
     user: { id: number, username: string },
     body: { title: string, sub_kategori: number, token_respon: string, theme_color: string },
-    banner: Express.Multer.File
+    banner?: Express.Multer.File
   ) {
     const slug = slugify(body.title, { lower: true, strict: true })
     const finalSlug = `${slug}-${Date.now()}`
-    const bannerPath = `/uploads/banner/${banner.filename}`
+    const bannerPath = banner ? `/uploads/banner/${banner.filename}` : null
     const tokenCollab = crypto.randomBytes(8).toString('hex')
 
     const isExist = await this.kategoriService.getSubKategoriById(body.sub_kategori)
@@ -278,6 +278,37 @@ export class FormService {
     return {
       message: "Berhasil Update",
       data: formPayload(getUpdate)
+    }
+  }
+
+  // Update Banner
+  async updateBanner(req: { id: number }, form: any, banner: Express.Multer.File) {
+    const isCreator = await this.isCreator.isCreator(req.id, form.id)
+    if (isCreator !== 'Creator') throw new UnauthorizedException("Anda Tidak Berhak Update Form Ini")
+
+    const bannerPath = `/uploads/banner/${banner.filename}`
+    await this.knexService.connection("forms")
+      .update({ banner: bannerPath })
+      .where("id", form.id)
+
+    return {
+      message: "Berhasil Update Banner",
+      data: { banner: bannerPath }
+    }
+  }
+
+  // Delete Banner
+  async deleteBanner(req: { id: number }, form: any) {
+    const isCreator = await this.isCreator.isCreator(req.id, form.id)
+    if (isCreator !== 'Creator') throw new UnauthorizedException("Anda Tidak Berhak Update Form Ini")
+
+    await this.knexService.connection("forms")
+      .update({ banner: null })
+      .where("id", form.id)
+
+    return {
+      message: "Berhasil Hapus Banner",
+      data: { banner: null }
     }
   }
 

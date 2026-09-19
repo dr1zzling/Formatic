@@ -62,12 +62,7 @@ function highlightCode(code, lang) {
 function parseTextToHtml(text) {
   if (!text) return '';
 
-  // Split teks menjadi segmen: code block, math block, atau teks biasa
-  // Strategi: pisahkan berdasarkan fence ``` dan $$...$$
   const segments = [];
-
-  // Regex untuk split: fenced code block atau display math
-  // Diproses satu per satu
   let rest = text;
 
   while (rest.length > 0) {
@@ -75,49 +70,41 @@ function parseTextToHtml(text) {
     const fenceStart = rest.indexOf('```');
     const mathStart  = rest.indexOf('$$');
 
-    // Mana yang lebih dulu?
     const hasFence = fenceStart !== -1;
     const hasMath  = mathStart !== -1;
 
     if (!hasFence && !hasMath) {
-      // Tidak ada blok khusus — semua teks biasa
       segments.push({ type: 'text', content: rest });
       rest = '';
       break;
     }
 
-    // Pilih yang paling awal
     const pickFence = hasFence && (!hasMath || fenceStart <= mathStart);
 
     if (pickFence) {
-      // Teks sebelum fence
       if (fenceStart > 0) {
         segments.push({ type: 'text', content: rest.slice(0, fenceStart) });
       }
-      // Ambil isi fence
       const afterFence = rest.slice(fenceStart + 3); // setelah ```
       const newlineIdx = afterFence.indexOf('\n');
       const lang = newlineIdx !== -1 ? afterFence.slice(0, newlineIdx).trim() : '';
       const codeStart = newlineIdx !== -1 ? newlineIdx + 1 : 0;
-      const endFence = afterFence.indexOf('\n```', codeStart);
+      const endFence = afterFence.indexOf('```', codeStart);
       if (endFence === -1) {
-        // Tidak ada penutup — sisa dianggap kode
         segments.push({ type: 'code', lang, content: afterFence.slice(codeStart) });
         rest = '';
       } else {
-        const code = afterFence.slice(codeStart, endFence);
+        const code = afterFence.slice(codeStart, endFence).replace(/\n$/, '');
         segments.push({ type: 'code', lang, content: code });
-        rest = afterFence.slice(endFence + 4); // +4 = \n```
+        rest = afterFence.slice(endFence + 3);
       }
     } else {
-      // Teks sebelum $$
       if (mathStart > 0) {
         segments.push({ type: 'text', content: rest.slice(0, mathStart) });
       }
       const afterMath = rest.slice(mathStart + 2); // setelah $$
       const endMath = afterMath.indexOf('$$');
       if (endMath === -1) {
-        // Tidak ada penutup — output literal
         segments.push({ type: 'text', content: rest.slice(mathStart) });
         rest = '';
       } else {
@@ -138,7 +125,6 @@ function parseTextToHtml(text) {
     } else if (seg.type === 'math') {
       html += `<span class="katex-display-wrap">${renderMath(seg.content, true)}</span>`;
     } else {
-      // Teks biasa — render inline math $...$ dan inline code `...`
       html += renderInlineText(seg.content);
     }
   }
@@ -187,19 +173,15 @@ function renderInlineText(text) {
 
 // ── Strip HTML tags dari dalam ekspresi math, konversi <sup> → ^{} ──────────
 function stripHtmlFromMath(expr) {
-  // Konversi <sup>...</sup> → ^{...} (Quill mengubah pangkat jadi <sup>)
   let result = expr.replace(/<sup[^>]*>([\s\S]*?)<\/sup>/gi, (_, inner) => {
     const text = inner.replace(/<[^>]+>/g, '').trim();
     return text.length === 1 ? `^${text}` : `^{${text}}`;
   });
-  // Konversi <sub>...</sub> → _{...}
   result = result.replace(/<sub[^>]*>([\s\S]*?)<\/sub>/gi, (_, inner) => {
     const text = inner.replace(/<[^>]+>/g, '').trim();
     return text.length === 1 ? `_${text}` : `_{${text}}`;
   });
-  // Strip sisa tag HTML
   result = result.replace(/<[^>]+>/g, '');
-  // Decode HTML entities
   result = result
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
@@ -217,52 +199,212 @@ function looksLikeMath(text) {
          /[a-zA-Z]_[0-9a-zA-Z]/.test(text) || // x_n, a_1
          /\^[{0-9a-zA-Z]/.test(text);    // ^2, ^{...}
 }
-function convertSupSubToKatex(segment) {
-  // Ambil teks plain dari segmen (dengan konversi sup/sub ke LaTeX)
-  const latexExpr = stripHtmlFromMath(segment);
-  if (!latexExpr.trim()) return segment;
-  if (!looksLikeMath(latexExpr)) return segment;
-  try {
-    return katex.renderToString(latexExpr.trim(), {
-      throwOnError: true,
-      output: 'html',
-    });
-  } catch {
-    return segment; // fallback
+
+// ── Decode HTML entities ─────────────────────────────────────────────────────
+function decodeEntities(str) {
+  return str
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+}
+
+/**
+ * Pre-process Quill HTML to merge consecutive <p> tags that form a fenced
+ * code block (``` ... ```) into a single <pre> block.
+ *
+ * Quill stores each line as a separate <p> element when the user inserts
+ * plain text via insertText(), so a code block like:
+ *   ```js
+ *   function hello() { return "world"; }
+ *   ```
+ * becomes:
+ *   <p>```js</p><p>function hello() { return "world"; }</p><p>```</p>
+ *
+ * This function collapses those into a single rendered <pre> block before
+ * the rest of processQuillHtml runs.
+ */
+function collapseFencedCodeBlocks(html) {
+  // Split on <p> boundaries, keeping the content between tags
+  const parts = [];
+  const pRegex = /<p([^>]*)>([\s\S]*?)<\/p>/gi;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = pRegex.exec(html)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({ type: 'raw', content: html.slice(lastIndex, match.index) });
+    }
+    // Decode the paragraph text (strip inline tags, convert <br> to \n)
+    const innerDecoded = match[2]
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+    ;
+    const innerText = decodeEntities(innerDecoded);
+    parts.push({ type: 'p', attrs: match[1], raw: match[2], text: innerText });
+    lastIndex = match.index + match[0].length;
   }
+  if (lastIndex < html.length) {
+    parts.push({ type: 'raw', content: html.slice(lastIndex) });
+  }
+
+  const out = [];
+  let i = 0;
+  while (i < parts.length) {
+    const part = parts[i];
+    if (part.type !== 'p') {
+      out.push(part.type === 'raw' ? part.content : `<p${part.attrs}>${part.raw}</p>`);
+      i++;
+      continue;
+    }
+
+    // Check if this <p> starts a fenced code block: text starts with ```
+    const fenceMatch = part.text.match(/^```([a-zA-Z0-9_#-]*)\n?([\s\S]*)$/);
+    if (fenceMatch) {
+      const lang = fenceMatch[1].trim().toLowerCase();
+      const firstLineCode = fenceMatch[2];
+
+      // If the opening ``` and closing ``` are in the same paragraph (via \n)
+      // e.g. ```js\ncode\n```  (single <p> with <br> separators)
+      if (firstLineCode.includes('\n```')) {
+        const endIdx = firstLineCode.indexOf('\n```');
+        const code = (firstLineCode.slice(0, endIdx))
+          .replace(/^\n+/, '').replace(/\n+$/, '');
+        const highlighted = highlightCode(code, lang);
+        const langClass = lang ? ` language-${lang}` : '';
+        out.push(`<pre class="hljs-pre"><code class="hljs${langClass}">${highlighted}</code></pre>`);
+        i++;
+        continue;
+      }
+
+      // Otherwise collect subsequent <p> elements until closing ```
+      const codeLines = firstLineCode ? [firstLineCode] : [];
+      i++;
+      let closed = false;
+      while (i < parts.length) {
+        const next = parts[i];
+        if (next.type !== 'p') {
+          // Non-<p> in the middle — include as raw and continue collecting
+          i++;
+          continue;
+        }
+        const lineText = next.text;
+        if (lineText.trim() === '```') {
+          closed = true;
+          i++;
+          break;
+        }
+        codeLines.push(lineText);
+        i++;
+      }
+
+      const code = codeLines.join('\n').replace(/^\n+/, '').replace(/\n+$/, '');
+      const highlighted = highlightCode(code, lang);
+      const langClass = lang ? ` language-${lang}` : '';
+      out.push(`<pre class="hljs-pre"><code class="hljs${langClass}">${highlighted}</code></pre>`);
+      continue;
+    }
+
+    out.push(`<p${part.attrs}>${part.raw}</p>`);
+    i++;
+  }
+
+  return out.join('');
 }
 
 // ── Post-process HTML dari Quill ─────────────────────────────────────────────
 function processQuillHtml(html) {
   if (!html) return '';
 
-  // 1. Display math $$...$$ — strip inner HTML tags dulu
+  // 1. Collapse fenced code blocks that span multiple <p> tags (Quill plain-text insert)
+  html = collapseFencedCodeBlocks(html);
+
+  // 1b. Fenced Code Blocks ```lang ... ``` (remaining inline / cross-tag cases)
+  html = html.replace(/(?:<p[^>]*>)?```([a-zA-Z0-9_#-]*)([\s\S]*?)```(?:<\/p>)?/gi, (_, lang, inner) => {
+    let code = inner
+      .replace(/^<br\s*\/?>/i, '')
+      .replace(/<br\s*\/?>$/i, '')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>\s*<p[^>]*>/gi, '\n')
+      .replace(/<\/div>\s*<div[^>]*>/gi, '\n')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .replace(/<[^>]+>/g, '')
+      .replace(/^\n+/, '')
+      .replace(/\n+$/, '');
+
+    const cleanLang = lang ? lang.trim().toLowerCase() : '';
+    const highlighted = highlightCode(code, cleanLang);
+    const langClass = cleanLang ? ` language-${cleanLang}` : '';
+    return `<pre class="hljs-pre"><code class="hljs${langClass}">${highlighted}</code></pre>`;
+  });
+
+  // 2. Quill v2 .ql-code-block-container
+  html = html.replace(/<div class="ql-code-block-container"[^>]*>([\s\S]*?)<\/div>(?=(?:(?!<div class="ql-code-block">)|$))/gi, (full, inner) => {
+    const lines = [];
+    const lineRegex = /<div class="ql-code-block"[^>]*>([\s\S]*?)<\/div>/gi;
+    let m;
+    while ((m = lineRegex.exec(inner)) !== null) {
+      const line = m[1]
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
+        .replace(/<[^>]+>/g, '');
+      lines.push(line);
+    }
+    const code = lines.length > 0 ? lines.join('\n') : inner.replace(/<[^>]+>/g, '');
+    const highlighted = highlightCode(code, '');
+    return `<pre class="hljs-pre"><code class="hljs">${highlighted}</code></pre>`;
+  });
+
+  // 3. Quill <pre class="ql-syntax"> atau <pre> biasa
+  html = html.replace(/<pre([^>]*)>([\s\S]*?)<\/pre>/gi, (_, attrs, inner) => {
+    const langMatch = attrs.match(/data-language=["']([^"']+)["']/i) || attrs.match(/class=["'][^"']*language-([^"'\s]+)/i);
+    const lang = langMatch ? langMatch[1] : '';
+
+    let code = inner
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>\s*<p[^>]*>/gi, '\n')
+      .replace(/<\/div>\s*<div[^>]*>/gi, '\n')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .replace(/<[^>]+>/g, '');
+
+    const highlighted = highlightCode(code, lang);
+    const langClass = lang ? ` language-${lang}` : '';
+    return `<pre class="hljs-pre"><code class="hljs${langClass}">${highlighted}</code></pre>`;
+  });
+
+  // 4. Display math $$...$$ — strip inner HTML tags dulu
   html = html.replace(/\$\$([\s\S]+?)\$\$/g, (_, expr) => {
     const clean = stripHtmlFromMath(expr);
     return `<span class="katex-display-wrap">${renderMath(clean, true)}</span>`;
   });
 
-  // 2. Inline math $...$ — tangani kasus ada tag HTML di dalam $...$
+  // 5. Inline math $...$ — tangani kasus ada tag HTML di dalam $...$
   html = html.replace(/\$((?:[^$]|<[^>]+>)+?)\$/g, (match, expr) => {
     const clean = stripHtmlFromMath(expr).trim();
     if (!clean) return match;
     return renderMath(clean, false);
   });
 
-  // 3. Handle ekspresi math di luar $...$ dalam <p> tag
-  //    Kasus A: Quill <sup>/<sub> mewakili pangkat  → <p>x<sup>2</sup></p>
-  //    Kasus B: User ketik ^ langsung sebagai teks   → <p>a^2-b^3</p>
+  // 6. Handle ekspresi math di luar $...$ dalam <p> tag
   html = html.replace(/<p([^>]*)>([\s\S]*?)<\/p>/gi, (fullMatch, attrs, inner) => {
-    // Sudah dihandle dollar sign di atas
-    if (/\$/.test(inner)) return fullMatch;
+    // Kalau sudah ada katex atau hljs-pre di dalamnya, jangan diubah
+    if (/\$|katex|hljs/i.test(inner)) return fullMatch;
 
-    // Dapatkan teks bersih dari inner HTML
     const plainText = stripHtmlFromMath(inner).trim();
-
-    // Cek apakah terlihat seperti ekspresi math
     if (!looksLikeMath(plainText)) return fullMatch;
 
-    // Coba render seluruh ekspresi sebagai KaTeX
     try {
       const rendered = katex.renderToString(plainText, {
         throwOnError: true,
@@ -271,8 +413,6 @@ function processQuillHtml(html) {
       const cls = 'katex-inline-wrap';
       return `<p${attrs}><span class="${cls}">${rendered}</span></p>`;
     } catch {
-      // Kalau gagal render sekaligus, coba split per token math
-      // dan render bagian-bagian yang mengandung ^ atau _ saja
       const converted = plainText.replace(
         /([a-zA-Z0-9]+(?:\^[{]?[a-zA-Z0-9]+[}]?|_[{]?[a-zA-Z0-9]+[}]?)+)/g,
         (seg) => {
@@ -283,18 +423,15 @@ function processQuillHtml(html) {
           } catch { return escapeHtml(seg); }
         }
       );
-      // Escape karakter non-math yang tersisa
       return `<p${attrs}>${converted}</p>`;
     }
   });
 
-  // 4. <pre> code blocks dari Quill
-  html = html.replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gi, (_, inner) => {
-    const decoded = inner
-      .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-    const code = decoded.replace(/<[^>]+>/g, '');
-    const highlighted = highlightCode(code, '');
-    return `<pre class="hljs-pre"><code class="hljs">${highlighted}</code></pre>`;
+  // 7. Inline code `code` dan Quill <code>
+  html = html.replace(/`([^`\n<]+)`/g, '<code class="inline-code">$1</code>');
+  html = html.replace(/<code>((?:(?!<\/code>)[\s\S])+)<\/code>/gi, (match, inner) => {
+    if (match.includes('class=')) return match;
+    return `<code class="inline-code">${inner}</code>`;
   });
 
   return html;
@@ -315,7 +452,7 @@ export default function RichTextDisplay({ content, className = '' }) {
         throwOnError: false,
         output: 'html',
         ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
-        ignoredClasses: ['katex', 'katex-display'],
+        ignoredClasses: ['katex', 'katex-display', 'hljs', 'hljs-pre', 'inline-code'],
       });
     } catch {
       // ignore render errors

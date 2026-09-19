@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { FORM_API_URL, flattenForm } from "../../utils/api";
-import { Bell, HelpCircle, Plus, ArrowRight, FileText, Search, ClipboardList, LockKeyhole } from "lucide-react";
+import { Bell, ArrowRight, FileText } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 
 const FORM_API = FORM_API_URL;
@@ -59,7 +59,8 @@ function ActivityCard({ forms, loading }) {
         })}
         {!loading && forms.length === 0 && <p className="text-[12px] text-[#8ca0ba] my-3">Belum ada aktivitas.</p>}
       </div>
-      <button onClick={() => navigate("/my-forms")} className="w-full h-[38px] mt-4 px-[14px] flex items-center justify-between rounded-[7px] bg-[#f0f6ff] text-[#1764d6] text-[11px] border-none cursor-pointer hover:bg-[#e3efff] transition-colors">
+      <button onClick={() => navigate("/my-forms")} className="w-full h-[38px] mt-4 px-[14px] flex items-center justify-between rounded-[7px] text-[11px] border-none cursor-pointer transition-colors"
+        style={{ backgroundColor: "var(--fm-hover)", color: "#1764d6" }}>
         <span>View all activity</span><ArrowRight size={17} />
       </button>
     </section>
@@ -183,201 +184,78 @@ function ManageFormsCard({ totalForms }) {
   );
 }
 
-const CARD_COLORS = [
-  { from: "#dbeafe", to: "#bfdbfe" },
-  { from: "#ede9fe", to: "#ddd6fe" },
-  { from: "#d1fae5", to: "#a7f3d0" },
-  { from: "#fef3c7", to: "#fde68a" },
-  { from: "#ffe4e6", to: "#fecdd3" },
-  { from: "#e0f2fe", to: "#bae6fd" },
-];
-
-/* ── Fetch Forms Grid (ganti CreateFormCard) ───────────────────── */
-function FetchFormsGrid({ search, category }) {
+/* ── MyFormsRow — horizontal scroll form milik sendiri ─────────── */
+function MyFormsRow({ forms, loading }) {
   const navigate = useNavigate();
-  const [forms, setForms]         = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [tokenModal, setTokenModal] = useState(null); // { slug, title }
-  const [tokenInput, setTokenInput] = useState("");
-  const [tokenErr, setTokenErr]     = useState("");
-  const [tokenLoading, setTokenLoading] = useState(false);
-
-  function handleCardClick(form) {
-    const slug  = form.slug ?? form.form_slug;
-    const token = form.token_respon;
-    if (token && token.trim() !== "") {
-      // Ada token — tampilkan modal
-      setTokenModal({ slug, title: form.title ?? form.form_title ?? "Form" });
-      setTokenInput(""); setTokenErr("");
-    } else {
-      navigate(`/fill/${slug}`);
-    }
-  }
-
-  async function handleTokenSubmit() {
-    if (!tokenInput.trim()) { setTokenErr("Masukkan token terlebih dahulu."); return; }
-    setTokenLoading(true); setTokenErr("");
-    try {
-      const res = await fetch(`${FORM_API_URL}/form/submit/check-token?form_slug=${tokenModal.slug}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
-        body: JSON.stringify({ token: tokenInput.trim() }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setTokenErr(data?.message || "Token salah atau tidak valid.");
-      } else {
-        setTokenModal(null);
-        navigate(`/fill/${tokenModal.slug}`);
-      }
-    } catch { setTokenErr("Tidak dapat terhubung ke server."); }
-    finally { setTokenLoading(false); }
-  }
-
-  useEffect(() => { load(); }, [category]);
-
-  async function load() {
-    setLoading(true);
-    try {
-      let res;
-      if (category === "All") {
-        res = await api.get("/form");
-      } else {
-        const map = { Quiz: "ujian", Survey: "survei" };
-        res = await api.get("/form/category", { params: { category: map[category] ?? category.toLowerCase() } });
-      }
-      setForms((res.data?.data ?? []).map(flattenForm));
-    } catch { setForms([]); }
-    finally { setLoading(false); }
-  }
-
-  const filtered = forms.filter(f =>
-    (f.title ?? f.form_title ?? "").toLowerCase().includes(search.toLowerCase())
-  );
-
+  const CARD_COLORS = [
+    { from: "#dbeafe", to: "#bfdbfe" },
+    { from: "#ede9fe", to: "#ddd6fe" },
+    { from: "#d1fae5", to: "#a7f3d0" },
+    { from: "#fef3c7", to: "#fde68a" },
+    { from: "#ffe4e6", to: "#fecdd3" },
+    { from: "#e0f2fe", to: "#bae6fd" },
+  ];
   return (
     <div className="mb-6">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-[15px] font-bold text-[#17366d]">Semua Form Tersedia</h2>
-        <button onClick={load} className="text-[12px] text-[#1764d6] hover:underline font-semibold">
-          Refresh
+        <h2 className="text-[15px] font-bold" style={{ color: "var(--fm-text)" }}>Form Saya</h2>
+        <button onClick={() => navigate("/my-forms")}
+          className="text-[12px] font-semibold hover:underline"
+          style={{ color: "#1764d6", background: "none", border: "none", cursor: "pointer" }}>
+          Lihat semua →
         </button>
       </div>
+      <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+        {/* Tombol buat form baru */}
+        <button
+          onClick={() => navigate("/my-forms")}
+          className="flex-shrink-0 w-[160px] h-[120px] rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-all hover:border-[#1a4fa0] hover:bg-[#f0f6fe]"
+          style={{ borderColor: "var(--fm-border)", backgroundColor: "var(--fm-card)" }}
+        >
+          <div className="w-10 h-10 rounded-full bg-[#eef5fb] flex items-center justify-center text-[#1a4fa0] text-[22px] font-bold">+</div>
+          <span className="text-[12px] font-semibold" style={{ color: "#1a4fa0" }}>Buat Form</span>
+        </button>
 
-      {loading && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl overflow-hidden border border-gray-100 animate-pulse">
-              <div className="h-24 bg-gray-100" />
-              <div className="p-3 space-y-2">
-                <div className="h-3 bg-gray-100 rounded w-3/4" />
-                <div className="h-2.5 bg-gray-100 rounded w-1/2" />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {!loading && filtered.length === 0 && (
-        <div className="text-center py-10 bg-white rounded-2xl border border-gray-100">
-          <div className="mb-2 flex justify-center text-gray-300"><ClipboardList size={30} /></div>
-          <p className="text-[13px] text-gray-500 font-medium">Belum ada form tersedia</p>
-        </div>
-      )}
-
-      {!loading && filtered.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-          {filtered.map((form, i) => {
-            const title  = form.title ?? form.form_title ?? "Untitled";
-            const banner = form.banner ?? form.form_banner;
-            const status = form.status ?? form.form_status ?? "private";
-            const cat    = form.category ?? "";
-            const clr    = CARD_COLORS[i % CARD_COLORS.length];
-            return (
-              <div key={form.id ?? i}
-                onClick={() => handleCardClick(form)}
-                className="group bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-lg transition-all cursor-pointer flex flex-col"
-                style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}
-              >
-                <div className="h-24 relative overflow-hidden"
-                  style={{ background: `linear-gradient(135deg,${clr.from},${clr.to})` }}>
-                  {banner && (
-                    <img src={`${FORM_API}${banner}`} alt={title}
-                      className="w-full h-full object-contain transition-transform duration-500 hover:scale-105"
-                      onError={e => { e.target.style.display = "none"; }} />
-                  )}
-                  <span className={`absolute top-2 left-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                    status === "public" ? "bg-green-500/90 text-white" : "bg-black/25 text-white/90"
-                  }`}>{status}</span>
-                </div>
-                <div className="p-2.5 flex-1 flex flex-col">
-                  {cat && <span className="text-[9px] font-bold uppercase tracking-wide text-gray-400 mb-0.5">{cat}</span>}
-                  <h3 className="text-[12px] font-semibold text-gray-800 leading-snug line-clamp-2 flex-1">{title}</h3>
-                  <p className="text-[10px] text-gray-400 mt-1.5">0 respons</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Modal Token */}
-      {tokenModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-          onClick={() => setTokenModal(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center"
-            onClick={e => e.stopPropagation()}>
-            <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-blue-50 flex items-center justify-center"><LockKeyhole size={20} className="text-blue-500" /></div>
-            <h3 className="text-[16px] font-extrabold text-[#102f56] mb-1">Form Terbatas</h3>
-            <p className="text-[13px] text-gray-400 mb-4">
-              Masukkan token untuk mengisi <strong>"{tokenModal.title}"</strong>
-            </p>
-            <input
-              type="text"
-              value={tokenInput}
-              onChange={e => { setTokenInput(e.target.value); setTokenErr(""); }}
-              onKeyDown={e => e.key === "Enter" && handleTokenSubmit()}
-              placeholder="Masukkan token..."
-              className="w-full border border-[#dbe5f0] rounded-xl px-4 py-3 text-[14px] text-center tracking-widest font-semibold outline-none focus:border-[#1a4fa0] focus:ring-4 focus:ring-[#1a4fa0]/10 transition-all mb-2"
-            />
-            {tokenErr && <p className="text-[12px] text-red-500 mb-2">{tokenErr}</p>}
-            <div className="flex gap-2 mt-2">
-              <button onClick={() => setTokenModal(null)}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-[13px] font-semibold text-gray-600 hover:bg-gray-50 transition">
-                Batal
-              </button>
-              <button onClick={handleTokenSubmit} disabled={tokenLoading}
-                className="flex-1 py-2.5 rounded-xl text-white text-[13px] font-bold hover:opacity-90 disabled:opacity-60 transition"
-                style={{ backgroundColor: "#1a4fa0" }}>
-                {tokenLoading ? "Memverifikasi..." : "Masuk →"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ── Search + Filter ───────────────────────────────────────────── */
-function SearchFilter({ search, setSearch, category, setCategory }) {
-  const categories = ["All", "Quiz", "Survey"];
-  return (
-    <div className="mb-7">
-      <div className="h-12 flex items-center gap-3 px-[17px] bg-white border border-[#dce7f5] rounded-lg shadow-[0_3px_12px_rgba(35,83,145,0.04)] text-[#5280b5] mb-[14px]">
-        <Search size={19} className="shrink-0" />
-        <input type="text" placeholder="Search forms or templates..."
-          value={search} onChange={e => setSearch(e.target.value)}
-          className="flex-1 outline-none border-none bg-transparent text-[13px] text-[#173d72] placeholder:text-[#9aacbf]" />
-      </div>
-      <div className="flex gap-3 flex-wrap">
-        {categories.map(item => (
-          <button key={item} onClick={() => setCategory(item)}
-            className={`min-w-[76px] h-[35px] px-[17px] flex items-center justify-center gap-1 border rounded-full text-[12px] font-medium transition-all ${
-              category === item ? "bg-[#0c3978] border-[#0c3978] text-white" : "bg-white border-[#d9e6f6] text-[#193c70] hover:border-[#3d91b2]"
-            }`}>{item}
-          </button>
+        {loading && [...Array(4)].map((_, i) => (
+          <div key={i} className="flex-shrink-0 w-[160px] h-[120px] rounded-2xl animate-pulse" style={{ backgroundColor: "var(--fm-card)" }} />
         ))}
+
+        {!loading && forms.slice(0, 8).map((form, i) => {
+          const title  = form.title ?? form.form_title ?? "Untitled";
+          const banner = form.banner ?? form.form_banner;
+          const status = form.status ?? "private";
+          const cat    = form.category ?? form.sub_kategori ?? "";
+          const clr    = CARD_COLORS[i % CARD_COLORS.length];
+          return (
+            <div key={form.id ?? i}
+              onClick={() => navigate(`/form/${form.slug ?? form.form_slug}`)}
+              className="flex-shrink-0 w-[160px] rounded-2xl overflow-hidden border cursor-pointer hover:-translate-y-1 hover:shadow-lg transition-all flex flex-col"
+              style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}
+            >
+              <div className="h-[72px] relative overflow-hidden"
+                style={{ background: `linear-gradient(135deg,${clr.from},${clr.to})` }}>
+                {banner && (
+                  <img src={`${FORM_API_URL}${banner}`} alt={title}
+                    className="w-full h-full object-contain"
+                    onError={e => { e.target.style.display = "none"; }} />
+                )}
+                <span className={`absolute top-1.5 right-1.5 text-[8px] font-bold px-1.5 py-0.5 rounded-full ${
+                  status === "public" ? "bg-green-500/90 text-white" : "bg-black/20 text-white/80"
+                }`}>{status === "public" ? "Publik" : "Draft"}</span>
+              </div>
+              <div className="p-2.5 flex-1">
+                {cat && <span className="text-[8px] font-bold uppercase tracking-wide text-gray-400">{cat}</span>}
+                <p className="text-[11px] font-semibold leading-snug line-clamp-2 mt-0.5" style={{ color: "var(--fm-text)" }}>{title}</p>
+              </div>
+            </div>
+          );
+        })}
+
+        {!loading && forms.length === 0 && (
+          <div className="flex-1 py-8 text-center">
+            <p className="text-[12px]" style={{ color: "var(--fm-text-2)" }}>Belum ada form. Buat form pertamamu!</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -387,11 +265,8 @@ function SearchFilter({ search, setSearch, category, setCategory }) {
 export default function Home() {
   const navigate = useNavigate();
   const username = getUsername();
-
-  const [search, setSearch]         = useState("");
-  const [category, setCategory]     = useState("All");
-  const [myForms, setMyForms]       = useState([]);
-  const [myLoading, setMyLoading]   = useState(true);
+  const [myForms, setMyForms]   = useState([]);
+  const [myLoading, setMyLoading] = useState(true);
 
   useEffect(() => { loadMyForms(); }, []);
 
@@ -411,7 +286,7 @@ export default function Home() {
           <header className="flex items-start justify-between mb-6 gap-3">
             <div className="min-w-0">
               <h1 className="m-0 text-[22px] sm:text-[28px] font-bold text-[#102f68] leading-tight">Hi, {username}! 👋</h1>
-              <p className="mt-1 text-[13px] text-[#8195b2] hidden sm:block">Fill out forms, give responses, and share your feedback.</p>
+              <p className="mt-1 text-[13px] text-[#8195b2] hidden sm:block">Kelola form, pantau respons, dan berbagi dengan mudah.</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button className="w-9 h-9 flex items-center justify-center text-[#143b75] bg-transparent border-none cursor-pointer"><Bell size={18} /></button>
@@ -419,10 +294,7 @@ export default function Home() {
             </div>
           </header>
 
-          <SearchFilter search={search} setSearch={setSearch} category={category} setCategory={setCategory} />
-
-          {/* Fetch Forms Grid — ganti CreateFormCard */}
-          <FetchFormsGrid search={search} category={category} />
+          <MyFormsRow forms={myForms} loading={myLoading} />
 
           {/* Bottom row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
