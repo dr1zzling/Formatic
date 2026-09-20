@@ -126,6 +126,7 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
     );
     if (image != null) {
       final bytes = await image.readAsBytes();
+      if (!mounted) return;
       setState(() => _bannerBytes = bytes);
     }
   }
@@ -198,8 +199,8 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
       themeColorSaved = settingResult['success'] == true;
     }
 
-    setState(() => _isLoading = false);
     if (!mounted) return;
+    setState(() => _isLoading = false);
 
     if (!themeColorSaved) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(

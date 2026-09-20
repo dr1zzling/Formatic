@@ -6,11 +6,11 @@ class ApiConfig {
   // Android physical device -> IP WiFi komputer
  static String get userApiBaseUrl => kIsWeb
     ? 'http://localhost:3000'
-    : 'http://10.10.18.254:3000';
+    : 'http://192.168.0.3:3000';
 
 static String get formApiBaseUrl => kIsWeb
     ? 'http://localhost:3002'
-    : 'http://10.10.18.254:3002';
+    : 'http://192.168.0.3:3002';
 
   // User API Endpoints
   static const String loginEndpoint = '/user/login';
@@ -39,6 +39,8 @@ static String get formApiBaseUrl => kIsWeb
   static const String submitExportExcelEndpoint = '/form/submit/export-excel';
   static const String monitoringEndpoint = '/form/monitoring';
   static const String monitoringResetEndpoint = '/form/monitoring/reset';
+  static const String monitoringProgressEndpoint = '/form/monitoring/progress';
+  static const String formBannerEndpoint = '/form/banner';
 
   // Request timeout
   static const Duration timeout = Duration(seconds: 30);

@@ -90,6 +90,7 @@ class _TrashScreenState extends State<TrashScreen> {
         }
       }
     } catch (_) {}
+    if (!mounted) return;
     setState(() => _isLoading = false);
   }
 

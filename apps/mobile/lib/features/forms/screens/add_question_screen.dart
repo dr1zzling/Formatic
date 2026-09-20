@@ -1,12 +1,14 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/form_service.dart';
 import '../../../core/config/api_config.dart';
 import '../widgets/form_audio_player.dart';
+import '../widgets/math_keyboard.dart';
 
 class AddQuestionScreen extends StatefulWidget {
   final String? formSlug;
@@ -29,9 +31,13 @@ class AddQuestionScreen extends StatefulWidget {
 class _AddQuestionScreenState extends State<AddQuestionScreen> {
   final _formKey = GlobalKey<FormState>();
   late QuillController _quillController;
+  bool _showMathKeyboard = false;
   final List<QuillController> _optionQuillControllers = [];
   final List<FocusNode> _optionFocusNodes = [];
   int _focusedOptionIndex = 0;
+
+  bool _mathKeyboardSupported(BuildContext context) =>
+      !kIsWeb && Theme.of(context).platform == TargetPlatform.android;
 
   String _selectedType = 'radio';
   int? _correctOptionIndex;
@@ -100,10 +106,12 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
         final decoded = jsonDecode(raw);
         if (decoded is List) {
           final doc = Document.fromJson(decoded);
+          final old = _quillController;
           _quillController = QuillController(
             document: doc,
             selection: const TextSelection.collapsed(offset: 0),
           );
+          old.dispose();
         } else {
           _setPlainText(_stripHtml(raw));
         }
@@ -225,10 +233,12 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
 
   void _setPlainText(String text) {
     final doc = Document()..insert(0, text);
+    final old = _quillController;
     _quillController = QuillController(
       document: doc,
       selection: const TextSelection.collapsed(offset: 0),
     );
+    old.dispose();
   }
 
   bool _isQuestionEmpty() {
@@ -332,6 +342,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
         }
         return;
       }
+      if (!mounted) return;
       setState(() {
         _selectedImageBytes = bytes;
         _selectedImageName = file.name;
@@ -519,40 +530,38 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
         );
       }
 
+      if (!mounted) return;
       setState(() => _isLoading = false);
 
-      if (mounted) {
-        if (result['success']) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                _isEditing
-                    ? 'Soal berhasil diperbarui!'
-                    : 'Soal berhasil ditambahkan!',
-              ),
-              backgroundColor: AppColors.success,
-            ),
-          );
-          Navigator.of(context).pop(true);
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['message'] ?? 'Gagal menyimpan soal'),
-              backgroundColor: AppColors.error,
-            ),
-          );
-        }
-      }
-    } catch (_) {
-      setState(() => _isLoading = false);
-      if (mounted) {
+      if (result['success']) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Gagal menyimpan soal. Coba lagi.'),
+          SnackBar(
+            content: Text(
+              _isEditing
+                  ? 'Soal berhasil diperbarui!'
+                  : 'Soal berhasil ditambahkan!',
+            ),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        Navigator.of(context).pop(true);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Gagal menyimpan soal'),
             backgroundColor: AppColors.error,
           ),
         );
       }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Gagal menyimpan soal. Coba lagi.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
     }
   }
 
@@ -781,7 +790,32 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
             const SizedBox(height: 24),
 
             // ── WYSIWYG Editor ────────────────────────────────────
-            _buildSectionLabel('Pertanyaan'),
+            Row(
+              children: [
+                Expanded(child: _buildSectionLabel('Pertanyaan')),
+                if (_mathKeyboardSupported(context))
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() => _showMathKeyboard = !_showMathKeyboard);
+                    },
+                    icon: Icon(
+                      _showMathKeyboard
+                          ? Icons.keyboard_hide_rounded
+                          : Icons.functions_rounded,
+                      size: 18,
+                    ),
+                    label: Text(
+                      _showMathKeyboard ? 'Tutup Matematika' : 'Matematika',
+                    ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: const Size(0, 40),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 10),
 
             // Toolbar
@@ -883,6 +917,9 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                 ),
               ),
             ),
+
+            if (_mathKeyboardSupported(context) && _showMathKeyboard)
+              MathKeyboard(controller: _quillController),
 
             if (_questionEmpty)
               Padding(

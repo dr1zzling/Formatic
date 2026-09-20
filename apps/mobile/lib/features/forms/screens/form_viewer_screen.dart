@@ -39,6 +39,9 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
   // Set of soal IDs yang ditandai ragu-ragu
   final Set<int> _doubtfulIds = {};
 
+  // Debounce laporan progress monitoring (paritas Web FillForm: 400ms)
+  Timer? _progressDebounce;
+
   // Timer state
   int? _durationSeconds;        // durasi dalam detik (duration menit * 60)
   int? _remainingSeconds;       // sisa waktu countdown
@@ -61,6 +64,10 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
   String _tokenError = '';
 
   List<Map<String, dynamic>> _questions = [];
+  
+  // Text input controllers - keyed by question ID to avoid mixing up answers
+  // Maps question ID → TextEditingController
+  final Map<dynamic, TextEditingController> _textControllers = {};
 
   @override
   void initState() {
@@ -71,7 +78,13 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
   @override
   void dispose() {
     _countdownTimer?.cancel();
+    _progressDebounce?.cancel();
     _tokenController.dispose();
+    // Dispose all text controllers
+    for (final controller in _textControllers.values) {
+      controller.dispose();
+    }
+    _textControllers.clear();
     super.dispose();
   }
 
@@ -80,9 +93,16 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
       _isLoading = true;
       _errorMessage = '';
     });
+    
+    // Clear old controllers when loading new form
+    for (final controller in _textControllers.values) {
+      controller.dispose();
+    }
+    _textControllers.clear();
 
     try {
       final result = await FormService.getFormBySlug(widget.slug);
+      if (!mounted) return;
 
       if (result['success']) {
         final data = result['data']['data'];
@@ -199,6 +219,13 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
           _currentPageIndex = 0;
           _isLoading = false;
         });
+
+        // Form tanpa token: daftarkan pengerjaan ke backend sekarang
+        // (paritas Web FillForm). Backend menolak submit tanpa record
+        // form_submit (400 "Submit form belum dimulai").
+        if (!_tokenNeeded) {
+          _registerNoTokenProgress();
+        }
       } else {
         setState(() {
           _errorMessage = result['message'] ?? 'Failed to load form';
@@ -206,6 +233,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = 'Error: ${e.toString()}';
         _isLoading = false;
@@ -287,6 +315,48 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
     if (_durationSeconds != null && _durationSeconds! > 0) {
       _initAndStartTimer();
     }
+    _emitProgress();
+  }
+
+  /// Form tanpa token: daftarkan pengerjaan ke backend sekali agar record
+  /// form_submit (status progress) dibuat. Backend menolak submit tanpa
+  /// record ("Submit form belum dimulai"). Fire-and-forget (paritas Web).
+  Future<void> _registerNoTokenProgress() async {
+    final result = await FormService.checkTokenResponden(
+      formSlug: widget.slug,
+      token: '',
+    );
+    if (!mounted) return;
+    if (result['success']) {
+      setState(() => _tokenValidated = true);
+      _emitProgress();
+    }
+    // Registrasi gagal (mis. 4xx/5xx backend): jangan kirim progress —
+    // tanpa record form_submit, laporan progress pasti ditolak.
+    // Fill form, jawaban, dan submit tidak terpengaruh.
+  }
+
+  /// Laporkan posisi halaman aktif ke monitoring creator (debounced 400ms,
+  /// fire-and-forget). Paritas Web FillForm.emitProgress.
+  void _emitProgress() {
+    if (_pageGroups.isEmpty || _isSubmitted) return;
+    _progressDebounce?.cancel();
+    _progressDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted || _isSubmitted || _pageGroups.isEmpty) return;
+      final idx = _currentPageIndex.clamp(0, _pageGroups.length - 1);
+      final soalOnPage =
+          (_pageGroups[idx]['soal'] as List? ?? []).length;
+      // Hasil sengaja diabaikan: endpoint boleh gagal (mis. 4xx/5xx atau
+      // kolom progress belum tersedia di DB runtime) tanpa mengganggu
+      // pengerjaan, jawaban, pagination, token, maupun submit.
+      FormService.updateMonitoringProgress(
+        formSlug: widget.slug,
+        currentPage: idx + 1,
+        currentSoal: soalOnPage,
+        totalPages: _pageGroups.length,
+        totalSoal: _allSoal.length,
+      );
+    });
   }
 
   /// Hitung dan mulai timer. Hanya dipanggil sekali saat user memulai pengerjaan.
@@ -348,16 +418,16 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
   /// Survey: semua soal dalam 1 halaman.
   /// Quiz: step-by-step per page, page 1 = identitas (tidak diacak),
   ///   page 2+ = soal ujian (diacak jika is_random).
+  /// CRITICAL: Store references to original _questions objects, not copies!
+  /// This ensures answer updates persist across page navigation.
   List<Map<String, dynamic>> _buildPageGroups(
       List rawSoal, bool isRandom, bool isQuiz) {
     if (!isQuiz) {
-      // Survey: satu page saja dengan semua soal
+      // Survey: satu page saja dengan semua soal (store references, not copies!)
       return [
         {
           'page': 1,
-          'soal': List<Map<String, dynamic>>.from(
-            _questions,
-          ),
+          'soal': _questions,  // ✅ Direct reference, not List.from()
         }
       ];
     }
@@ -389,7 +459,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
               };
             },
           );
-          return found;
+          return found;  // ✅ Store reference to _questions object, not copy
         }).toList();
         pageMap[pageNum] = soalList;
       }
@@ -399,7 +469,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
     if (pageMap.isEmpty) {
       for (final q in _questions) {
         final p = q['page'] as int? ?? 1;
-        pageMap.putIfAbsent(p, () => []).add(q);
+        pageMap.putIfAbsent(p, () => []).add(q);  // ✅ Direct reference
       }
     }
 
@@ -407,15 +477,16 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
     final groups = sortedPages.map((p) {
       var soal = pageMap[p]!;
       // Shuffle soal di page 2+ jika is_random (page 1 = identitas, tidak diacak)
+      // ⚠️ Create shuffled list, but still contains references to original objects
       if (isRandom && p > 1) {
-        soal = List<Map<String, dynamic>>.from(soal)..shuffle();
+        soal = List<Map<String, dynamic>>.from(soal)..shuffle();  // Shuffle list only, not objects
       }
       return {'page': p, 'soal': soal};
     }).toList();
 
     return groups.isEmpty
         ? [
-            {'page': 1, 'soal': List<Map<String, dynamic>>.from(_questions)}
+            {'page': 1, 'soal': _questions}  // ✅ Direct reference, not List.from()
           ]
         : groups;
   }
@@ -492,13 +563,43 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
   void _goToNextPage() {
     if (!_validateCurrentPage()) return;
     if (_currentPageIndex < _pageGroups.length - 1) {
+      // [FillForm] DEBUG: Log page change
+      assert(() {
+        final currentAnswers = _currentPageSoal.map((q) {
+          final ans = q['answer'];
+          return 'Q${q['id']}=${ans is String ? (ans.isEmpty ? "(empty)" : ans.substring(0, (ans.length < 20 ? ans.length : 20))) : ans}';
+        }).join(', ');
+        debugPrint(
+          '[FillForm] PAGE_CHANGE '
+          'from=${_currentPageIndex + 1} '
+          'to=${_currentPageIndex + 2} '
+          'currentPageAnswers=[$currentAnswers]'
+        );
+        return true;
+      }());
       setState(() => _currentPageIndex++);
+      _emitProgress();
     }
   }
 
   void _goToPreviousPage() {
     if (_currentPageIndex > 0) {
+      // [FillForm] DEBUG: Log page change
+      assert(() {
+        final nextPageAnswers = _currentPageSoal.map((q) {
+          final ans = q['answer'];
+          return 'Q${q['id']}=${ans is String ? (ans.isEmpty ? "(empty)" : ans.substring(0, (ans.length < 20 ? ans.length : 20))) : ans}';
+        }).join(', ');
+        debugPrint(
+          '[FillForm] PAGE_CHANGE '
+          'from=${_currentPageIndex + 1} '
+          'to=${_currentPageIndex} '
+          'currentPageAnswers=[$nextPageAnswers]'
+        );
+        return true;
+      }());
       setState(() => _currentPageIndex--);
+      _emitProgress();
     }
   }
 
@@ -581,7 +682,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
   }
 
   void _showTimeWarning() {
-    if (!_hasShownWarning) {
+    if (!_hasShownWarning && mounted) {
       _hasShownWarning = true;
       showDialog(
         context: context,
@@ -608,10 +709,9 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
 
   Future<void> _handleAutoSubmit() async {
     _countdownTimer?.cancel();
-    if (mounted) {
-      Navigator.of(context, rootNavigator: true).popUntil(
-          (route) => route.isFirst || route is PageRoute);
-    }
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).popUntil(
+        (route) => route.isFirst || route is PageRoute);
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).clearSnackBars();
@@ -713,11 +813,36 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
         answers.add({'jawaban': jawaban});
       }
 
+      // [FillForm] DEBUG: Log submit request
+      assert(() {
+        debugPrint(
+          '[FillForm] SUBMIT_REQUEST '
+          'endpoint=POST /api/submit '
+          'formSlug=${widget.slug} '
+          'answersCount=${answers.length} '
+          'filesCount=${uploadFiles.length} '
+          'payload=${answers.toString().substring(0, (answers.toString().length < 100 ? answers.toString().length : 100))}'
+        );
+        return true;
+      }());
+
       final result = await FormService.submitForm(
         formSlug: widget.slug,
         answers: answers,
         files: uploadFiles,
       );
+
+      // [FillForm] DEBUG: Log submit response
+      assert(() {
+        debugPrint(
+          '[FillForm] SUBMIT_RESPONSE '
+          'success=${result['success']} '
+          'statusCode=${result['statusCode'] ?? "N/A"} '
+          'message="${result['message'] ?? "N/A"}" '
+          'answersCount=${answers.length}'
+        );
+        return true;
+      }());
 
       if (!mounted) return;
       setState(() {
@@ -727,20 +852,83 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
 
       if (!result['success']) {
         final statusCode = result['statusCode'];
-        if (statusCode != 409) {
+        final message = result['message'] as String? ?? '';
+        
+        // Distinguish validation errors (4xx) from server errors (5xx)
+        if (statusCode >= 400 && statusCode < 500) {
+          // Validation/client error - show "Isi Tidak Sesuai" warning
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Isi Tidak Sesuai',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  if (message.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      message,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ] else
+                    const Padding(
+                      padding: EdgeInsets.only(top: 6),
+                      child: Text(
+                        'Periksa kembali jawaban Anda.',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                ],
+              ),
+              backgroundColor: AppColors.warning,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+          // Reset submission state to allow retry
+          if (!mounted) return;
+          setState(() {
+            _isSubmitted = false;
+          });
+        } else if (statusCode != 409) {
+          // Server error (5xx) or other issue
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(result['message'] ?? 'Gagal mengirim, tapi waktu telah habis.'),
-            backgroundColor: AppColors.warning,
+            content: Text(
+              statusCode >= 500 
+                ? 'Terjadi kesalahan pada server. Silakan coba lagi.'
+                : (message.isNotEmpty ? message : 'Gagal mengirim, tapi waktu telah habis.'),
+            ),
+            backgroundColor: AppColors.error,
             duration: const Duration(seconds: 5),
           ));
+          // Reset submission state to allow retry even on server error
+          if (!mounted) return;
+          setState(() {
+            _isSubmitted = false;
+          });
         }
       }
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _isSubmitting = false;
-        _isSubmitted = true;
+        _isSubmitted = false;
       });
+      // Show generic error but don't crash
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Terjadi kesalahan. Silakan coba lagi.'),
+          backgroundColor: AppColors.error,
+          duration: const Duration(seconds: 4),
+        ),
+      );
     }
   }
 
@@ -815,17 +1003,28 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
   }
 
   Future<void> _pickFile(int index) async {
-    final picked = await FilePickerPlatform.instance.pickFiles();
-    if (picked.isEmpty) return;
-    final file = picked.first;
-    final bytes = await file.xFile.readAsBytes();
-    if (!mounted) return;
-    setState(() {
-      _questions[index]['answer'] = {'bytes': bytes, 'filename': file.name};
-    });
+    try {
+      final picked = await FilePickerPlatform.instance.pickFiles();
+      if (picked.isEmpty) return;
+      final file = picked.first;
+      final bytes = await file.xFile.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _questions[index]['answer'] = {'bytes': bytes, 'filename': file.name};
+      });
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Gagal memilih file. Coba lagi.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   Future<void> _handleSubmit() async {
+    if (_isSubmitting || _isSubmitted) return;
     if (_tokenNeeded && !_tokenValidated) {
       _promptToken();
       return;
@@ -925,9 +1124,21 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
 
       final result = await FormService.submitForm(
           formSlug: widget.slug, answers: answers, files: uploadFiles);
+      
+      // [SubmitDebug] Log result
+      assert(() {
+        debugPrint('[SubmitDebug] HANDLESUBMIT_RESULT_RECEIVED');
+        debugPrint('[SubmitDebug] success=${result['success']}');
+        debugPrint('[SubmitDebug] statusCode=${result['statusCode']}');
+        debugPrint('[SubmitDebug] message=${result['message']}');
+        return true;
+      }());
+      
+      if (!mounted) return;
       setState(() => _isSubmitting = false);
 
-      if (result['success'] && mounted) {
+      if (result['success']) {
+        if (!mounted) return;
         setState(() => _isSubmitted = true);
         // Simpan ke riwayat lokal (SharedPreferences) sesuai Web FE behavior
         await saveHistoryEntry(
@@ -935,25 +1146,41 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
           formTitle: _formTitle,
           category: _category,
         );
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Form submitted successfully!'),
           backgroundColor: AppColors.success,
         ));
-      } else if (mounted) {
+      } else {
+        if (!mounted) return;
         final statusCode = result['statusCode'];
+        if (statusCode == 409) {
+          // Backend memastikan user sudah pernah submit (completed) —
+          // terminal state, tampilkan layar selesai bukan error berulang.
+          setState(() => _isSubmitted = true);
+          await saveHistoryEntry(
+            formSlug: widget.slug,
+            formTitle: _formTitle,
+            category: _category,
+          );
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Anda sudah mengisi form ini sebelumnya.'),
+            backgroundColor: AppColors.success,
+          ));
+          return;
+        }
         String message = result['message'] ?? 'Failed to submit form';
-        if (statusCode == 409) message = 'You have already submitted this form.';
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(message), backgroundColor: AppColors.error));
       }
     } catch (_) {
+      if (!mounted) return;
       setState(() => _isSubmitting = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Failed to submit form. Please check your connection and try again.'),
           backgroundColor: AppColors.error,
         ));
-      }
     }
   }
 
@@ -1050,20 +1277,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
         ? '${_durationSeconds! ~/ 60} Menit'
         : 'Tanpa Batasan Waktu';
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-        ),
-        title: const Text('Informasi Form',
-            style: TextStyle(
-                fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-      ),
-      body: SingleChildScrollView(
+    return SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -1184,8 +1398,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildInfoRow(
@@ -1793,7 +2006,62 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
   }
 
   Widget _buildTextInput(Map<String, dynamic> question, int index) {
+    // FIX: Use TextEditingController to bind TextField to stored answer
+    // Ensures answer persists when page navigation causes widget rebuild
+    
+    final questionId = question['id'];
+    final storedAnswer = question['answer']?.toString() ?? '';
+    
+    // Get or create controller for this specific question ID
+    // Using question ID (not index) to prevent controller mixing when questions reorder
+    if (!_textControllers.containsKey(questionId)) {
+      final controller = TextEditingController(text: storedAnswer);
+      _textControllers[questionId] = controller;
+      
+      // [FillForm] DEBUG: Log controller creation
+      assert(() {
+        debugPrint(
+          '[FillForm] ANSWER_CONTROLLER_CREATED '
+          'questionId=$questionId '
+          'index=$index '
+          'initialValue="$storedAnswer"'
+        );
+        return true;
+      }());
+    } else {
+      // Controller exists - sync stored answer to controller if out of sync
+      final controller = _textControllers[questionId]!;
+      if (controller.text != storedAnswer && storedAnswer.isNotEmpty) {
+        // Answer was updated externally (e.g., via page change), sync to controller
+        controller.text = storedAnswer;
+        
+        // [FillForm] DEBUG: Log controller sync
+        assert(() {
+          debugPrint(
+            '[FillForm] ANSWER_CONTROLLER_SYNCED '
+            'questionId=$questionId '
+            'synced_to="$storedAnswer"'
+          );
+          return true;
+        }());
+      }
+    }
+    
+    final controller = _textControllers[questionId]!;
+    
+    // [FillForm] DEBUG: Log answer render
+    assert(() {
+      debugPrint(
+        '[FillForm] ANSWER_RENDER '
+        'questionId=$questionId '
+        'index=$index '
+        'controllerText="${controller.text.isEmpty ? "(empty)" : controller.text.substring(0, (controller.text.length < 50 ? controller.text.length : 50))}"'
+      );
+      return true;
+    }());
+    
     return TextField(
+      controller: controller,  // ✅ FIX: Use controller bound to question ID
       maxLines: 4,
       decoration: InputDecoration(
         hintText: 'Type your answer here...',
@@ -1809,7 +2077,21 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
             borderRadius: BorderRadius.circular(8),
             borderSide: const BorderSide(color: AppColors.primary, width: 2)),
       ),
-      onChanged: (value) => _questions[index]['answer'] = value,
+      onChanged: (value) {
+        // Update stored answer in _questions
+        // [FillForm] DEBUG: Log answer updates
+        assert(() {
+          debugPrint(
+            '[FillForm] ANSWER_UPDATE '
+            'questionId=$questionId '
+            'index=$index '
+            'newAnswer="${value.isEmpty ? "(empty)" : value.substring(0, (value.length < 50 ? value.length : 50))}"'
+          );
+          return true;
+        }());
+        
+        setState(() => _questions[index]['answer'] = value);
+      },
     );
   }
 
@@ -1966,10 +2248,14 @@ class QuillRichText extends StatefulWidget {
 class _QuillRichTextState extends State<QuillRichText> {
   quill.QuillController? _controller;
   bool _isQuillDelta = false;
+  late final ScrollController _scrollController;
+  late final FocusNode _focusNode;
 
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController();
+    _focusNode = FocusNode(canRequestFocus: false);
     _parse();
   }
 
@@ -2014,6 +2300,8 @@ class _QuillRichTextState extends State<QuillRichText> {
   @override
   void dispose() {
     _controller?.dispose();
+    _scrollController.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -2033,8 +2321,8 @@ class _QuillRichTextState extends State<QuillRichText> {
       return ExcludeSemantics(
         child: quill.QuillEditor(
           controller: _controller!,
-          scrollController: ScrollController(),
-          focusNode: FocusNode(canRequestFocus: false),
+          scrollController: _scrollController,
+          focusNode: _focusNode,
           config: quill.QuillEditorConfig(
             autoFocus: false,
             expands: false,

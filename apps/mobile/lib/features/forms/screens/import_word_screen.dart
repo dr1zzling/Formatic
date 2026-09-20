@@ -149,15 +149,17 @@ class _ImportWordScreenState extends State<ImportWordScreen> {
       // {soal: {question, type, page}, options: [...]}.
       if (widget.targetPage > 0 && listSoal.isNotEmpty) {
         await _reassignPageForImportedSoal(listSoal, widget.targetPage);
+        if (!mounted) return;
       }
 
-      if (!mounted) return;
       setState(() => _isLoading = false);
+      if (!mounted) return;
 
       await _showSuccessDialog(count);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } else {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
         _errorMessage =

@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'dart:typed_data' show Uint8List;
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/download_utils.dart';
+import '../../../core/config/api_config.dart';
 import '../../../core/services/form_service.dart';
 import 'add_question_screen.dart';
 import 'form_viewer_screen.dart';
@@ -43,6 +46,7 @@ class _FormEditorScreenState extends State<FormEditorScreen>
   String _tokenRespon = ''; // loaded from backend via getFormBySlug
   int? _startAtMillis;      // loaded from backend via getFormBySlug
   String? _themeColor;      // loaded from backend via getFormBySlug
+  String? _banner;          // loaded from backend via getFormBySlug
   bool _isSavingChanges = false;
   final GlobalKey<_SettingsTabState> _settingsKey = GlobalKey<_SettingsTabState>();
 
@@ -68,6 +72,7 @@ class _FormEditorScreenState extends State<FormEditorScreen>
 
     try {
       final result = await FormService.getFormBySlug(widget.formSlug);
+      if (!mounted) return;
       if (result['success']) {
         final data = result['data']['data'];
         // Backend returns soal grouped by page: [{page:1, soal:[...]}, ...]
@@ -151,6 +156,12 @@ class _FormEditorScreenState extends State<FormEditorScreen>
               ? rawTheme.toString()
               : null;
 
+          // Parse banner (path relatif, mis. /uploads/banner/...)
+          final rawBanner = form['banner'];
+          _banner = rawBanner?.toString().isNotEmpty == true
+              ? rawBanner.toString()
+              : null;
+
           _questions = listSoal.asMap().entries.map((entry) {
             final index = entry.key;
             final soal = entry.value;
@@ -186,6 +197,7 @@ class _FormEditorScreenState extends State<FormEditorScreen>
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = 'Error: ${e.toString()}';
         _isLoading = false;
@@ -467,6 +479,11 @@ class _FormEditorScreenState extends State<FormEditorScreen>
                         initialTokenRespon: _tokenRespon,
                         initialStartAtMillis: _startAtMillis,
                         initialThemeColor: _themeColor,
+                        initialBanner: _banner,
+                        onBannerChanged: (url) {
+                          if (!mounted) return;
+                          setState(() => _banner = url);
+                        },
                       ),
                     ],
                   ),
@@ -1373,6 +1390,7 @@ class _ScoreSheetState extends State<_ScoreSheet> {
           soalId: soalId,
           payload: payload,
         );
+        if (!mounted) return;
         if (result['success'] != true) {
           setState(() {
             _errorMsg = result['message'] ?? 'Gagal menyimpan skor soal ${i + 1}.';
@@ -1383,19 +1401,19 @@ class _ScoreSheetState extends State<_ScoreSheet> {
       }
 
       if (!mounted) return;
+      final savedMessage = _mode == 'auto'
+          ? 'Skor otomatis berhasil disimpan (total: ${_currentTotal.toStringAsFixed(0)} pts).'
+          : 'Skor manual berhasil disimpan.';
       Navigator.of(context).pop();
       widget.onSaved();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            _mode == 'auto'
-                ? 'Skor otomatis berhasil disimpan (total: ${_currentTotal.toStringAsFixed(0)} pts).'
-                : 'Skor manual berhasil disimpan.',
-          ),
+          content: Text(savedMessage),
           backgroundColor: AppColors.success,
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMsg = 'Terjadi kesalahan: ${e.toString()}';
         _isSaving = false;
@@ -1979,13 +1997,31 @@ class _ResponsesTabState extends State<_ResponsesTab> {
       if (result['success']) {
         final bytes = result['bytes'] as Uint8List;
         final filename = result['filename'] as String;
-        triggerFileDownload(bytes, filename);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('File Excel berhasil diunduh.'),
-            backgroundColor: AppColors.success,
-          ),
-        );
+        if (kIsWeb) {
+          triggerFileDownload(bytes, filename);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('File Excel berhasil diunduh.'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        } else {
+          final savedUri = await FilePicker.saveFile(
+            fileName: filename,
+            mimeType:
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            bytes: bytes,
+            dialogTitle: 'Simpan file Excel',
+          );
+          if (savedUri == null) return;
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('File Excel berhasil disimpan.'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -2434,6 +2470,8 @@ class _SettingsTab extends StatefulWidget {
   final String initialTokenRespon;
   final int? initialStartAtMillis;
   final String? initialThemeColor;
+  final String? initialBanner;
+  final ValueChanged<String?> onBannerChanged;
 
   const _SettingsTab({
     super.key,
@@ -2446,6 +2484,8 @@ class _SettingsTab extends StatefulWidget {
     this.initialTokenRespon = '',
     this.initialStartAtMillis,
     this.initialThemeColor,
+    this.initialBanner,
+    required this.onBannerChanged,
   });
 
   @override
@@ -2469,6 +2509,11 @@ class _SettingsTabState extends State<_SettingsTab>
   // theme_color dari backend — bisa diubah di Settings
   String? _themeColor;
   bool _isSavingTheme = false;
+  // banner dari backend (path relatif) — bisa update/hapus di Settings
+  String? _banner;
+  bool _isSavingBanner = false;
+  String? _bannerError;
+  String? _bannerSuccessMsg;
 
   // Preset warna yang sama dengan create_form_screen
   static const List<Map<String, dynamic>> _presetColors = [
@@ -2493,6 +2538,7 @@ class _SettingsTabState extends State<_SettingsTab>
     _isRandom = widget.initialIsRandom;
     _startAtMillis = widget.initialStartAtMillis;
     _themeColor = widget.initialThemeColor;
+    _banner = widget.initialBanner;
     _durationController = TextEditingController(
       text: widget.initialDurationMinutes > 0
           ? widget.initialDurationMinutes.toString()
@@ -2524,6 +2570,9 @@ class _SettingsTabState extends State<_SettingsTab>
     }
     if (oldWidget.initialThemeColor != widget.initialThemeColor) {
       _themeColor = widget.initialThemeColor;
+    }
+    if (oldWidget.initialBanner != widget.initialBanner) {
+      _banner = widget.initialBanner;
     }
   }
 
@@ -2692,7 +2741,82 @@ class _SettingsTabState extends State<_SettingsTab>
     }
   }
 
+  /// Upload banner baru (PATCH /form/banner). Maks 5MB, JPG/PNG/WEBP.
+  /// Mengikuti contract backend: field multipart `banner`.
+  Future<void> _uploadBanner() async {
+    final result = await FilePickerPlatform.instance.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+    );
+    if (result.isEmpty) return;
+    final file = result.first;
+    final bytes = await file.xFile.readAsBytes();
+    if (bytes.isEmpty) return;
+    if (bytes.lengthInBytes > 5 * 1024 * 1024) {
+      if (!mounted) return;
+      setState(() {
+        _bannerError = 'Gambar terlalu besar. Maksimal 5MB.';
+        _bannerSuccessMsg = null;
+      });
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isSavingBanner = true;
+      _bannerError = null;
+      _bannerSuccessMsg = null;
+    });
+
+    final upload = await FormService.updateBanner(
+      slug: widget.formSlug,
+      bannerBytes: bytes,
+      filename: file.name,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _isSavingBanner = false;
+      if (upload['success']) {
+        _banner = upload['banner']?.toString() ?? _banner;
+        _bannerSuccessMsg = upload['message'] ?? 'Banner berhasil diupdate!';
+        _bannerError = null;
+      } else {
+        _bannerError = upload['message'] ?? 'Gagal upload banner.';
+        _bannerSuccessMsg = null;
+      }
+    });
+    if (upload['success']) widget.onBannerChanged(_banner);
+  }
+
+  /// Hapus banner (DELETE /form/banner). Mengikuti Web SettingsTab.
+  Future<void> _deleteBanner() async {
+    if (!mounted || _banner == null) return;
+    setState(() {
+      _isSavingBanner = true;
+      _bannerError = null;
+      _bannerSuccessMsg = null;
+    });
+
+    final result = await FormService.deleteBanner(slug: widget.formSlug);
+
+    if (!mounted) return;
+    setState(() {
+      _isSavingBanner = false;
+      if (result['success']) {
+        _banner = null;
+        _bannerSuccessMsg = result['message'] ?? 'Banner berhasil dihapus.';
+        _bannerError = null;
+      } else {
+        _bannerError = result['message'] ?? 'Gagal hapus banner.';
+        _bannerSuccessMsg = null;
+      }
+    });
+    if (result['success']) widget.onBannerChanged(null);
+  }
+
   Future<void> _saveThemeColor(String? selectedHex) async {
+    final previousHex = _themeColor;
     setState(() {
       _themeColor = selectedHex;
       _isSavingTheme = true;
@@ -2717,7 +2841,7 @@ class _SettingsTabState extends State<_SettingsTab>
 
     if (!result['success']) {
       // Rollback ke nilai sebelumnya jika gagal
-      setState(() => _themeColor = selectedHex == null ? null : _themeColor);
+      setState(() => _themeColor = previousHex);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(result['message'] ?? 'Gagal menyimpan warna tema.'),
@@ -2983,6 +3107,83 @@ class _SettingsTabState extends State<_SettingsTab>
                         value: _isRandom,
                         onTap: () => _toggleShuffle(!_isRandom),
                       ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── BANNER FORM ───────────────────────────────────────
+          _buildSectionLabel('BANNER FORM'),
+          const SizedBox(height: 8),
+          _buildCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildCardHeader(
+                  icon: Icons.image_outlined,
+                  title: 'Banner Form',
+                  subtitle: 'Gambar header di atas form. JPG, PNG, atau WEBP maks 5MB.',
+                ),
+                const SizedBox(height: 14),
+                if (_banner != null && _banner!.isNotEmpty)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(
+                      _banner!.startsWith('http')
+                          ? _banner!
+                          : '${ApiConfig.formApiBaseUrl}$_banner',
+                      height: 120,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        height: 120,
+                        color: AppColors.background,
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.broken_image_outlined,
+                            color: AppColors.textHint),
+                      ),
+                    ),
+                  ),
+                if (_banner != null && _banner!.isNotEmpty)
+                  const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildSaveButton(
+                        label: 'Upload',
+                        isSaving: _isSavingBanner,
+                        onTap: _uploadBanner,
+                      ),
+                    ),
+                    if (_banner != null && _banner!.isNotEmpty) ...[
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: _isSavingBanner ? null : _deleteBanner,
+                          child: Container(
+                            height: 46,
+                            decoration: BoxDecoration(
+                              color: AppColors.error.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Center(
+                              child: Text('Hapus',
+                                  style: TextStyle(
+                                      color: AppColors.error,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14)),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                if (_bannerError != null)
+                  _buildFeedback(_bannerError!, isError: true),
+                if (_bannerSuccessMsg != null)
+                  _buildFeedback(_bannerSuccessMsg!, isError: false),
               ],
             ),
           ),

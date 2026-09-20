@@ -620,9 +620,52 @@ class FormService {
         '${ApiConfig.formApiBaseUrl}${ApiConfig.submitEndpoint}?form_slug=$formSlug',
       );
 
+      // [SubmitDebug] Log submit request details
+      assert(() {
+        debugPrint('[SubmitDebug] SUBMIT_REQUEST_START');
+        debugPrint('[SubmitDebug] method=POST');
+        debugPrint('[SubmitDebug] endpoint=${ApiConfig.submitEndpoint}');
+        debugPrint('[SubmitDebug] url=$url');
+        debugPrint('[SubmitDebug] form_slug=$formSlug');
+        debugPrint('[SubmitDebug] answersCount=${answers.length}');
+        debugPrint('[SubmitDebug] filesCount=${files.length}');
+        
+        // Log payload structure without sensitive data
+        try {
+          final payload = jsonEncode(answers);
+          final truncated = payload.length > 200 
+            ? '${payload.substring(0, 200)}...' 
+            : payload;
+          debugPrint('[SubmitDebug] payload=$truncated');
+          
+          // Log answer types breakdown
+          for (int i = 0; i < answers.length && i < 5; i++) {
+            final ans = answers[i];
+            final jawaban = ans['jawaban'] as Map?;
+            if (jawaban != null) {
+              final soalId = jawaban['soal_id'];
+              final hasSoalOptionId = jawaban.containsKey('soal_option_id');
+              final hasAnswerText = jawaban.containsKey('answer_text');
+              debugPrint('[SubmitDebug] answer[$i] soal_id=$soalId has_option=$hasSoalOptionId has_text=$hasAnswerText');
+            }
+          }
+        } catch (e) {
+          debugPrint('[SubmitDebug] payload_debug_error=$e');
+        }
+        
+        return true;
+      }());
+
       final request = http.MultipartRequest('POST', url);
       final headers = await _getAuthHeaders();
       request.headers.addAll(headers);
+      
+      // [SubmitDebug] Log headers (without token value)
+      assert(() {
+        debugPrint('[SubmitDebug] headers_keys=${request.headers.keys.join(",")}');
+        return true;
+      }());
+      
       request.fields['data'] = jsonEncode(answers);
 
       for (final file in files) {
@@ -635,18 +678,52 @@ class FormService {
         );
       }
 
+      // [SubmitDebug] Log before sending
+      assert(() {
+        debugPrint('[SubmitDebug] SUBMIT_SENDING');
+        return true;
+      }());
+
       final streamedResponse = await request.send().timeout(ApiConfig.timeout);
       final response = await http.Response.fromStream(streamedResponse);
+      
+      // [SubmitDebug] Log response details
+      assert(() {
+        debugPrint('[SubmitDebug] SUBMIT_RESPONSE_RECEIVED');
+        debugPrint('[SubmitDebug] statusCode=${response.statusCode}');
+        debugPrint('[SubmitDebug] responseContentLength=${response.bodyBytes.length}');
+        
+        final bodyPreview = response.body.length > 200
+          ? '${response.body.substring(0, 200)}...'
+          : response.body;
+        debugPrint('[SubmitDebug] responseBody=$bodyPreview');
+        
+        return true;
+      }());
+      
       _handle401(response.statusCode);
       final data = await _decodeResponse(response);
 
       if (response.statusCode == 201 || response.statusCode == 200) {
+        // [SubmitDebug] Success
+        assert(() {
+          debugPrint('[SubmitDebug] SUBMIT_SUCCESS statusCode=${response.statusCode}');
+          return true;
+        }());
+        
         return {
           'success': true,
           'message': data['message'] ?? 'Form submitted successfully',
           'data': data,
         };
       }
+
+      // [SubmitDebug] Error response
+      assert(() {
+        debugPrint('[SubmitDebug] SUBMIT_ERROR statusCode=${response.statusCode}');
+        debugPrint('[SubmitDebug] errorMessage=${data['message']}');
+        return true;
+      }());
 
       return {
         'success': false,
@@ -655,6 +732,12 @@ class FormService {
         'statusCode': response.statusCode,
       };
     } catch (e) {
+      // [SubmitDebug] Exception
+      assert(() {
+        debugPrint('[SubmitDebug] SUBMIT_EXCEPTION error=$e');
+        return true;
+      }());
+      
       return {'success': false, 'message': 'Connection error: ${e.toString()}'};
     }
   }
@@ -1149,6 +1232,135 @@ class FormService {
       return {
         'success': false,
         'message': data['message'] ?? 'Gagal melakukan reset',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
+    }
+  }
+
+  /// Responden melaporkan posisi halaman/soal aktif (monitoring real-time creator).
+  /// Endpoint: `PATCH /form/monitoring/progress?form_slug=<slug>`
+  /// Body: `{current_page, current_soal, total_pages, total_soal}`
+  /// Response 200: { message: "Progress diperbarui" }.
+  /// 403 jika pemanggil creator; tanpa record → { message: "Tidak ada record pengerjaan" }.
+  /// Dipakai fire-and-forget dari viewer; tidak pernah throw.
+  static Future<Map<String, dynamic>> updateMonitoringProgress({
+    required String formSlug,
+    required int currentPage,
+    required int currentSoal,
+    required int totalPages,
+    required int totalSoal,
+  }) async {
+    try {
+      final url = Uri.parse(
+        '${ApiConfig.formApiBaseUrl}${ApiConfig.monitoringProgressEndpoint}?form_slug=$formSlug',
+      );
+      final headers = await _getHeaders();
+      final response = await http
+          .patch(
+            url,
+            headers: headers,
+            body: jsonEncode({
+              'current_page': currentPage,
+              'current_soal': currentSoal,
+              'total_pages': totalPages,
+              'total_soal': totalSoal,
+            }),
+          )
+          .timeout(ApiConfig.timeout);
+
+      _handle401(response.statusCode);
+      final data = await _decodeResponse(response);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Progress diperbarui',
+        };
+      }
+
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Gagal memperbarui progress',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
+    }
+  }
+
+  /// Update banner form (creator only).
+  /// Endpoint: `PATCH /form/banner?form_slug=<slug>`, multipart field `banner`.
+  /// Backend: maks 5MB, hanya JPG/JPEG/PNG/WEBP.
+  /// Response 200: { message: "Berhasil Update Banner", data: { banner: "..." } }
+  static Future<Map<String, dynamic>> updateBanner({
+    required String slug,
+    required Uint8List bannerBytes,
+    required String filename,
+  }) async {
+    try {
+      final url = Uri.parse(
+        '${ApiConfig.formApiBaseUrl}${ApiConfig.formBannerEndpoint}?form_slug=$slug',
+      );
+
+      final request = http.MultipartRequest('PATCH', url);
+      final headers = await _getAuthHeaders();
+      request.headers.addAll(headers);
+      request.files.add(
+        http.MultipartFile.fromBytes('banner', bannerBytes, filename: filename),
+      );
+
+      final streamedResponse = await request.send().timeout(ApiConfig.timeout);
+      final response = await http.Response.fromStream(streamedResponse);
+      _handle401(response.statusCode);
+      final data = await _decodeResponse(response);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final banner =
+            data['data'] is Map ? (data['data'] as Map)['banner'] : null;
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Banner berhasil diupdate',
+          'banner': banner?.toString(),
+        };
+      }
+
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Gagal upload banner',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
+    }
+  }
+
+  /// Hapus banner form (creator only).
+  /// Endpoint: `DELETE /form/banner?form_slug=<slug>`
+  /// Response 200: { message: "Berhasil Hapus Banner", data: { banner: null } }
+  static Future<Map<String, dynamic>> deleteBanner({
+    required String slug,
+  }) async {
+    try {
+      final url = Uri.parse(
+        '${ApiConfig.formApiBaseUrl}${ApiConfig.formBannerEndpoint}?form_slug=$slug',
+      );
+      final headers = await _getHeaders();
+      final response = await http
+          .delete(url, headers: headers)
+          .timeout(ApiConfig.timeout);
+
+      _handle401(response.statusCode);
+      final data = await _decodeResponse(response);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Banner berhasil dihapus',
+        };
+      }
+
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Gagal hapus banner',
       };
     } catch (e) {
       return {'success': false, 'message': 'Connection error: ${e.toString()}'};

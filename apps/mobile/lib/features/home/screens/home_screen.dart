@@ -245,7 +245,8 @@ class _HomeContentState extends State<_HomeContent>
   Future<void> _loadForms() async {
     setState(() => _isLoading = true);
     final result = await FormService.getForms();
-    if (result['success'] && mounted) {
+    if (!mounted) return;
+    if (result['success']) {
       // getForms() selalu return {'success': true, 'data': {'data': [...]}}
       final List<dynamic> forms =
           (result['data'] as Map?)?['data'] is List
@@ -281,6 +282,7 @@ class _HomeContentState extends State<_HomeContent>
         _isLoading = false;
       });
     } else {
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }

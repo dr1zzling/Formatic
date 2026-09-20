@@ -4,6 +4,16 @@ import '../config/api_config.dart';
 import 'storage_service.dart';
 
 class AuthService {
+  static Map<String, dynamic> _safeDecode(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) return decoded;
+      return {};
+    } catch (_) {
+      return {};
+    }
+  }
+
   // Login
   static Future<Map<String, dynamic>> login({
     required String username,
@@ -21,16 +31,23 @@ class AuthService {
         }),
       ).timeout(ApiConfig.timeout);
 
-      final data = jsonDecode(response.body);
+      final data = _safeDecode(response.body);
 
       if (response.statusCode == 200) {
-        await StorageService.saveToken(data['token']);
+        final token = data['token']?.toString();
+        if (token == null || token.isEmpty) {
+          return {
+            'success': false,
+            'message': data['message'] ?? 'Login failed: invalid server response',
+          };
+        }
+        await StorageService.saveToken(token);
         await StorageService.saveUsername(username);
         
         return {
           'success': true,
           'message': data['message'],
-          'token': data['token'],
+          'token': token,
         };
       } else {
         return {
@@ -63,16 +80,23 @@ class AuthService {
         }),
       ).timeout(ApiConfig.timeout);
 
-      final data = jsonDecode(response.body);
+      final data = _safeDecode(response.body);
 
       if (response.statusCode == 201) {
-        await StorageService.saveToken(data['token']);
+        final token = data['token']?.toString();
+        if (token == null || token.isEmpty) {
+          return {
+            'success': false,
+            'message': data['message'] ?? 'Registration failed: invalid server response',
+          };
+        }
+        await StorageService.saveToken(token);
         await StorageService.saveUsername(username);
         
         return {
           'success': true,
           'message': data['message'],
-          'token': data['token'],
+          'token': token,
         };
       } else {
         return {
@@ -105,7 +129,7 @@ class AuthService {
         }),
       ).timeout(ApiConfig.timeout);
 
-      final data = jsonDecode(response.body);
+      final data = _safeDecode(response.body);
 
       if (response.statusCode == 200) {
         return {

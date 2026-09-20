@@ -72,138 +72,334 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   void _showChangePasswordDialog() {
+    final currentPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
     final confirmController = TextEditingController();
+    var controllersDisposed = false;
+    void disposeControllers() {
+      if (!controllersDisposed) {
+        controllersDisposed = true;
+        currentPasswordController.dispose();
+        newPasswordController.dispose();
+        confirmController.dispose();
+      }
+    }
+
     bool lifting = false;
+    bool obscureCurrentPassword = true;
+    bool obscureNewPassword = true;
+    bool obscureConfirmPassword = true;
 
     showDialog(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.lock_outline, color: AppColors.primary),
-              SizedBox(width: 12),
-              Text('Change Password'),
-            ],
-          ),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Akun: $_username',
-                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+        builder: (context, setDialogState) {
+          final mediaQuery = MediaQuery.of(context);
+          final maxDialogHeight =
+              (mediaQuery.size.height -
+                      mediaQuery.viewInsets.bottom -
+                      mediaQuery.padding.top -
+                      mediaQuery.padding.bottom -
+                      48)
+                  .clamp(300.0, mediaQuery.size.height)
+                  .toDouble();
+
+          InputDecoration passwordDecoration({
+            required String label,
+            required String hint,
+            required bool obscureText,
+            required VoidCallback onToggleVisibility,
+          }) {
+            return InputDecoration(
+              labelText: label,
+              hintText: hint,
+              filled: true,
+              fillColor: AppColors.inputFill,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 15,
+              ),
+              suffixIcon: IconButton(
+                tooltip: obscureText
+                    ? 'Tampilkan password'
+                    : 'Sembunyikan password',
+                onPressed: lifting ? null : onToggleVisibility,
+                icon: Icon(
+                  obscureText
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: AppColors.textSecondary,
+                  size: 20,
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: newPasswordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Password Baru',
-                    border: OutlineInputBorder(),
-                  ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: AppColors.inputBorder),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(
+                  color: AppColors.primary,
+                  width: 1.6,
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: confirmController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Konfirmasi Password Baru',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Menggunakan endpoint aktual PUT /user/forgot-password.\n'
-                  'Password berubah tanpa memverifikasi password lama.',
-                  style: TextStyle(fontSize: 11, color: AppColors.textHint),
-                ),
-              ],
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: AppColors.inputBorder),
+              ),
+            );
+          }
+
+          return Dialog(
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 24,
+              vertical: 24,
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: lifting
-                  ? null
-                  : () {
-                      newPasswordController.dispose();
-                      confirmController.dispose();
-                      Navigator.of(dialogContext).pop();
-                    },
-              child: Text(
-                'Batal',
-                style: TextStyle(color: AppColors.textSecondary),
+            elevation: 0,
+            backgroundColor: AppColors.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: 360,
+                maxHeight: maxDialogHeight,
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Container(
+                          height: 44,
+                          width: 44,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(
+                            Icons.lock_outline,
+                            color: AppColors.primary,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Change Password',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Akun: $_username',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 22),
+                    TextField(
+                      controller: currentPasswordController,
+                      obscureText: obscureCurrentPassword,
+                      textInputAction: TextInputAction.next,
+                      decoration: passwordDecoration(
+                        label: 'Password Saat Ini',
+                        hint: 'Masukkan password saat ini',
+                        obscureText: obscureCurrentPassword,
+                        onToggleVisibility: () {
+                          setDialogState(
+                            () => obscureCurrentPassword =
+                                !obscureCurrentPassword,
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: newPasswordController,
+                      obscureText: obscureNewPassword,
+                      textInputAction: TextInputAction.next,
+                      decoration: passwordDecoration(
+                        label: 'Password Baru',
+                        hint: 'Masukkan password baru',
+                        obscureText: obscureNewPassword,
+                        onToggleVisibility: () {
+                          setDialogState(
+                            () => obscureNewPassword = !obscureNewPassword,
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: confirmController,
+                      obscureText: obscureConfirmPassword,
+                      textInputAction: TextInputAction.done,
+                      decoration: passwordDecoration(
+                        label: 'Konfirmasi Password Baru',
+                        hint: 'Ulangi password baru',
+                        obscureText: obscureConfirmPassword,
+                        onToggleVisibility: () {
+                          setDialogState(
+                            () => obscureConfirmPassword =
+                                !obscureConfirmPassword,
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: lifting
+                                ? null
+                                : () {
+                                    disposeControllers();
+                                    Navigator.of(dialogContext).pop();
+                                  },
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size.fromHeight(48),
+                              foregroundColor: AppColors.textSecondary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: const Text(
+                              'Batal',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: lifting
+                                ? null
+                                : () async {
+                                    final currentPassword =
+                                        currentPasswordController.text.trim();
+                                    final newPassword = newPasswordController
+                                        .text
+                                        .trim();
+                                    final confirm = confirmController.text;
+                                    if (currentPassword.isEmpty ||
+                                        newPassword.isEmpty ||
+                                        confirm.isEmpty) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Isi semua field terlebih dahulu',
+                                          ),
+                                          backgroundColor: AppColors.error,
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    if (newPassword != confirm) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Konfirmasi password tidak cocok',
+                                          ),
+                                          backgroundColor: AppColors.error,
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    setDialogState(() => lifting = true);
+                                    final result =
+                                        await AuthService.resetPassword(
+                                          username: _username,
+                                          newPassword: newPassword,
+                                        );
+                                    if (!context.mounted) return;
+
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          result['message'] ??
+                                              (result['success']
+                                                  ? 'Password berhasil diubah'
+                                                  : 'Gagal mengubah password'),
+                                        ),
+                                        backgroundColor: result['success']
+                                            ? AppColors.success
+                                            : AppColors.error,
+                                      ),
+                                    );
+                                    if (result['success']) {
+                                      disposeControllers();
+                                      Navigator.of(dialogContext).pop();
+                                    } else {
+                                      setDialogState(() => lifting = false);
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: AppColors.primary
+                                  .withValues(alpha: 0.45),
+                              disabledForegroundColor: Colors.white,
+                              elevation: 0,
+                              minimumSize: const Size.fromHeight(48),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: lifting
+                                ? const SizedBox(
+                                    height: 18,
+                                    width: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : const Text(
+                                    'Simpan',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-            ElevatedButton(
-              onPressed: lifting
-                  ? null
-                  : () async {
-                      final newPassword = newPasswordController.text.trim();
-                      final confirm = confirmController.text;
-                      if (newPassword.isEmpty || confirm.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Isi semua field terlebih dahulu'),
-                            backgroundColor: AppColors.error,
-                          ),
-                        );
-                        return;
-                      }
-                      if (newPassword != confirm) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Konfirmasi password tidak cocok'),
-                            backgroundColor: AppColors.error,
-                          ),
-                        );
-                        return;
-                      }
-
-                      setDialogState(() => lifting = true);
-                      final result = await AuthService.resetPassword(
-                        username: _username,
-                        newPassword: newPassword,
-                      );
-                      if (!context.mounted) return;
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            result['message'] ??
-                                (result['success'] ? 'Password berhasil diubah' : 'Gagal mengubah password'),
-                          ),
-                          backgroundColor:
-                              result['success'] ? AppColors.success : AppColors.error,
-                        ),
-                      );
-                      if (result['success']) {
-                        newPasswordController.dispose();
-                        confirmController.dispose();
-                        Navigator.of(dialogContext).pop();
-                      } else {
-                        setDialogState(() => lifting = false);
-                      }
-                    },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-              child: lifting
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Text('Simpan'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
-    );
+    ).whenComplete(disposeControllers);
   }
 
   @override
@@ -212,7 +408,9 @@ class _ProfileScreenState extends State<ProfileScreen>
     return Scaffold(
       backgroundColor: AppColors.background,
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            )
           : SafeArea(
               child: SingleChildScrollView(
                 child: Column(
@@ -248,7 +446,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primary.withOpacity(0.30),
+                            color: AppColors.primary.withValues(alpha: 0.30),
                             blurRadius: 20,
                             offset: const Offset(0, 8),
                           ),
@@ -256,7 +454,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ),
                       child: Center(
                         child: Text(
-                          _username.isNotEmpty ? _username[0].toUpperCase() : 'U',
+                          _username.isNotEmpty
+                              ? _username[0].toUpperCase()
+                              : 'U',
                           style: const TextStyle(
                             fontSize: 38,
                             fontWeight: FontWeight.bold,
@@ -278,9 +478,12 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ),
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.10),
+                        color: AppColors.primary.withValues(alpha: 0.10),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -321,9 +524,17 @@ class _ProfileScreenState extends State<ProfileScreen>
                                     color: AppColors.blueAccent,
                                     borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: const Icon(Icons.description, color: Colors.white, size: 32),
+                                  child: const Icon(
+                                    Icons.description,
+                                    color: Colors.white,
+                                    size: 32,
+                                  ),
                                 ),
-                                children: [const Text('A modern form builder application')],
+                                children: [
+                                  const Text(
+                                    'A modern form builder application',
+                                  ),
+                                ],
                               );
                             },
                           ),
@@ -356,10 +567,18 @@ class _ProfileScreenState extends State<ProfileScreen>
                                         width: 40,
                                         height: 40,
                                         decoration: BoxDecoration(
-                                          color: AppColors.error.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(8),
+                                          color: AppColors.error.withValues(
+                                            alpha: 0.1,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                         ),
-                                        child: const Icon(Icons.logout, color: AppColors.error, size: 20),
+                                        child: const Icon(
+                                          Icons.logout,
+                                          color: AppColors.error,
+                                          size: 20,
+                                        ),
                                       ),
                                       const SizedBox(width: 16),
                                       const Expanded(
@@ -373,7 +592,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                                           ),
                                         ),
                                       ),
-                                      const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.error),
+                                      const Icon(
+                                        Icons.arrow_forward_ios,
+                                        size: 16,
+                                        color: AppColors.error,
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -423,7 +646,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.10),
+                    color: AppColors.primary.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(icon, color: AppColors.primary, size: 20),
@@ -454,7 +677,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ],
                   ),
                 ),
-                Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textHint),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: AppColors.textHint,
+                ),
               ],
             ),
           ),

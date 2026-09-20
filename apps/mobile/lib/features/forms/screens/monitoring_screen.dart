@@ -271,6 +271,22 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                       ),
             ],
           ),
+          if (_pageLabel(item).isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.article_outlined,
+                    size: 13, color: AppColors.primary),
+                const SizedBox(width: 4),
+                Text(_pageLabel(item),
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ],
           if (startAt.isNotEmpty || submittedAt.isNotEmpty) ...[
             const SizedBox(height: 10),
             const Divider(height: 1),
@@ -303,6 +319,28 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
         ],
       ),
     );
+  }
+
+  /// Label posisi halaman pengerjaan dari response monitoring backend
+  /// (`current_page`, `total_pages`). Paritas kolom progres Web Monitoring.
+  /// Kosong jika data tidak tersedia atau peserta sudah selesai.
+  String _pageLabel(Map<String, dynamic> item) {
+    final status = item['status']?.toString() ?? '';
+    if (status == 'completed' || status == 'submitted') return '';
+    final current = item['current_page'];
+    final total = item['total_pages'];
+    if (current == null) return '';
+    final currentInt = current is num
+        ? current.toInt()
+        : int.tryParse(current.toString());
+    if (currentInt == null) return '';
+    final totalInt = total is num
+        ? total.toInt()
+        : int.tryParse(total?.toString() ?? '');
+    if (totalInt != null && totalInt > 0) {
+      return 'Halaman $currentInt/$totalInt';
+    }
+    return 'Halaman $currentInt';
   }
 
   String _fmt(dynamic raw) {

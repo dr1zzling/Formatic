@@ -80,6 +80,14 @@ class _QrScannerScreenState extends State<QrScannerScreen>
 
   void _showEnterCodeDialog() {
     final controller = TextEditingController();
+    var controllerDisposed = false;
+    void disposeController() {
+      if (!controllerDisposed) {
+        controllerDisposed = true;
+        controller.dispose();
+      }
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -159,6 +167,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                 onPressed: () {
                   final slug = controller.text.trim();
                   if (slug.isEmpty) return;
+                  disposeController();
                   Navigator.pop(ctx);
                   Navigator.of(context).pushReplacement(
                     MaterialPageRoute(
@@ -184,7 +193,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
           ],
         ),
       ),
-    );
+    ).whenComplete(disposeController);
   }
 
   @override

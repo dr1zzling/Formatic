@@ -65,6 +65,7 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
       }
 
       final result = await FormService.getFormBySlug(_formSlug);
+      if (!mounted) return;
 
       if (result['success']) {
         final data = result['data']['data'];
@@ -101,6 +102,7 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = 'Error: ${e.toString()}';
         _isLoading = false;

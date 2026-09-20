@@ -111,6 +111,7 @@ class MyFormsScreenState extends State<MyFormsScreen>
       // Load question and response counts in background
       _loadFormCounts();
     } else {
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }

@@ -457,15 +457,22 @@ export class SubmitService {
       const existingSubmit = await trx('form_submit')
         .where({ user_id: req.id, form_id: form.id })
         .first()
-      if (existingSubmit?.status == "completed") throw new ConflictException("Anda sudah mengisi form ini")
+      if (!existingSubmit) throw new BadRequestException("Submit form belum dimulai")
+      if (existingSubmit.status == "completed") throw new ConflictException("Anda sudah mengisi form ini")
 
-      const updateToCompleted = await this.changeFormSubmit("submit", req.id, form.id, 1, undefined, this.knexService.connection.fn.now())
+      const [updateToCompleted] = await trx('form_submit')
+        .where({ id: existingSubmit.id, user_id: req.id, form_id: form.id })
+        .update({ status: "completed", submitted_at: this.knexService.connection.fn.now() })
+        .returning("*")
+
+      const submittedId = updateToCompleted?.id ?? existingSubmit.id
+      if (submittedId == null) throw new BadRequestException("ID submit tidak valid")
 
       await trx('user_answer').insert(
-        answers.map((answer) => ({ ...answer, submitted_id: updateToCompleted.id }))
+        answers.map((answer) => ({ ...answer, submitted_id: submittedId }))
       )
 
-      return updateToCompleted
+      return updateToCompleted ?? { ...existingSubmit, status: "completed", submitted_at: null }
     })
 
     return {

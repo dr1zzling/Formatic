@@ -433,6 +433,7 @@ class _FormPreviewSheetState extends State<_FormPreviewSheet> {
   }
 
   Future<void> _copySoal(String targetSlug) async {
+    if (_isCopying) return;
     if (_soal.isEmpty || targetSlug.isEmpty) return;
     setState(() => _isCopying = true);
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
@@ -23,6 +25,7 @@ class _FormAudioPlayerState extends State<FormAudioPlayer> {
   bool _playing = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
+  final List<StreamSubscription> _subscriptions = [];
 
   @override
   void initState() {
@@ -32,25 +35,25 @@ class _FormAudioPlayerState extends State<FormAudioPlayer> {
         ? DeviceFileSource(widget.deviceFilePath!)
         : UrlSource(widget.url);
 
-    _player.onPlayerStateChanged.listen((state) {
+    _subscriptions.add(_player.onPlayerStateChanged.listen((state) {
       if (!mounted) return;
       setState(() => _playing = state == PlayerState.playing);
-    });
-    _player.onPositionChanged.listen((pos) {
+    }));
+    _subscriptions.add(_player.onPositionChanged.listen((pos) {
       if (!mounted) return;
       setState(() => _position = pos);
-    });
-    _player.onDurationChanged.listen((dur) {
+    }));
+    _subscriptions.add(_player.onDurationChanged.listen((dur) {
       if (!mounted) return;
       setState(() => _duration = dur);
-    });
-    _player.onPlayerComplete.listen((_) {
+    }));
+    _subscriptions.add(_player.onPlayerComplete.listen((_) {
       if (!mounted) return;
       setState(() {
         _playing = false;
         _position = Duration.zero;
       });
-    });
+    }));
 
     _init();
   }
@@ -66,6 +69,10 @@ class _FormAudioPlayerState extends State<FormAudioPlayer> {
 
   @override
   void dispose() {
+    for (final sub in _subscriptions) {
+      sub.cancel();
+    }
+    _subscriptions.clear();
     _player.dispose();
     super.dispose();
   }

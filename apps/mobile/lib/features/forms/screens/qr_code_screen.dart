@@ -39,28 +39,33 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
 
     try {
       final result = await FormService.generateQrCode(widget.formSlug);
+      if (!mounted) return;
 
       if (result['success']) {
         final raw = result['data']['qrCode']?.toString() ?? '';
         final bytes = _decodeDataUrl(raw);
         if (bytes == null) {
+          if (!mounted) return;
           setState(() {
             _errorMessage = 'QR code format tidak valid';
             _isLoading = false;
           });
           return;
         }
+        if (!mounted) return;
         setState(() {
           _qrCodeBytes = bytes;
           _isLoading = false;
         });
       } else {
+        if (!mounted) return;
         setState(() {
           _errorMessage = result['message'] ?? 'Failed to generate QR code';
           _isLoading = false;
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = 'Error: ${e.toString()}';
         _isLoading = false;
