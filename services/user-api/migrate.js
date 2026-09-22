@@ -13,6 +13,7 @@ async function migrate() {
         await pg.query(`
             CREATE DATABASE formatic_form
         `)
+        console.log("Berhasil Membuat Form DB")
 
         // Create Table User
         await pool.query(`

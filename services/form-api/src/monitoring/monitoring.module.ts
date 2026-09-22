@@ -4,9 +4,10 @@ import { MonitoringController } from './monitoring.controller';
 import { KnexModule } from 'src/database/knex.module';
 import { ValidateIsCreator } from 'src/Pipe/validate.is.creator';
 import { FormModule } from 'src/form/form.module';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
-  imports: [KnexModule, FormModule],
+  imports: [KnexModule, FormModule, JwtModule],
   controllers: [MonitoringController],
   providers: [MonitoringService, ValidateIsCreator],
 })

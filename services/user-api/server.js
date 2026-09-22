@@ -17,9 +17,10 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     credentials: true
 }))
+app.set('trust proxy', 1)
 
 function jwtToken(payload) {
-    return jwt.sign(payload, process.env.SECRET, { expiresIn: '365d' })
+    return jwt.sign(payload, process.env.SECRET, { expiresIn: '1d' })
 }
 
 function isPasswordStrong(password) {
@@ -96,7 +97,7 @@ app.post('/user/register', registerLimit, async (req, res) => {
         if (!isPasswordStrong(isSpace)) {
             return res.status(400).json({
                 status: 400,
-                message: "Password Min 8 Char, 1 Kapital, 1 Lower"
+                message: "Password Min 8 Char, 1 Kapital, 1 Lower, 1 Angka"
             })
         }
 

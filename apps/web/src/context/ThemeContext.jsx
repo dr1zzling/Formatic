@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 
-const ThemeContext = createContext({ dark: false, toggle: () => {} });
+const ThemeContext = createContext({ dark: false, toggle: () => {}, setFillFormActive: () => {} });
 
 export function ThemeProvider({ children }) {
   const [dark, setDark] = useState(() => {
@@ -8,20 +8,31 @@ export function ThemeProvider({ children }) {
     if (saved) return saved === "dark";
     return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
   });
+  const fillFormActiveRef = useRef(false);
+
+  const applyTheme = (isDark) => {
+    if (fillFormActiveRef.current) return; // jangan apply saat di halaman responden
+    const html = document.documentElement;
+    html.setAttribute("data-theme", isDark ? "dark" : "light");
+  };
 
   useEffect(() => {
-    const html = document.documentElement;
-    if (dark) {
-      html.setAttribute("data-theme", "dark");
-      localStorage.setItem("formatic-theme", "dark");
-    } else {
-      html.setAttribute("data-theme", "light");
-      localStorage.setItem("formatic-theme", "light");
-    }
+    localStorage.setItem("formatic-theme", dark ? "dark" : "light");
+    applyTheme(dark);
   }, [dark]);
 
+  const setFillFormActive = (active) => {
+    fillFormActiveRef.current = active;
+    if (!active) {
+      // Restore tema saat keluar dari FillForm
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    } else {
+      document.documentElement.setAttribute("data-theme", "light");
+    }
+  };
+
   return (
-    <ThemeContext.Provider value={{ dark, toggle: () => setDark(v => !v) }}>
+    <ThemeContext.Provider value={{ dark, toggle: () => setDark(v => !v), setFillFormActive }}>
       {children}
     </ThemeContext.Provider>
   );

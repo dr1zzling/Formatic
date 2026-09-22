@@ -2,12 +2,12 @@ import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post,
 import * as express from 'express'
 import { SoalService } from './soal.service'
 import { ValidateFormExist } from '../Pipe/validate.form.exist'
-import { JwtAuthGuard } from '../guard/jwt.auth.guard'
 import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express'
 import { diskStorage } from 'multer'
 import { extname } from 'path'
 import { memoryStorage } from 'multer'
 import { ValidateSoalExist } from 'src/Pipe/validate.soal.exist'
+import { JwtAuthGuard } from 'src/guard/auth.guard'
 
 @Controller('form/soal')
 export class SoalController {

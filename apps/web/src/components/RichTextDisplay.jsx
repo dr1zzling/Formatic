@@ -6,13 +6,26 @@ import renderMathInElement from 'katex/contrib/auto-render';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github.css';
 
-// ── Escape HTML ──────────────────────────────────────────────────────────────
+// ── Escape HTML (mencegah double escaping jika sudah ter-escape) ─────────────
 function escapeHtml(str) {
+  if (!str) return '';
   return String(str)
-    .replace(/&/g, '&amp;')
+    .replace(/&(?!(amp|lt|gt|quot|#39|#x?[0-9a-fA-F]+);)/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+// ── Decode HTML entities ─────────────────────────────────────────────────────
+function decodeEntities(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&');
 }
 
 // ── Render satu ekspresi math → HTML ────────────────────────────────────────
@@ -25,14 +38,12 @@ function renderMath(expr, display) {
         throwOnError: false,
         output: 'html',
       });
-      // Bungkus dalam span dengan font-size eksplisit agar bisa dikontrol CSS
       const cls = display ? 'katex-display-wrap' : 'katex-inline-wrap';
       return `<span class="${cls}">${rendered}</span>`;
     } catch {
       // fallback ke unicode display
     }
   }
-  // Unicode math (√, ², ∫, ±, →, lim, dll) → styled span
   const cls = display ? 'math-display' : 'math-inline';
   return `<span class="${cls}">${escapeHtml(expr.trim())}</span>`;
 }
@@ -40,24 +51,74 @@ function renderMath(expr, display) {
 // ── Syntax highlight satu blok kode ─────────────────────────────────────────
 function highlightCode(code, lang) {
   try {
+    const cleanCode = decodeEntities(code);
     const result = lang
-      ? hljs.highlight(code, { language: lang, ignoreIllegals: true })
-      : hljs.highlightAuto(code);
+      ? hljs.highlight(cleanCode, { language: lang, ignoreIllegals: true })
+      : hljs.highlightAuto(cleanCode);
     return result.value;
   } catch {
     return escapeHtml(code);
   }
 }
 
+// ── Strip HTML tags dari dalam ekspresi math, konversi <sup> → ^{} ──────────
+function stripHtmlFromMath(expr) {
+  if (!expr) return '';
+  let result = expr.replace(/<sup[^>]*>([\s\S]*?)<\/sup>/gi, (_, inner) => {
+    const text = inner.replace(/<[^>]+>/g, '').trim();
+    return text.length === 1 ? `^${text}` : `^{${text}}`;
+  });
+  result = result.replace(/<sub[^>]*>([\s\S]*?)<\/sub>/gi, (_, inner) => {
+    const text = inner.replace(/<[^>]+>/g, '').trim();
+    return text.length === 1 ? `_${text}` : `_{${text}}`;
+  });
+  result = result.replace(/<[^>]+>/g, '');
+  result = decodeEntities(result);
+  return result;
+}
+
+// ── Cek apakah string terlihat seperti ekspresi math ────────────────────────
+function looksLikeMath(text) {
+  if (!text) return false;
+  return /[a-zA-Z]\^/.test(text) ||
+         /[0-9]\^/.test(text) ||
+         /[a-zA-Z]_[0-9a-zA-Z]/.test(text) ||
+         /\^[{0-9a-zA-Z]/.test(text);
+}
+
+// ── Daftar tag WYSIWYG yang aman ───────────────────────────────────────────
+const ALLOWED_TAGS = new Set([
+  'p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'strike', 'del',
+  'sub', 'sup', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote',
+  'pre', 'code', 'span', 'ul', 'ol', 'li', 'a', 'img', 'audio',
+  'video', 'source', 'table', 'thead', 'tbody', 'tfoot', 'tr', 'th',
+  'td', 'caption', 'hr', 'div'
+]);
+
+// ── Sanitize tag HTML non-WYSIWYG/berbahaya agar tidak merusak tata letak ──
+function sanitizeRawHtmlTags(html) {
+  if (!html) return '';
+
+  return html.replace(/<\/?([!a-zA-Z0-9_-]+)([\s\S]*?)>/g, (match, tagName, attrs) => {
+    const lower = tagName.toLowerCase();
+    
+    // Tag berbahaya / non-wysiwyg (doctype, html, head, meta, link, script, style, header, footer, etc.)
+    if (!ALLOWED_TAGS.has(lower) || lower.startsWith('!')) {
+      return `&lt;${match.slice(1, -1)}&gt;`;
+    }
+
+    // Bersihkan event handlers berbahaya (onclick, onerror, onload, dll)
+    const cleanAttrs = attrs
+      .replace(/\s*on\w+\s*=\s*(["'][^"']*["']|[^\s>]+)/gi, '')
+      .replace(/\s*href\s*=\s*["']\s*javascript:[^"']*["']/gi, ' href="#"')
+      .replace(/\s*src\s*=\s*["']\s*javascript:[^"']*["']/gi, ' src=""');
+
+    return `<${match.startsWith('</') ? '/' : ''}${tagName}${cleanAttrs}>`;
+  });
+}
+
 /**
- * Parse teks biasa (dari import docx) → HTML
- *
- * Format yang didukung:
- *   ```lang          → fenced code block (diakhiri ```)
- *   $$expr$$         → display math (satu baris atau multi via \n)
- *   $expr$           → inline math
- *   `expr`           → inline code
- *   \n               → <br>
+ * Parse teks biasa (dari import docx / plain text) → HTML
  */
 function parseTextToHtml(text) {
   if (!text) return '';
@@ -66,7 +127,6 @@ function parseTextToHtml(text) {
   let rest = text;
 
   while (rest.length > 0) {
-    // ── Cari fenced code block ─────────────────────────────────────────────
     const fenceStart = rest.indexOf('```');
     const mathStart  = rest.indexOf('$$');
 
@@ -85,7 +145,7 @@ function parseTextToHtml(text) {
       if (fenceStart > 0) {
         segments.push({ type: 'text', content: rest.slice(0, fenceStart) });
       }
-      const afterFence = rest.slice(fenceStart + 3); // setelah ```
+      const afterFence = rest.slice(fenceStart + 3);
       const newlineIdx = afterFence.indexOf('\n');
       const lang = newlineIdx !== -1 ? afterFence.slice(0, newlineIdx).trim() : '';
       const codeStart = newlineIdx !== -1 ? newlineIdx + 1 : 0;
@@ -102,7 +162,7 @@ function parseTextToHtml(text) {
       if (mathStart > 0) {
         segments.push({ type: 'text', content: rest.slice(0, mathStart) });
       }
-      const afterMath = rest.slice(mathStart + 2); // setelah $$
+      const afterMath = rest.slice(mathStart + 2);
       const endMath = afterMath.indexOf('$$');
       if (endMath === -1) {
         segments.push({ type: 'text', content: rest.slice(mathStart) });
@@ -115,7 +175,6 @@ function parseTextToHtml(text) {
     }
   }
 
-  // ── Render tiap segmen ───────────────────────────────────────────────────
   let html = '';
   for (const seg of segments) {
     if (seg.type === 'code') {
@@ -171,63 +230,12 @@ function renderInlineText(text) {
   return html;
 }
 
-// ── Strip HTML tags dari dalam ekspresi math, konversi <sup> → ^{} ──────────
-function stripHtmlFromMath(expr) {
-  let result = expr.replace(/<sup[^>]*>([\s\S]*?)<\/sup>/gi, (_, inner) => {
-    const text = inner.replace(/<[^>]+>/g, '').trim();
-    return text.length === 1 ? `^${text}` : `^{${text}}`;
-  });
-  result = result.replace(/<sub[^>]*>([\s\S]*?)<\/sub>/gi, (_, inner) => {
-    const text = inner.replace(/<[^>]+>/g, '').trim();
-    return text.length === 1 ? `_${text}` : `_{${text}}`;
-  });
-  result = result.replace(/<[^>]+>/g, '');
-  result = result
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ');
-  return result;
-}
-
-// ── Cek apakah string terlihat seperti ekspresi math (ada pangkat, operasi) ──
-function looksLikeMath(text) {
-  return /[a-zA-Z]\^/.test(text) ||      // a^2, x^n
-         /[0-9]\^/.test(text) ||          // 2^3
-         /[a-zA-Z]_[0-9a-zA-Z]/.test(text) || // x_n, a_1
-         /\^[{0-9a-zA-Z]/.test(text);    // ^2, ^{...}
-}
-
-// ── Decode HTML entities ─────────────────────────────────────────────────────
-function decodeEntities(str) {
-  return str
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ');
-}
-
 /**
  * Pre-process Quill HTML to merge consecutive <p> tags that form a fenced
  * code block (``` ... ```) into a single <pre> block.
- *
- * Quill stores each line as a separate <p> element when the user inserts
- * plain text via insertText(), so a code block like:
- *   ```js
- *   function hello() { return "world"; }
- *   ```
- * becomes:
- *   <p>```js</p><p>function hello() { return "world"; }</p><p>```</p>
- *
- * This function collapses those into a single rendered <pre> block before
- * the rest of processQuillHtml runs.
  */
 function collapseFencedCodeBlocks(html) {
-  // Split on <p> boundaries, keeping the content between tags
+  if (!html) return '';
   const parts = [];
   const pRegex = /<p([^>]*)>([\s\S]*?)<\/p>/gi;
   let lastIndex = 0;
@@ -237,11 +245,9 @@ function collapseFencedCodeBlocks(html) {
     if (match.index > lastIndex) {
       parts.push({ type: 'raw', content: html.slice(lastIndex, match.index) });
     }
-    // Decode the paragraph text (strip inline tags, convert <br> to \n)
     const innerDecoded = match[2]
       .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<[^>]+>/g, '')
-    ;
+      .replace(/<[^>]+>/g, '');
     const innerText = decodeEntities(innerDecoded);
     parts.push({ type: 'p', attrs: match[1], raw: match[2], text: innerText });
     lastIndex = match.index + match[0].length;
@@ -260,14 +266,11 @@ function collapseFencedCodeBlocks(html) {
       continue;
     }
 
-    // Check if this <p> starts a fenced code block: text starts with ```
     const fenceMatch = part.text.match(/^```([a-zA-Z0-9_#-]*)\n?([\s\S]*)$/);
     if (fenceMatch) {
       const lang = fenceMatch[1].trim().toLowerCase();
       const firstLineCode = fenceMatch[2];
 
-      // If the opening ``` and closing ``` are in the same paragraph (via \n)
-      // e.g. ```js\ncode\n```  (single <p> with <br> separators)
       if (firstLineCode.includes('\n```')) {
         const endIdx = firstLineCode.indexOf('\n```');
         const code = (firstLineCode.slice(0, endIdx))
@@ -279,20 +282,16 @@ function collapseFencedCodeBlocks(html) {
         continue;
       }
 
-      // Otherwise collect subsequent <p> elements until closing ```
       const codeLines = firstLineCode ? [firstLineCode] : [];
       i++;
-      let closed = false;
       while (i < parts.length) {
         const next = parts[i];
         if (next.type !== 'p') {
-          // Non-<p> in the middle — include as raw and continue collecting
           i++;
           continue;
         }
         const lineText = next.text;
         if (lineText.trim() === '```') {
-          closed = true;
           i++;
           break;
         }
@@ -318,7 +317,7 @@ function collapseFencedCodeBlocks(html) {
 function processQuillHtml(html) {
   if (!html) return '';
 
-  // 1. Collapse fenced code blocks that span multiple <p> tags (Quill plain-text insert)
+  // 1. Collapse fenced code blocks that span multiple <p> tags
   html = collapseFencedCodeBlocks(html);
 
   // 1b. Fenced Code Blocks ```lang ... ``` (remaining inline / cross-tag cases)
@@ -399,7 +398,6 @@ function processQuillHtml(html) {
 
   // 6. Handle ekspresi math di luar $...$ dalam <p> tag
   html = html.replace(/<p([^>]*)>([\s\S]*?)<\/p>/gi, (fullMatch, attrs, inner) => {
-    // Kalau sudah ada katex atau hljs-pre di dalamnya, jangan diubah
     if (/\$|katex|hljs/i.test(inner)) return fullMatch;
 
     const plainText = stripHtmlFromMath(inner).trim();
@@ -434,11 +432,14 @@ function processQuillHtml(html) {
     return `<code class="inline-code">${inner}</code>`;
   });
 
+  // 8. Sanitize tag berbahaya / non-WYSIWYG agar tidak merusak struktur DOM
+  html = sanitizeRawHtmlTags(html);
+
   return html;
 }
 
 // ── Komponen utama ────────────────────────────────────────────────────────────
-export default function RichTextDisplay({ content, className = '' }) {
+export default function RichTextDisplay({ content, className = '', style }) {
   const containerRef = useRef(null);
 
   useEffect(() => {
@@ -461,7 +462,7 @@ export default function RichTextDisplay({ content, className = '' }) {
 
   if (!content) return null;
 
-  const isHtml = /<[a-z][\s\S]*>/i.test(content);
+  const isHtml = /<(!DOCTYPE|[a-z/][\s\S]*?)>/i.test(content);
 
   const finalHtml = isHtml
     ? processQuillHtml(content)
@@ -471,6 +472,7 @@ export default function RichTextDisplay({ content, className = '' }) {
     <div
       ref={containerRef}
       className={`rich-display ql-snow ${className}`}
+      style={style}
       dangerouslySetInnerHTML={{ __html: finalHtml }}
     />
   );

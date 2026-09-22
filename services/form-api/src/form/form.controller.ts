@@ -1,11 +1,11 @@
 import { BadRequestException, Body, Controller, Get, Param, Post, Query, Request, UseGuards, ParseIntPipe, UseInterceptors, UploadedFile, UploadedFiles, Delete, Patch, ParseFilePipe, FileTypeValidator, MaxFileSizeValidator, Put } from '@nestjs/common';
 import { FormService } from './form.service';
-import { JwtAuthGuard } from '../guard/jwt.auth.guard';
 import { ValidateFormExist } from '../Pipe/validate.form.exist';
-import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { CustomFileTypeValidator } from '../Pipe/validate.format.file';
+import { JwtAuthGuard } from 'src/guard/auth.guard';
 
 
 @Controller('form')
@@ -16,13 +16,18 @@ export class FormController {
 
   // Get All Form
   @Get()
-  getAllForm() {
+  @UseGuards(JwtAuthGuard)
+  getAllForm(
+    @Request() req
+  ) {
     return this.formService.getAll()
   }
 
   // Get All By Category
   @Get('category')
+  @UseGuards(JwtAuthGuard)
   getAll(
+    @Request() req,
     @Query('category') category: string
   ) {
     return this.formService.getAllByCategory(category)

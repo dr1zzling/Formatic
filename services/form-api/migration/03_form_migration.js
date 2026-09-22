@@ -13,7 +13,7 @@ exports.up = function (knex) {
     table.boolean('is_random')
     table.integer('duration').nullable()
     table.timestamp('start_at', { useTz: true }).nullable()
-    table.text('banner').notNullable()
+    table.text('banner').nullable()
     table.string('theme_color')
 
 

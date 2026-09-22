@@ -306,7 +306,11 @@ export default function Discovery() {
                             style={{ borderColor: "var(--fm-border)", color: "var(--fm-text-2)" }}>
                             {String.fromCharCode(65 + oi)}
                           </span>
-                          {opt.value ?? opt.option_value ?? `Opsi ${oi + 1}`}
+                          <RichTextDisplay
+                            content={opt.value ?? opt.option_value ?? `Opsi ${oi + 1}`}
+                            className="text-[13px]"
+                            style={{ color: "var(--fm-text)" }}
+                          />
                         </div>
                       ))}
                     </div>

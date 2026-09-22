@@ -95,7 +95,7 @@ export default function Register() {
 
           <div>
             <h1 className="text-5xl lg:text-6xl font-bold tracking-tight mb-4 text-white">
-              Form<span style={{ color: COLORS.cyan }}>Matic</span>
+              Form<span style={{ color: COLORS.cyan }}>atic</span>
             </h1>
             <p className="text-white/75 text-base lg:text-lg mb-16 max-w-sm">
               Create forms, collect responses, and gain insights with ease
@@ -187,10 +187,10 @@ export default function Register() {
           {/* Logo mobile — hanya muncul di layar kecil */}
           <div className="flex md:hidden justify-center mb-6">
             <h1 className="text-3xl font-bold text-white tracking-tight">
-              Form<span style={{ color: COLORS.cyan }}>Matic</span>
+              Form<span style={{ color: COLORS.cyan }}>atic</span>
             </h1>
           </div>
-          <div className="relative w-full bg-white rounded-3xl shadow-2xl px-8 py-10">
+          <div className="relative w-full bg-white rounded-3xl shadow-2xl px-8 py-10" style={{ backgroundColor: "white" }}>
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold" style={{ color: COLORS.navy }}>
                 Create <span style={{ color: COLORS.cyan }}>Account</span>
@@ -219,7 +219,7 @@ export default function Register() {
                   onChange={(e) => setUsername(e.target.value)}
                   required
                   className="w-full rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-cyan-400 transition"
-                  style={{ border: `1px solid ${COLORS.border}` }}
+                  style={{ border: `1px solid ${COLORS.border}`, backgroundColor: "white", color: COLORS.navy }}
                 />
               </div>
 
@@ -237,7 +237,7 @@ export default function Register() {
                     required
                     minLength={6}
                     className="w-full rounded-lg pl-4 pr-10 py-2.5 text-sm outline-none focus:ring-2 focus:ring-cyan-400 transition"
-                    style={{ border: `1px solid ${COLORS.border}` }}
+                    style={{ border: `1px solid ${COLORS.border}`, backgroundColor: "white", color: COLORS.navy }}
                   />
                   <button
                     type="button"
@@ -265,7 +265,7 @@ export default function Register() {
                     required
                     minLength={6}
                     className="w-full rounded-lg pl-4 pr-10 py-2.5 text-sm outline-none focus:ring-2 focus:ring-cyan-400 transition"
-                    style={{ border: `1px solid ${COLORS.border}` }}
+                    style={{ border: `1px solid ${COLORS.border}`, backgroundColor: "white", color: COLORS.navy }}
                   />
                   <button
                     type="button"

@@ -317,7 +317,78 @@ body {
   background-color: var(--fm-card) !important;
 }
 
-/* ── Dark mode: MyForms search bar ──────────────────────────── */
+/* ── Dark mode: KaTeX boxes ──────────────────────────────────── */
+[data-theme="dark"] .katex-display-wrap,
+[data-theme="dark"] .katex-inline-wrap {
+  color: var(--fm-text) !important;
+}
+
+[data-theme="dark"] .math-display {
+  background: #1a2538 !important;
+  border-color: #2a3a54 !important;
+  color: var(--fm-text) !important;
+}
+
+[data-theme="dark"] .math-inline {
+  background: #1e2d45 !important;
+  color: var(--fm-text) !important;
+}
+
+/* ── Dark mode: highlight.js code blocks ─────────────────────── */
+[data-theme="dark"] .hljs-pre,
+[data-theme="dark"] pre.ql-syntax {
+  background: #161b22 !important;
+  border-color: #30363d !important;
+}
+
+[data-theme="dark"] code.hljs,
+[data-theme="dark"] pre.ql-syntax {
+  background: #161b22 !important;
+  color: #e6edf3 !important;
+}
+
+[data-theme="dark"] code.inline-code {
+  background: #2d333b !important;
+  border-color: #444c56 !important;
+  color: #e6edf3 !important;
+}
+
+/* hljs token colors for dark (github-dark palette) */
+[data-theme="dark"] .hljs-comment,
+[data-theme="dark"] .hljs-quote { color: #8b949e !important; }
+[data-theme="dark"] .hljs-keyword,
+[data-theme="dark"] .hljs-selector-tag,
+[data-theme="dark"] .hljs-addition { color: #ff7b72 !important; }
+[data-theme="dark"] .hljs-number,
+[data-theme="dark"] .hljs-string,
+[data-theme="dark"] .hljs-meta .hljs-meta-string,
+[data-theme="dark"] .hljs-literal,
+[data-theme="dark"] .hljs-doctag,
+[data-theme="dark"] .hljs-regexp { color: #a5d6ff !important; }
+[data-theme="dark"] .hljs-title,
+[data-theme="dark"] .hljs-section,
+[data-theme="dark"] .hljs-name,
+[data-theme="dark"] .hljs-selector-id,
+[data-theme="dark"] .hljs-selector-class { color: #d2a8ff !important; }
+[data-theme="dark"] .hljs-attribute,
+[data-theme="dark"] .hljs-attr,
+[data-theme="dark"] .hljs-variable,
+[data-theme="dark"] .hljs-template-variable,
+[data-theme="dark"] .hljs-class .hljs-title,
+[data-theme="dark"] .hljs-type { color: #ffa657 !important; }
+[data-theme="dark"] .hljs-symbol,
+[data-theme="dark"] .hljs-bullet,
+[data-theme="dark"] .hljs-subst,
+[data-theme="dark"] .hljs-meta,
+[data-theme="dark"] .hljs-meta .hljs-keyword,
+[data-theme="dark"] .hljs-selector-attr,
+[data-theme="dark"] .hljs-selector-pseudo,
+[data-theme="dark"] .hljs-link { color: #79c0ff !important; }
+[data-theme="dark"] .hljs-built_in,
+[data-theme="dark"] .hljs-deletion { color: #ffa198 !important; }
+[data-theme="dark"] .hljs-formula { color: #cff0db !important; }
+[data-theme="dark"] .hljs-emphasis { font-style: italic; }
+[data-theme="dark"] .hljs-strong { font-weight: bold; }
 [data-theme="dark"] .bg-white\/90 { background-color: var(--fm-card) !important; }
 [data-theme="dark"] .border-\[\#d9e8f1\] { border-color: var(--fm-border) !important; }
 
@@ -339,6 +410,114 @@ body {
 [data-theme="dark"] ::-webkit-scrollbar-track { background: var(--fm-bg-3); }
 [data-theme="dark"] ::-webkit-scrollbar-thumb { background: var(--fm-border); border-radius: 3px; }
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: var(--fm-text-3); }
+
+/* ── Dark mode: hover fixes (semua hover terang -> gelap) ────── */
+/* ponytail: attribute selector biar 1 blok cover semua hover tanpa edit ratusan file */
+[data-theme="dark"] [class*="hover:bg-[#eef5fb]"]:hover,
+[data-theme="dark"] [class*="hover:bg-[#f0f6fe]"]:hover,
+[data-theme="dark"] [class*="hover:bg-[#f4fafd]"]:hover,
+[data-theme="dark"] [class*="hover:bg-[#f7faff]"]:hover,
+[data-theme="dark"] [class*="hover:bg-[#edf6fb]"]:hover,
+[data-theme="dark"] [class*="hover:bg-gray-50"]:hover,
+[data-theme="dark"] [class*="hover:bg-gray-100"]:hover,
+[data-theme="dark"] [class*="hover:bg-white"]:hover {
+  background-color: #24344f !important;
+}
+[data-theme="dark"] [class*="hover:bg-gray-200"]:hover {
+  background-color: #31465f !important;
+}
+[data-theme="dark"] [class*="hover:bg-black/5"]:hover {
+  background-color: rgba(255, 255, 255, 0.07) !important;
+}
+[data-theme="dark"] [class*="hover:bg-blue-50"]:hover {
+  background-color: #0f2236 !important;
+}
+[data-theme="dark"] [class*="hover:bg-red-50"]:hover,
+[data-theme="dark"] [class*="hover:bg-red-100"]:hover {
+  background-color: rgba(248, 113, 113, 0.13) !important;
+}
+[data-theme="dark"] [class*="hover:bg-green-50"]:hover,
+[data-theme="dark"] [class*="hover:bg-green-100"]:hover {
+  background-color: rgba(74, 222, 128, 0.13) !important;
+}
+[data-theme="dark"] [class*="hover:bg-amber-100"]:hover {
+  background-color: rgba(251, 191, 36, 0.16) !important;
+}
+[data-theme="dark"] [class*="hover:bg-purple-50"]:hover {
+  background-color: rgba(167, 139, 250, 0.14) !important;
+}
+[data-theme="dark"] [class*="hover:bg-violet-100"]:hover {
+  background-color: #1e1040 !important;
+}
+
+/* hover text gelap -> terang */
+[data-theme="dark"] [class*="hover:text-gray-600"]:hover,
+[data-theme="dark"] [class*="hover:text-slate-600"]:hover,
+[data-theme="dark"] [class*="hover:text-[#183056]"]:hover,
+[data-theme="dark"] [class*="hover:text-gray-300"]:hover {
+  color: var(--fm-text) !important;
+}
+[data-theme="dark"] [class*="hover:text-[#1a4fa0]"]:hover,
+[data-theme="dark"] [class*="hover:text-[#1764d6]"]:hover {
+  color: #7ab3ef !important;
+}
+[data-theme="dark"] [class*="hover:text-red-400"]:hover,
+[data-theme="dark"] [class*="hover:text-red-500"]:hover,
+[data-theme="dark"] [class*="hover:text-red-600"]:hover {
+  color: #f87171 !important;
+}
+[data-theme="dark"] [class*="hover:text-amber-600"]:hover {
+  color: #fbbf24 !important;
+}
+
+/* hover border terang -> gelap / aksen tetap terlihat */
+[data-theme="dark"] [class*="hover:border-gray-200"]:hover,
+[data-theme="dark"] [class*="hover:border-gray-300"]:hover,
+[data-theme="dark"] [class*="hover:border-black/20"]:hover,
+[data-theme="dark"] [class*="hover:border-[#d4e5fa]"]:hover {
+  border-color: var(--fm-card-border) !important;
+}
+[data-theme="dark"] [class*="hover:border-[#1a4fa0]"]:hover,
+[data-theme="dark"] [class*="hover:border-[#3d91b2]"]:hover {
+  border-color: #4a8fd4 !important;
+}
+[data-theme="dark"] [class*="hover:border-red-200"]:hover {
+  border-color: #5a2222 !important;
+}
+[data-theme="dark"] [class*="hover:border-green-500"]:hover {
+  border-color: #22c55e !important;
+}
+[data-theme="dark"] [class*="hover:border-amber-300"]:hover {
+  border-color: #5a4010 !important;
+}
+[data-theme="dark"] [class*="hover:border-purple-400"]:hover {
+  border-color: #7c5cd6 !important;
+}
+
+/* group-hover */
+[data-theme="dark"] .group:hover [class*="group-hover:text-[#1a4fa0]"],
+[data-theme="dark"] .group:hover [class*="group-hover:text-[#1764d6]"] {
+  color: #7ab3ef !important;
+}
+[data-theme="dark"] .group:hover [class*="group-hover:bg-[#3d91b2]"] {
+  background-color: #2a6d8a !important;
+}
+
+/* quill toolbar button hover */
+[data-theme="dark"] .ql-toolbar.ql-snow button:hover {
+  background-color: #24344f !important;
+  border-radius: 6px;
+}
+[data-theme="dark"] .ql-toolbar.ql-snow button:hover .ql-stroke {
+  stroke: #c4d6f0 !important;
+}
+[data-theme="dark"] .ql-toolbar.ql-snow button:hover .ql-fill {
+  fill: #c4d6f0 !important;
+}
+[data-theme="dark"] .ql-toolbar.ql-snow .ql-picker-label:hover,
+[data-theme="dark"] .ql-toolbar.ql-snow .ql-picker-item:hover {
+  color: #c4d6f0 !important;
+}
 
 
 @layer utilities {
@@ -390,8 +569,22 @@ body {
   margin-right: 6px;
 }
 
+.option-quill-wrapper .ql-toolbar {
+  padding-right: 78px !important;
+}
+
+.option-quill-wrapper .option-quill-container .ql-toolbar {
+  padding-right: 78px !important;
+}
+
 /* Dark mode */
 [data-theme="dark"] .option-quill-wrapper {
+  border-color: var(--fm-card-border) !important;
+}
+
+[data-theme="dark"] .option-rumus-btn {
+  color: #60a5fa !important;
+  background-color: var(--fm-card) !important;
   border-color: var(--fm-card-border) !important;
 }
 
@@ -426,6 +619,16 @@ body {
   border-top-left-radius: 0.75rem;
   border-top-right-radius: 0.75rem;
   padding: 8px 12px;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  overflow: visible !important;
+}
+
+.quill-wrapper .ql-toolbar.ql-snow .ql-formats {
+  display: inline-flex !important;
+  flex-wrap: wrap !important;
+  margin-right: 8px !important;
+  margin-bottom: 4px !important;
 }
 
 .quill-wrapper .ql-container.ql-snow {

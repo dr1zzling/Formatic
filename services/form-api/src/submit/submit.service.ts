@@ -54,9 +54,6 @@ export class SubmitService {
 
   // Check Token
   async checkTokenResponden(req: { id: number, username: string }, form: any, token: string) {
-    const checkRole = await this.isCreator.isCreator(req.id, form.id)
-    if (checkRole != false) throw new ForbiddenException("Anda Tidak Berhak Sebagai Responden")
-
     const isFormPublic = await this.knexService.connection("forms")
       .select("status")
       .where({ id: form.id })
@@ -398,9 +395,6 @@ export class SubmitService {
 
   // Submit Form
   async submitForm(req: { id: number }, form: any, data: string, files: Express.Multer.File[] = []) {
-    const checkRole = await this.isCreator.isCreator(req.id, form.id)
-    if (checkRole != false) throw new ForbiddenException("Anda Tidak Berhak Sebagai Responden")
-
     let payload: any[]
     try {
       payload = JSON.parse(data)

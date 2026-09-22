@@ -7,6 +7,7 @@ import { ArrowLeft, Send, Check, CheckCircle2, UploadCloud, FileText, Bell, Arro
 import { saveToHistory } from "./History";
 import RichTextDisplay from "../../components/RichTextDisplay";
 import { getStoredTheme, DEFAULT_FORM_THEME } from "../../utils/theme";
+import { useTheme } from "../../context/ThemeContext";
 
 const TYPE_LABEL = {
   radio: "Pilihan Ganda",
@@ -19,14 +20,22 @@ function fallbackLabel(opt, i) {
   return opt.value?.trim() || opt.option_value?.trim() || `Opsi ${i + 1}`;
 }
 
-const inputCls =
-  "w-full rounded-xl border border-[#dbe5f0] bg-white px-4 py-3 text-[15px] text-[#102f56] outline-none focus:border-[#1a4fa0] focus:ring-4 focus:ring-[#1a4fa0]/10 transition-all placeholder:text-gray-300";
+// inputCls is now a function that accepts theme to support dark themes
+const getInputCls = (theme) =>
+  `w-full rounded-xl border px-4 py-3 text-[15px] outline-none focus:ring-4 transition-all placeholder:text-gray-400`;
 
 export default function FillForm() {
   const { slug }        = useParams();
   const navigate        = useNavigate();
+  const { setFillFormActive } = useTheme();
 
   const [zoomLevel, setZoomLevel] = useState(1);
+
+  // Beritahu ThemeContext untuk stop apply dark mode selama di halaman responden
+  useEffect(() => {
+    setFillFormActive(true);
+    return () => setFillFormActive(false);
+  }, []);
 
   // Ambil user ID dari token untuk isolasi draft per akun
   const userId = (() => {
@@ -539,7 +548,7 @@ export default function FillForm() {
 
   /* ── Loading ────────────────────────────────────────── */
   if (loading) return (
-    <div className="min-h-screen grid place-items-center" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
+    <div data-theme="light" className="min-h-screen grid place-items-center" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
       <div className="text-center">
         <div className="w-10 h-10 border-2 border-[#1a4fa0] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
         <p className="text-gray-500 text-sm">Memuat form...</p>
@@ -549,7 +558,7 @@ export default function FillForm() {
 
   /* ── Error ──────────────────────────────────────────── */
   if (error) return (
-    <div className="min-h-screen grid place-items-center px-4" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
+    <div data-theme="light" className="min-h-screen grid place-items-center px-4" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
       <div className="bg-white rounded-3xl shadow-[0_16px_50px_rgba(23,64,120,0.12)] p-10 max-w-sm text-center border border-[#e5eef7]">
         <FileQuestion size={30} className="mx-auto mb-3 text-gray-300" />
         <p className="font-bold text-gray-800 mb-1">Form tidak ditemukan</p>
@@ -561,7 +570,7 @@ export default function FillForm() {
 
   /* ── Timed out — tampil layar waktu habis, submit di background ── */
   if (autoSubmitting || (timedOut && !done)) return (
-    <div className="min-h-screen grid place-items-center px-4" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
+    <div data-theme="light" className="min-h-screen grid place-items-center px-4" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
       <div className="rounded-3xl shadow-[0_16px_50px_rgba(23,64,120,0.12)] p-10 max-w-sm w-full text-center border"
         style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}>
         <AlarmClock size={44} className="mx-auto mb-4 text-gray-300" />
@@ -587,7 +596,7 @@ export default function FillForm() {
 
   /* ── Success ────────────────────────────────────────── */
   if (done) return (
-    <div className="min-h-screen grid place-items-center px-4" style={{ backgroundColor: theme.bg || "var(--fm-bg)" }}>
+    <div data-theme="light" className="min-h-screen grid place-items-center px-4" style={{ backgroundColor: theme.bg || "var(--fm-bg)" }}>
       <div className="rounded-3xl shadow-[0_16px_50px_rgba(23,64,120,0.12)] p-10 max-w-sm text-center border"
         style={{ backgroundColor: theme.cardBg || "#ffffff", borderColor: theme.borderCard || "#e5eef7" }}>
         <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-green-50 text-green-600 grid place-items-center">
@@ -630,7 +639,7 @@ export default function FillForm() {
 
   // Tampilkan halaman input token jika belum diverifikasi
   if (needsToken && !tokenVerified) return (
-    <div className="min-h-screen grid place-items-center px-4" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
+    <div data-theme="light" className="min-h-screen grid place-items-center px-4" style={{ background: "linear-gradient(135deg,var(--fm-bg) 0%,var(--fm-bg-2) 60%,var(--fm-bg-3) 100%)" }}>
       <div className="bg-white rounded-3xl shadow-[0_16px_50px_rgba(23,64,120,0.12)] p-8 w-full max-w-sm border border-[#e5eef7] text-center">
         <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-blue-50 flex items-center justify-center"><LockKeyhole size={22} className="text-blue-500" /></div>
         <h2 className="text-[18px] font-extrabold text-[#102f56] mb-1">Form Terbatas</h2>
@@ -707,7 +716,7 @@ export default function FillForm() {
     const doubtCount    = doubtfulIds.size;
 
     return (
-      <div className="min-h-screen flex flex-col transition-colors duration-300" style={{ backgroundColor: theme.bg || "var(--fm-bg)" }}>
+      <div data-theme="light" className="min-h-screen flex flex-col transition-colors duration-300" style={{ backgroundColor: theme.bg || "var(--fm-bg)" }}>
         {/* Top bar */}
         <div className="sticky top-0 z-10 backdrop-blur border-b px-4 py-3 transition-colors"
           style={{ backgroundColor: theme.cardBg || "var(--fm-card)", borderColor: theme.borderCard || "#e5eef7" }}>
@@ -718,17 +727,21 @@ export default function FillForm() {
               </button>
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1.5">
-                  <button onClick={zoomOut} className="p-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all" title="Zoom Out">
-                    <ZoomOut size={14} />
+                  <button onClick={zoomOut} className="p-1.5 rounded-lg border transition-all" title="Zoom Out"
+                    style={{ borderColor: theme.borderCard || "#d0e3f5", backgroundColor: theme.cardBg || "#ffffff" }}>
+                    <ZoomOut size={14} style={{ color: theme.descColor || "#64779d" }} />
                   </button>
-                  <button onClick={resetZoom} title="Reset zoom ke 100%" className="px-2 py-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all text-[11px] font-bold tabular-nums min-w-[44px]" style={{ color: theme.primaryColor || "#1a4fa0" }}>
+                  <button onClick={resetZoom} title="Reset zoom ke 100%" className="px-2 py-1.5 rounded-lg border transition-all text-[11px] font-bold tabular-nums min-w-[44px]"
+                    style={{ borderColor: theme.borderCard || "#d0e3f5", backgroundColor: theme.cardBg || "#ffffff", color: theme.primaryColor || "#1a4fa0" }}>
                     {Math.round(zoomLevel * 100)}%
                   </button>
-                  <button onClick={zoomIn} className="p-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all" title="Zoom In">
-                    <ZoomIn size={14} />
+                  <button onClick={zoomIn} className="p-1.5 rounded-lg border transition-all" title="Zoom In"
+                    style={{ borderColor: theme.borderCard || "#d0e3f5", backgroundColor: theme.cardBg || "#ffffff" }}>
+                    <ZoomIn size={14} style={{ color: theme.descColor || "#64779d" }} />
                   </button>
-                  <button onClick={refreshForm} disabled={refreshing} className="p-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all disabled:opacity-60" title="Muat ulang soal">
-                    <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+                  <button onClick={refreshForm} disabled={refreshing} className="p-1.5 rounded-lg border transition-all disabled:opacity-60" title="Muat ulang soal"
+                    style={{ borderColor: theme.borderCard || "#d0e3f5", backgroundColor: theme.cardBg || "#ffffff" }}>
+                    <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} style={{ color: theme.descColor || "#64779d" }} />
                   </button>
                 </div>
               </div>
@@ -821,13 +834,12 @@ export default function FillForm() {
               (!prevSoal || prevSoal.group_id !== soal.group_id);
             return (
               <div key={soal.id ?? idx}>
-                {/* Group wacana header */}
+                {/* Group bacaan header */}
                 {showGroupHeader && (
                   <div className="mb-4 rounded-2xl border border-[#d4e5fa] overflow-hidden"
                     style={{ backgroundColor: "var(--fm-card)" }}>
                     <div className="px-4 py-2 bg-[#eef5fb] border-b border-[#d4e5fa] flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#1a4fa0] uppercase tracking-wider"><FileText size={12} /> Wacana / Teks</span>
-                      <span className="text-[11px] text-gray-400">Group #{soal.group_id}</span>
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#1a4fa0] uppercase tracking-wider"><FileText size={12} /> Bacaan</span>
                     </div>
                     <div className="px-5 py-4">
                       <p className="text-[14px] leading-relaxed whitespace-pre-wrap" style={{ color: "var(--fm-text)" }}>
@@ -853,8 +865,9 @@ export default function FillForm() {
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border transition ${
                       isDoubt
                         ? "bg-amber-50 border-amber-300 text-amber-700"
-                        : "bg-white border-gray-200 text-gray-400 hover:border-amber-300 hover:text-amber-600"
-                    }`}>
+                        : "border-gray-200 text-gray-400 hover:border-amber-300 hover:text-amber-600"
+                    }`}
+                    style={!isDoubt ? { backgroundColor: theme.cardBg || "#ffffff" } : {}}>
                     <Flag size={13} /> {isDoubt ? "Ragu-ragu" : "Tandai ragu-ragu"}
                   </button>
                 </div>
@@ -932,7 +945,7 @@ export default function FillForm() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col transition-colors duration-300" style={{ backgroundColor: theme.bg || "var(--fm-bg)" }}>
+    <div data-theme="light" className="min-h-screen flex flex-col transition-colors duration-300" style={{ backgroundColor: theme.bg || "var(--fm-bg)" }}>
       {/* Top bar */}
       <div className="sticky top-0 z-10 backdrop-blur border-b px-4 py-3"
         style={{ backgroundColor: theme.cardBg || "white", borderColor: theme.borderCard || "#e5eef7" }}>
@@ -946,17 +959,21 @@ export default function FillForm() {
             </span>
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5">
-                <button onClick={zoomOut} className="p-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all" title="Zoom Out">
-                  <ZoomOut size={14} />
+                <button onClick={zoomOut} className="p-1.5 rounded-lg border transition-all" title="Zoom Out"
+                  style={{ borderColor: theme.borderCard || "#d0e3f5", backgroundColor: theme.cardBg || "#ffffff" }}>
+                  <ZoomOut size={14} style={{ color: theme.descColor || "#64779d" }} />
                 </button>
-                <button onClick={resetZoom} title="Reset zoom ke 100%" className="px-2 py-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all text-[11px] font-bold tabular-nums min-w-[44px]" style={{ color: theme.primaryColor || "#1a4fa0" }}>
+                <button onClick={resetZoom} title="Reset zoom ke 100%" className="px-2 py-1.5 rounded-lg border transition-all text-[11px] font-bold tabular-nums min-w-[44px]"
+                  style={{ borderColor: theme.borderCard || "#d0e3f5", backgroundColor: theme.cardBg || "#ffffff", color: theme.primaryColor || "#1a4fa0" }}>
                   {Math.round(zoomLevel * 100)}%
                 </button>
-                <button onClick={zoomIn} className="p-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all" title="Zoom In">
-                  <ZoomIn size={14} />
+                <button onClick={zoomIn} className="p-1.5 rounded-lg border transition-all" title="Zoom In"
+                  style={{ borderColor: theme.borderCard || "#d0e3f5", backgroundColor: theme.cardBg || "#ffffff" }}>
+                  <ZoomIn size={14} style={{ color: theme.descColor || "#64779d" }} />
                 </button>
-                <button onClick={refreshForm} disabled={refreshing} className="p-1.5 rounded-lg border border-[#d0e3f5] bg-white hover:bg-[#eef5fb] transition-all disabled:opacity-60" title="Muat ulang soal">
-                  <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+                <button onClick={refreshForm} disabled={refreshing} className="p-1.5 rounded-lg border transition-all disabled:opacity-60" title="Muat ulang soal"
+                  style={{ borderColor: theme.borderCard || "#d0e3f5", backgroundColor: theme.cardBg || "#ffffff" }}>
+                  <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} style={{ color: theme.descColor || "#64779d" }} />
                 </button>
               </div>
             </div>
@@ -1004,13 +1021,12 @@ export default function FillForm() {
             (!prevSoalS || prevSoalS.group_id !== soal.group_id);
           return (
             <div key={soal.id ?? qi}>
-              {/* Group wacana header */}
+              {/* Group bacaan header */}
               {showGroupHeaderS && (
                 <div className="mb-4 rounded-2xl border border-[#d4e5fa] overflow-hidden"
                   style={{ backgroundColor: "var(--fm-card)" }}>
                   <div className="px-4 py-2 bg-[#eef5fb] border-b border-[#d4e5fa] flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#1a4fa0] uppercase tracking-wider"><FileText size={12} /> Wacana / Teks</span>
-                    <span className="text-[11px] text-gray-400">Group #{soal.group_id}</span>
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#1a4fa0] uppercase tracking-wider"><FileText size={12} /> Bacaan</span>
                   </div>
                   <div className="px-5 py-4">
                     <p className="text-[14px] leading-relaxed whitespace-pre-wrap" style={{ color: "var(--fm-text)" }}>
@@ -1077,7 +1093,7 @@ export default function FillForm() {
                         <span className={`inline-grid place-items-center shrink-0 border-2 transition-all mt-0.5 ${soal.type === "checkbox" ? "w-6 h-6 rounded-[8px]" : "w-6 h-6 rounded-full"}`}
                           style={{
                             borderColor: selected ? (theme.accentColor || "#1a4fa0") : "#94a3b8",
-                            backgroundColor: selected ? (theme.accentColor || "#1a4fa0") : "#f1f5f9"
+                            backgroundColor: selected ? (theme.accentColor || "#1a4fa0") : (theme.cardBg || "#f1f5f9")
                           }}
                         >
                           {selected && (soal.type === "checkbox"
@@ -1100,13 +1116,20 @@ export default function FillForm() {
                 <textarea key={`text-s-${soal.id}`} rows={3} placeholder="Tulis jawabanmu di sini..."
                   value={answers[soal.id] ?? ""}
                   onChange={e => setAnswer(soal.id, e.target.value)}
-                  className={inputCls} />
+                  className={getInputCls(theme)}
+                  style={{
+                    borderColor: theme.borderCard || "#dbe5f0",
+                    backgroundColor: theme.cardBg || "#ffffff",
+                    color: theme.titleColor || "#102f56",
+                    caretColor: theme.accentColor || "#1a4fa0",
+                  }} />
               )}
               {soal.type === "file" && (
-                <label className="flex flex-col items-center justify-center gap-2 w-full rounded-xl border-2 border-dashed border-[#c3d4e4] bg-[#f7fafd] py-8 cursor-pointer hover:border-[#1a4fa0] hover:bg-[#f0f6fe] transition-all">
+                <label className="flex flex-col items-center justify-center gap-2 w-full rounded-xl border-2 border-dashed py-8 cursor-pointer transition-all"
+                  style={{ borderColor: theme.borderCard || "#c3d4e4", backgroundColor: `${theme.cardBg || "#f7fafd"}` }}>
                   {answers[soal.id]?.file
-                    ? <><FileText size={28} className="text-[#1a4fa0]" /><span className="text-[14px] font-semibold text-[#102f56]">{answers[soal.id].file.name}</span></>
-                    : <><UploadCloud size={28} className="text-[#1a4fa0]" /><span className="text-[14px] font-semibold text-[#102f56]">Unggah file jawaban</span></>}
+                    ? <><FileText size={28} style={{ color: theme.accentColor || "#1a4fa0" }} /><span className="text-[14px] font-semibold" style={{ color: theme.titleColor || "#102f56" }}>{answers[soal.id].file.name}</span></>
+                    : <><UploadCloud size={28} style={{ color: theme.accentColor || "#1a4fa0" }} /><span className="text-[14px] font-semibold" style={{ color: theme.titleColor || "#102f56" }}>Unggah file jawaban</span></>}
                   <input type="file" className="hidden" onChange={e => setAnswer(soal.id, { file: e.target.files?.[0] })} />
                 </label>
               )}
@@ -1114,8 +1137,9 @@ export default function FillForm() {
               <div className="flex justify-end mt-3">
                 <button onClick={() => toggleDoubt(soal.id)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border transition ${
-                    isDoubt ? "bg-amber-50 border-amber-300 text-amber-700" : "bg-white border-gray-200 text-gray-400 hover:border-amber-300 hover:text-amber-600"
-                  }`}>
+                    isDoubt ? "bg-amber-50 border-amber-300 text-amber-700" : "border-gray-200 text-gray-400 hover:border-amber-300 hover:text-amber-600"
+                  }`}
+                  style={!isDoubt ? { backgroundColor: theme.cardBg || "#ffffff" } : {}}>
                   <Flag size={13} /> {isDoubt ? "Ragu-ragu" : "Tandai ragu-ragu"}
                 </button>
               </div>
@@ -1218,7 +1242,7 @@ function SoalItem({ soal, idx, answers, setAnswer, toggleOption, errorSoalId, so
                 }`}
                   style={{
                     borderColor: selected ? (theme.accentColor || "#1a4fa0") : "#94a3b8",
-                    backgroundColor: selected ? (theme.accentColor || "#1a4fa0") : "#f1f5f9"
+                    backgroundColor: selected ? (theme.accentColor || "#1a4fa0") : (theme.cardBg || "#f1f5f9")
                   }}
                 >
                   {selected && (soal.type === "checkbox"
@@ -1243,14 +1267,21 @@ function SoalItem({ soal, idx, answers, setAnswer, toggleOption, errorSoalId, so
           placeholder="Tulis jawabanmu di sini..."
           value={answers[soal.id] ?? ""}
           onChange={e => setAnswer(soal.id, e.target.value)}
-          className={inputCls}
+          className={getInputCls(theme)}
+          style={{
+            borderColor: theme.borderCard || "#dbe5f0",
+            backgroundColor: theme.cardBg || "#ffffff",
+            color: theme.titleColor || "#102f56",
+            caretColor: theme.accentColor || "#1a4fa0",
+          }}
         />
       )}
       {soal.type === "file" && (
-        <label className="flex flex-col items-center justify-center gap-2 w-full rounded-xl border-2 border-dashed border-[#c3d4e4] bg-[#f7fafd] py-8 cursor-pointer hover:border-[#1a4fa0] hover:bg-[#f0f6fe] transition-all">
+        <label className="flex flex-col items-center justify-center gap-2 w-full rounded-xl border-2 border-dashed py-8 cursor-pointer transition-all"
+          style={{ borderColor: theme.borderCard || "#c3d4e4", backgroundColor: theme.cardBg || "#f7fafd" }}>
           {answers[soal.id]?.file
-            ? <><FileText size={28} className="text-[#1a4fa0]" /><span className="text-[14px] font-semibold text-[#102f56]">{answers[soal.id].file.name}</span></>
-            : <><UploadCloud size={28} className="text-[#1a4fa0]" /><span className="text-[14px] font-semibold">Unggah file jawaban</span></>}
+            ? <><FileText size={28} style={{ color: theme.accentColor || "#1a4fa0" }} /><span className="text-[14px] font-semibold" style={{ color: theme.titleColor || "#102f56" }}>{answers[soal.id].file.name}</span></>
+            : <><UploadCloud size={28} style={{ color: theme.accentColor || "#1a4fa0" }} /><span className="text-[14px] font-semibold" style={{ color: theme.titleColor || "#64779d" }}>Unggah file jawaban</span></>}
           <input type="file" className="hidden" onChange={e => setAnswer(soal.id, { file: e.target.files?.[0] })} />
         </label>
       )}

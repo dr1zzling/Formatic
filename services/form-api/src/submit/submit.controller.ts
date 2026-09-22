@@ -1,12 +1,12 @@
 import { Body, Controller, Get, Post, Query, Req, Request, Res, StreamableFile, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { SubmitService } from './submit.service';
 import { ValidateFormExist } from '../Pipe/validate.form.exist';
-import { JwtAuthGuard } from '../guard/jwt.auth.guard';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import * as express from 'express';
 import { Readable } from 'stream';
+import { JwtAuthGuard } from 'src/guard/auth.guard';
 
 @Controller('form/submit')
 export class SubmitController {

@@ -1,8 +1,9 @@
-// Update with your config settings.
 require("dotenv").config()
 /**
  * @type { Object.<string, import("knex").Knex.Config> }
  */
+
+const sslConfig = process.env.ENV_MODE === 'development' ? { rejectUnauthorized: false } : false
 module.exports = {
 
   development: {
@@ -13,7 +14,7 @@ module.exports = {
       password: process.env.DB_PASS,
       host: process.env.DB_HOST,
       port: Number(process.env.DB_PORT) || 6543,
-      ssl: { rejectUnauthorized: false }
+      ssl: sslConfig
     },
     migrations: {
       directory: './migration'
@@ -31,7 +32,7 @@ module.exports = {
       password: process.env.DB_PASS,
       host: process.env.DB_HOST,
       port: Number(process.env.DB_PORT) || 6543,
-      ssl: { rejectUnauthorized: false }
+      ssl: sslConfig
     },
     migrations: {
       directory: './migration'

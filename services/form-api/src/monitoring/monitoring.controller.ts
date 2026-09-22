@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Patch, Put, Query, Request, UseGuards } from '@nestjs/common';
 import { MonitoringService } from './monitoring.service';
-import { JwtAuthGuard } from 'src/guard/jwt.auth.guard';
 import { ValidateFormExist } from 'src/Pipe/validate.form.exist';
+import { JwtAuthGuard } from 'src/guard/auth.guard';
 
 @Controller('form/monitoring')
 export class MonitoringController {

@@ -4,704 +4,308 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Isi Form - Verifikasi Token</title>
+    <title>Isi Formulir / Ujian</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 
-<body class="bg-slate-100 min-h-screen text-slate-800 pb-20">
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
 
-    <!-- Sticky Header Navbar -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm">
-        <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
-            <button onclick="window.location.href='dashboard.html'"
-                class="px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition flex items-center gap-1">
-                ← Kembali ke Dashboard
-            </button>
-
-            <!-- Timer di Header Navbar -->
-            <div id="nav-timer" class="hidden items-center gap-1.5 px-3 py-1.5 bg-red-50 border border-red-200 rounded-lg text-red-600 font-mono text-xs font-extrabold shadow-sm">
-                <span>⏱️</span>
-                <span id="timer-text-nav">00:00:00</span>
-            </div>
-
-            <span id="header-category" class="text-xs font-bold px-2.5 py-1 rounded bg-indigo-50 text-indigo-700 uppercase tracking-wider">
-                Verifikasi...
-            </span>
-        </div>
-    </header>
-
-    <!-- Main Container -->
-    <main class="max-w-3xl mx-auto px-4 mt-6 space-y-6">
-
-        <!-- Alert Box -->
-        <div id="alert-box" class="hidden p-4 rounded-xl text-sm font-medium"></div>
-
-        <!-- Card Loading State -->
-        <div id="loading-state" class="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm text-center">
-            <p class="text-slate-500 animate-pulse font-medium">Menunggu verifikasi token...</p>
-        </div>
-
-        <!-- Form Wrapper -->
-        <form id="form-fill" onsubmit="handleSubmitAnswers(event)" class="hidden space-y-6" enctype="multipart/form-data">
-
-            <!-- Banner & Meta Info Form Card -->
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <img id="form-banner" src="" alt="Banner Form" class="w-full h-48 md:h-56 object-cover bg-slate-200"
-                    onerror="this.src='https://via.placeholder.com/800x250?text=No+Banner+Image'">
-                <div class="p-6 md:p-8 space-y-3">
-                    <div class="flex items-center justify-between gap-2">
-                        <span id="form-status" class="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider"></span>
-                        <!-- Indicator Page Header -->
-                        <span id="page-indicator-badge" class="text-xs font-extrabold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
-                            Halaman 1
-                        </span>
-                    </div>
-                    <h1 id="form-title" class="text-2xl md:text-3xl font-extrabold text-slate-900 leading-tight"></h1>
-                    <p class="text-xs text-slate-400">Pastikan Anda menjawab seluruh pertanyaan yang diberikan sebelum menekan tombol kirim.</p>
+    <!-- MODAL CHECK TOKEN -->
+    <div id="tokenModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full p-6 space-y-5 animate-in fade-in zoom-in duration-200">
+            <div class="text-center space-y-2">
+                <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mx-auto text-xl shadow-inner">
+                    <i class="fa-solid fa-lock"></i>
                 </div>
+                <h3 class="text-lg font-bold text-slate-900">Verifikasi Token Responden</h3>
+                <p class="text-xs text-slate-500">Formulir ini dilindungi token. Masukkan token yang diberikan oleh pembuat form untuk mulai mengerjakan.</p>
             </div>
 
-            <!-- Question Cards Container (Rendered Per Page) -->
-            <div id="soal-container" class="space-y-6"></div>
+            <div id="tokenAlert" class="hidden p-3 rounded-xl text-xs font-medium border"></div>
 
-            <!-- Navigation Buttons (Prev / Next / Submit) -->
-            <div class="flex items-center justify-between pt-4 border-t border-slate-200">
-                <button type="button" id="btn-prev" onclick="changePage(-1)"
-                    class="px-6 py-3 bg-slate-200 hover:bg-slate-300 disabled:opacity-40 text-slate-700 font-bold rounded-xl transition text-sm flex items-center gap-2">
-                    ◀ Sebelumnya
-                </button>
-
-                <div class="flex items-center gap-2">
-                    <button type="button" id="btn-next" onclick="changePage(1)"
-                        class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 transition text-sm flex items-center gap-2">
-                        Selanjutnya ▶
-                    </button>
-
-                    <button type="submit" id="btn-submit"
-                        class="hidden px-8 py-3.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold rounded-xl shadow-lg shadow-emerald-200 transition text-sm flex items-center justify-center gap-2">
-                        <span>🚀</span> Kirim Jawaban
-                    </button>
-                </div>
-            </div>
-
-        </form>
-
-    </main>
-
-    <!-- MODAL TOKEN RESPONDEN (DIPINDAHKAN KE FILL-FORM) -->
-    <div id="modal-token" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 space-y-4 relative">
-            <div class="flex justify-between items-center border-b pb-3">
-                <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
-                    <span>🔑</span> Verifikasi Token Responden
-                </h3>
-                <button onclick="window.location.href='dashboard.html'" class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
-            </div>
-
-            <p class="text-xs text-slate-500 leading-relaxed">
-                Masukkan token responden yang valid untuk mulai mengisi formulir ini. Jika token salah, Anda akan dikembalikan ke dashboard.
-            </p>
-
-            <!-- Alert khusus modal -->
-            <div id="modal-alert" class="hidden p-3 rounded-lg text-xs font-medium bg-red-100 text-red-700 border border-red-200"></div>
-
-            <form id="form-check-token" onsubmit="handleVerifyToken(event)" class="space-y-4">
+            <form id="tokenForm" onsubmit="handleCheckToken(event)" class="space-y-4">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Token Responden (Opsional / Jika Ada)</label>
-                    <input type="text" id="input-token-respon" placeholder="Masukkan token..."
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">Token Responden</label>
+                    <input type="text" id="tokenInput" placeholder="Contoh: 120"
+                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-600 focus:bg-white transition text-center font-mono tracking-widest text-lg">
                 </div>
-
-                <div class="flex justify-end gap-2 pt-2 border-t">
-                    <button type="button" onclick="window.location.href='dashboard.html'" class="px-4 py-2 bg-slate-100 text-slate-600 text-xs font-semibold rounded-lg hover:bg-slate-200 transition">Batal</button>
-                    <button type="submit" id="btn-submit-token" class="px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 shadow-sm transition flex items-center gap-1">
-                        <span>Masuk Form</span> &rarr;
+                <div class="flex gap-3 pt-2">
+                    <button type="button" onclick="window.location.href='dashboard.html'"
+                        class="flex-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold text-xs py-2.5 rounded-xl transition">
+                        Kembali
+                    </button>
+                    <button type="submit" id="btnSubmitToken"
+                        class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs py-2.5 rounded-xl shadow-sm transition flex items-center justify-center gap-2">
+                        <span>Verifikasi</span>
+                        <i class="fa-solid fa-arrow-right text-[10px]"></i>
                     </button>
                 </div>
             </form>
         </div>
     </div>
 
+    <!-- MAIN APP CONTAINER -->
+    <div id="mainApp" class="flex-1 flex flex-col hidden">
+        <!-- Header Banner / Info -->
+        <header id="formHeader" class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+            <div class="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+                <div>
+                    <span id="badgeCategory" class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 bg-indigo-50 text-indigo-600 rounded-full">Kategori</span>
+                    <h1 id="formTitle" class="text-lg font-bold text-slate-900 mt-1">Judul Form</h1>
+                </div>
+                <div class="text-right">
+                    <span class="text-xs text-slate-400 block">Halaman</span>
+                    <span id="pageIndicator" class="text-sm font-bold text-indigo-600">1 dari 1</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Form Content Container -->
+        <main class="max-w-4xl mx-auto px-4 py-8 flex-1 w-full space-y-6">
+            <div id="globalAlert" class="hidden p-4 rounded-xl text-sm font-medium border shadow-sm transition"></div>
+
+            <!-- Questions Form Container -->
+            <form id="questionForm" onsubmit="handleFinishExam(event)" class="space-y-6">
+                <div id="questionsContainer" class="space-y-6">
+                    <!-- Render Soal Berdasarkan Page Dinamis -->
+                </div>
+
+                <!-- Navigation Pagination Buttons -->
+                <div class="flex items-center justify-between pt-6 border-t border-slate-200">
+                    <button type="button" id="prevBtn" onclick="changePage(-1)"
+                        class="px-5 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition flex items-center gap-2 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+                        <i class="fa-solid fa-arrow-left"></i> Sebelumnya
+                    </button>
+                    
+                    <button type="button" id="nextBtn" onclick="changePage(1)"
+                        class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition flex items-center gap-2 shadow-sm">
+                        Selanjutnya <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+
+                    <button type="submit" id="submitBtn"
+                        class="hidden px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-2 shadow-sm">
+                        <i class="fa-solid fa-check"></i> Kirim Jawaban
+                    </button>
+                </div>
+            </form>
+        </main>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
     <script>
-        const API_BASE_URL = 'http://localhost:4000';
-        const token = localStorage.getItem('token');
-
-        if (!token) {
-            window.location.href = 'index.html';
-        }
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const formSlug = urlParams.get('slug');
-
-        if (!formSlug) {
-            alert('Form slug tidak ditemukan!');
-            window.location.href = 'dashboard.html';
-        }
-
-        let timerInterval = null;
-        let isTimeExpired = false;
-        let sortedPageNumbers = [];
-        let pagesData = {};
+        const API_URL = 'http://localhost:3001';
+        let formSlug = '';
+        let formDataObj = null;
+        let pagesData = [];
         let currentPageIndex = 0;
-        let userAnswersState = {};
+        let userAnswers = {};
 
-        // --- HANDLE VERIFIKASI TOKEN DI HALAMAN FILL-FORM ---
-        async function handleVerifyToken(e) {
-            e.preventDefault();
-            const modalAlert = document.getElementById('modal-alert');
-            modalAlert.classList.add('hidden');
-
-            const tokenRespon = document.getElementById('input-token-respon').value.trim();
-            const btnSubmit = document.getElementById('btn-submit-token');
-
-            btnSubmit.disabled = true;
-            btnSubmit.textContent = 'Memeriksa...';
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/form/submit/check-token?form_slug=${encodeURIComponent(formSlug)}`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ token: tokenRespon || null })
-                });
-
-                const result = await response.json();
-
-                if (response.ok) {
-                    // Token Valid -> Tutup Modal dan Muat Detail Form
-                    document.getElementById('modal-token').classList.add('hidden');
-                    fetchFormDetail();
-                } else {
-                    // Jika Token Salah -> Tampilkan pesan error sebentar lalu redirect ke dashboard.html
-                    modalAlert.textContent = result.message || 'Token salah! Mengalihkan ke dashboard...';
-                    modalAlert.classList.remove('hidden');
-                    setTimeout(() => {
-                        window.location.href = 'dashboard.html';
-                    }, 1500);
-                }
-            } catch (err) {
-                console.error(err);
-                modalAlert.textContent = 'Terjadi kesalahan koneksi ke server. Mengalihkan...';
-                modalAlert.classList.remove('hidden');
-                setTimeout(() => {
-                    window.location.href = 'dashboard.html';
-                }, 1500);
-            } finally {
-                btnSubmit.disabled = false;
-                btnSubmit.innerHTML = '<span>Masuk Form</span> &rarr;';
-            }
+        function getAuthToken() {
+            return localStorage.getItem('token') || '';
         }
 
-        // --- FETCH FORM DETAIL ---
-        async function fetchFormDetail() {
-            try {
-                const clientFetchTime = Date.now();
-
-                const res = await fetch(`${API_BASE_URL}/form/slug?slug=${encodeURIComponent(formSlug)}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                
-                const serverDateHeader = res.headers.get('date');
-                const serverTime = serverDateHeader ? new Date(serverDateHeader).getTime() : Date.now();
-
-                const result = await res.json();
-
-                if (!res.ok) {
-                    showGlobalAlert(result.message || 'Gagal memuat detail form', false);
-                    document.getElementById('loading-state').classList.add('hidden');
-                    return;
-                }
-
-                renderFormUI(result.data);
-
-                if (result.data.duration && result.data.start_at) {
-                    initServerBasedTimer(result.data.start_at, result.data.duration, serverTime, clientFetchTime);
-                }
-
-            } catch (err) {
-                console.error(err);
-                showGlobalAlert('Terjadi kesalahan koneksi ke server.', false);
-                document.getElementById('loading-state').classList.add('hidden');
-            }
+        function showModalAlert(message, type = 'error') {
+            const el = document.getElementById('tokenAlert');
+            el.className = `p-3 rounded-xl text-xs font-medium border ${type === 'error' ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`;
+            el.textContent = message;
+            el.classList.remove('hidden');
         }
 
-        // --- TIMER MANAJEMEN BERBASIS SERVER ---
-        function initServerBasedTimer(startAtISO, durationMinutes, serverTimeMs, clientFetchTimeMs) {
-            const startAtMs = new Date(startAtISO).getTime();
-            const durationMs = durationMinutes * 60 * 1000;
-            const endAtMs = startAtMs + durationMs;
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            formSlug = urlParams.get('slug');
 
-            const serverClientOffset = serverTimeMs - clientFetchTimeMs;
-
-            document.getElementById('nav-timer').classList.remove('hidden');
-            document.getElementById('nav-timer').classList.add('flex');
-
-            function updateCountdown() {
-                const currentEstimatedServerTime = Date.now() + serverClientOffset;
-                const remainingMs = endAtMs - currentEstimatedServerTime;
-
-                if (remainingMs <= 0) {
-                    clearInterval(timerInterval);
-                    handleTimeExpired();
-                    return;
-                }
-
-                const hours = Math.floor(remainingMs / (1000 * 60 * 60));
-                const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
-                const seconds = Math.floor((remainingMs % (1000 * 60)) / 1000);
-
-                const formattedTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-
-                document.getElementById('timer-text-nav').textContent = formattedTime;
-            }
-
-            updateCountdown();
-            timerInterval = setInterval(updateCountdown, 1000);
-        }
-
-        // --- HANDLER SAAT WAKTU HABIS ---
-        async function handleTimeExpired() {
-            if (isTimeExpired) return;
-            isTimeExpired = true;
-
-            document.getElementById('timer-text-nav').textContent = "00:00:00";
-            showGlobalAlert('⏰ Waktu pengerjaan telah habis! Mengirimkan jawaban Anda secara otomatis...', false);
-
-            saveCurrentPageAnswers();
-
-            const formInputs = document.querySelectorAll('#form-fill input, #form-fill button');
-            formInputs.forEach(input => input.disabled = true);
-
-            await processSubmit(true);
-        }
-
-        // --- RENDER FORM UI & STRUCTURING PAGINATION ---
-        function renderFormUI(formData) {
-            document.title = `${formData.title} - FormApp`;
-            document.getElementById('header-category').textContent = formData.category || 'Survei';
-            document.getElementById('form-title').textContent = formData.title;
-            
-            if (formData.banner) {
-                document.getElementById('form-banner').src = `${API_BASE_URL}${formData.banner}`;
-            }
-
-            const statusBadge = document.getElementById('form-status');
-            statusBadge.textContent = formData.status || 'Public';
-            statusBadge.className = formData.status === 'public' 
-                ? 'text-[10px] font-bold px-2.5 py-0.5 rounded bg-emerald-100 text-emerald-800 uppercase tracking-wider'
-                : 'text-[10px] font-bold px-2.5 py-0.5 rounded bg-amber-100 text-amber-800 uppercase tracking-wider';
-
-            pagesData = {};
-            const rawSoal = formData.soal || [];
-
-            if (Array.isArray(rawSoal) && rawSoal.length > 0) {
-                if (rawSoal[0] && Array.isArray(rawSoal[0].soal)) {
-                    rawSoal.forEach(group => {
-                        const pageNum = (group.page === null || group.page === undefined) ? 1 : Number(group.page);
-                        if (!pagesData[pageNum]) pagesData[pageNum] = [];
-                        pagesData[pageNum].push(...group.soal);
-                    });
-                } else {
-                    rawSoal.forEach(soalObj => {
-                        const pageNum = (soalObj.page === null || soalObj.page === undefined) ? 1 : Number(soalObj.page);
-                        if (!pagesData[pageNum]) pagesData[pageNum] = [];
-                        pagesData[pageNum].push(soalObj);
-                    });
-                }
-            }
-
-            sortedPageNumbers = Object.keys(pagesData).map(Number).sort((a, b) => a - b);
-            currentPageIndex = 0;
-
-            document.getElementById('loading-state').classList.add('hidden');
-            document.getElementById('form-fill').classList.remove('hidden');
-
-            renderCurrentPageSoal();
-        }
-
-        function renderCurrentPageSoal() {
-            const soalContainer = document.getElementById('soal-container');
-            soalContainer.innerHTML = '';
-
-            if (sortedPageNumbers.length === 0) {
-                soalContainer.innerHTML = `
-                    <div class="bg-white p-6 rounded-2xl border border-slate-200 text-center text-slate-400 text-xs italic">
-                        Formulir ini belum memiliki pertanyaan.
-                    </div>
-                `;
-                document.getElementById('btn-prev').classList.add('hidden');
-                document.getElementById('btn-next').classList.add('hidden');
+            if (!formSlug) {
+                alert('Slug form tidak ditemukan!');
+                window.location.href = 'dashboard.html';
                 return;
             }
 
-            const currentRealPage = sortedPageNumbers[currentPageIndex];
-            const currentSoalList = pagesData[currentRealPage] || [];
+            fetchFormDetail();
+        });
 
-            let globalSoalIndexOffset = 0;
-            for (let i = 0; i < currentPageIndex; i++) {
-                const prevPageNum = sortedPageNumbers[i];
-                globalSoalIndexOffset += pagesData[prevPageNum].length;
+        // 1. Fetch Detail Form Berdasarkan Slug
+        async function fetchFormDetail() {
+            try {
+                const token = getAuthToken();
+                const response = await fetch(`${API_URL}/form/slug?slug=${encodeURIComponent(formSlug)}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await response.json();
+
+                if (!response.ok) throw new Error(result.message || 'Gagal memuat form');
+
+                formDataObj = result.data.form;
+                pagesData = result.data.soal || [];
+
+                document.getElementById('formTitle').textContent = formDataObj.title || 'Tanpa Judul';
+                document.getElementById('badgeCategory').textContent = formDataObj.kategori?.sub_kategori || formDataObj.kategori?.primary_kategori || 'Umum';
+
+                checkTokenRequirement();
+
+            } catch (error) {
+                console.error(error);
+                alert(error.message || 'Terjadi kesalahan saat memuat data form');
+                window.location.href = 'dashboard.html';
             }
-
-            currentSoalList.forEach((soal, index) => {
-                const globalNumber = globalSoalIndexOffset + index + 1;
-                const card = createSoalCard(soal, globalNumber);
-                soalContainer.appendChild(card);
-            });
-
-            restoreCurrentPageAnswers();
-
-            document.getElementById('page-indicator-badge').textContent = `Halaman ${currentPageIndex + 1} dari ${sortedPageNumbers.length}`;
-            
-            const btnPrev = document.getElementById('btn-prev');
-            const btnNext = document.getElementById('btn-next');
-            const btnSubmit = document.getElementById('btn-submit');
-
-            btnPrev.disabled = (currentPageIndex === 0);
-
-            if (currentPageIndex === sortedPageNumbers.length - 1) {
-                btnNext.classList.add('hidden');
-                btnSubmit.classList.remove('hidden');
-            } else {
-                btnNext.classList.remove('hidden');
-                btnSubmit.classList.add('hidden');
-            }
-
-            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        function createSoalCard(soal, number) {
-            const card = document.createElement('div');
-            card.className = 'bg-white p-6 md:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-4';
-            card.setAttribute('data-soal-id', soal.id);
-            card.setAttribute('data-soal-type', soal.type);
+        // 2. Cek Kebutuhan Token Responden
+        async function checkTokenRequirement() {
+            const tokenResponRequired = formDataObj.token?.token_respon;
 
-            let soalImageHtml = '';
-            if (soal.image) {
-                soalImageHtml = `
-                    <div class="mt-3 overflow-hidden rounded-xl border border-slate-100 bg-slate-50">
-                        <img src="${API_BASE_URL}${soal.image}" alt="Gambar Soal ${number}" class="max-h-72 w-full object-contain mx-auto p-2">
-                    </div>
-                `;
+            // Jika token_respon null atau kosong, langsung verifikasi dengan mengirim token null/kosong ke backend
+            if (!tokenResponRequired) {
+                await verifyTokenAPI(null);
+            } else {
+                document.getElementById('tokenModal').classList.remove('hidden');
+            }
+        }
+
+        // Handle Submit Form Token Modal
+        async function handleCheckToken(e) {
+            e.preventDefault();
+            const tokenVal = document.getElementById('tokenInput').value.trim();
+            await verifyTokenAPI(tokenVal);
+        }
+
+        // Request ke endpoint /form/submit/check-token?form_slug=... (POST) dengan Body { token }
+        async function verifyTokenAPI(tokenString) {
+            const btn = document.getElementById('btnSubmitToken');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Memverifikasi...`;
             }
 
-            let optionsHtml = '';
+            try {
+                const tokenAuth = getAuthToken();
+                // Mengirim form_slug lewat Query Parameter sesuai dengan pipe ValidateFormExist Anda
+                const response = await fetch(`${API_URL}/form/submit/check-token?form_slug=${encodeURIComponent(formSlug)}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${tokenAuth}`
+                    },
+                    body: JSON.stringify({
+                        token: tokenString
+                    })
+                });
 
-            if (soal.type === 'radio' || soal.type === 'checkbox') {
-                const isRadio = soal.type === 'radio';
-                const inputName = `question_${soal.id}`;
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.message || 'Token Salah / Gagal Verifikasi');
 
-                const optionsList = (soal.options || []).map((opt) => `
-                    <label class="flex items-start gap-3 p-3.5 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/30 cursor-pointer transition">
-                        <input type="${isRadio ? 'radio' : 'checkbox'}" 
-                               name="${inputName}" 
-                               value="${opt.id}" 
-                               class="mt-0.5 h-4 w-4 text-indigo-600 border-slate-300 focus:ring-indigo-500">
-                        <div class="flex-1 text-xs md:text-sm text-slate-700 font-medium leading-relaxed">
-                            <span>${opt.value}</span>
-                            ${opt.image ? `<img src="${API_BASE_URL}${opt.image}" class="mt-2 max-h-32 rounded-lg border" />` : ''}
+                document.getElementById('tokenModal').classList.add('hidden');
+                document.getElementById('mainApp').classList.remove('hidden');
+
+                renderCurrentPage();
+
+            } catch (error) {
+                console.error(error);
+                showModalAlert(error.message || 'Verifikasi gagal', 'error');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `<span>Verifikasi</span> <i class="fa-solid fa-arrow-right text-[10px]"></i>`;
+                }
+            }
+        }
+
+        // 3. Render Soal Berdasarkan Halaman (Pagination)
+        function renderCurrentPage() {
+            const container = document.getElementById('questionsContainer');
+            container.innerHTML = '';
+
+            if (pagesData.length === 0) {
+                container.innerHTML = `<div class="bg-white p-8 rounded-2xl border text-center text-slate-400 text-xs">Belum ada soal pada form ini.</div>`;
+                return;
+            }
+
+            const currentPageObj = pagesData[currentPageIndex];
+            document.getElementById('pageIndicator').textContent = `${currentPageIndex + 1} dari ${pagesData.length}`;
+
+            const pageWrapper = document.createElement('div');
+            pageWrapper.className = "space-y-6";
+
+            currentPageObj.soal.forEach((q, idx) => {
+                const card = document.createElement('div');
+                card.className = "bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4";
+
+                let optionsHTML = '';
+                if (q.options && q.options.length > 0) {
+                    q.options.forEach(opt => {
+                        const isChecked = userAnswers[q.id] == opt.id ? 'checked' : '';
+                        optionsHTML += `
+                            <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer transition">
+                                <input type="radio" name="question_${q.id}" value="${opt.id}" ${isChecked} onchange="saveAnswer(${q.id}, ${opt.id})"
+                                    class="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500">
+                                <span class="text-xs font-medium text-slate-700">${opt.value}</span>
+                            </label>
+                        `;
+                    });
+                }
+
+                card.innerHTML = `
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 text-xs font-bold flex items-center justify-center">${idx + 1}</span>
+                            <span class="text-[10px] text-slate-400 font-medium uppercase">Pilihan Ganda</span>
                         </div>
-                    </label>
-                `).join('');
-
-                optionsHtml = `<div class="space-y-2.5 pt-2">${optionsList}</div>`;
-
-            } else if (soal.type === 'text') {
-                optionsHtml = `
-                    <div class="pt-2">
-                        <input type="text" name="question_${soal.id}" placeholder="Ketik jawaban Anda di sini..."
-                            class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-xs md:text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <p class="text-sm font-semibold text-slate-900">${q.question}</p>
+                    <div class="space-y-2 pt-2">
+                        ${optionsHTML}
                     </div>
                 `;
-            } else if (soal.type === 'file') {
-                optionsHtml = `
-                    <div class="pt-2">
-                        <input type="file" name="question_file_${soal.id}"
-                            class="w-full text-xs md:text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer border border-slate-200 p-1.5 rounded-xl">
-                    </div>
-                `;
-            }
 
-            card.innerHTML = `
-                <div class="flex items-start gap-3 border-b border-slate-100 pb-3">
-                    <span class="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
-                        ${number}
-                    </span>
-                    <h3 class="text-sm md:text-base font-bold text-slate-800 leading-snug">
-                        ${soal.question}
-                    </h3>
-                </div>
-                ${soalImageHtml}
-                ${optionsHtml}
-            `;
+                pageWrapper.appendChild(card);
+            });
 
-            return card;
+            container.appendChild(pageWrapper);
+            updatePaginationButtons();
+        }
+
+        function saveAnswer(soalId, optionId) {
+            userAnswers[soalId] = optionId;
         }
 
         function changePage(direction) {
-            hideGlobalAlert();
+            const newIndex = currentPageIndex + direction;
+            if (newIndex >= 0 && newIndex < pagesData.length) {
+                currentPageIndex = newIndex;
+                renderCurrentPage();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
 
-            if (direction > 0) {
-                const isValid = validateAndSaveCurrentPage();
-                if (!isValid) {
-                    showGlobalAlert('Harap jawab seluruh pertanyaan pada halaman ini sebelum melanjutkan.', false);
-                    return;
-                }
+        function updatePaginationButtons() {
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            const submitBtn = document.getElementById('submitBtn');
+
+            if (currentPageIndex === 0) {
+                prevBtn.disabled = true;
             } else {
-                saveCurrentPageAnswers();
+                prevBtn.disabled = false;
             }
 
-            const targetIndex = currentPageIndex + direction;
-            if (targetIndex >= 0 && targetIndex < sortedPageNumbers.length) {
-                currentPageIndex = targetIndex;
-                renderCurrentPageSoal();
-            }
-        }
-
-        function validateAndSaveCurrentPage() {
-            let isCurrentPageValid = true;
-            saveCurrentPageAnswers((soalId, hasValue) => {
-                if (!hasValue) isCurrentPageValid = false;
-            });
-            return isCurrentPageValid;
-        }
-
-        function saveCurrentPageAnswers(onValidateCallback) {
-            const soalCards = document.querySelectorAll('#soal-container > div');
-            
-            soalCards.forEach((card) => {
-                const soalId = Number(card.getAttribute('data-soal-id'));
-                const soalType = card.getAttribute('data-soal-type');
-                let hasValue = false;
-
-                if (soalType === 'radio') {
-                    const selected = card.querySelector(`input[name="question_${soalId}"]:checked`);
-                    if (selected) {
-                        userAnswersState[soalId] = Number(selected.value);
-                        hasValue = true;
-                    } else {
-                        delete userAnswersState[soalId];
-                    }
-
-                } else if (soalType === 'checkbox') {
-                    const checkedList = card.querySelectorAll(`input[name="question_${soalId}"]:checked`);
-                    if (checkedList.length > 0) {
-                        userAnswersState[soalId] = Array.from(checkedList).map(chk => Number(chk.value));
-                        hasValue = true;
-                    } else {
-                        delete userAnswersState[soalId];
-                    }
-
-                } else if (soalType === 'text') {
-                    const textInput = card.querySelector(`input[name="question_${soalId}"]`);
-                    const val = textInput ? textInput.value.trim() : '';
-                    if (val !== '') {
-                        userAnswersState[soalId] = val;
-                        hasValue = true;
-                    } else {
-                        delete userAnswersState[soalId];
-                    }
-
-                } else if (soalType === 'file') {
-                    const fileInput = card.querySelector(`input[name="question_file_${soalId}"]`);
-                    if (fileInput && fileInput.files[0]) {
-                        userAnswersState[soalId] = fileInput.files[0];
-                        hasValue = true;
-                    }
-                    if (userAnswersState[soalId] instanceof File) {
-                        hasValue = true;
-                    }
-                }
-
-                if (onValidateCallback) onValidateCallback(soalId, hasValue);
-            });
-        }
-
-        function restoreCurrentPageAnswers() {
-            const soalCards = document.querySelectorAll('#soal-container > div');
-
-            soalCards.forEach((card) => {
-                const soalId = Number(card.getAttribute('data-soal-id'));
-                const soalType = card.getAttribute('data-soal-type');
-                const savedVal = userAnswersState[soalId];
-
-                if (savedVal === undefined || savedVal === null) return;
-
-                if (soalType === 'radio') {
-                    const radioToSelect = card.querySelector(`input[name="question_${soalId}"][value="${savedVal}"]`);
-                    if (radioToSelect) radioToSelect.checked = true;
-
-                } else if (soalType === 'checkbox' && Array.isArray(savedVal)) {
-                    savedVal.forEach(optId => {
-                        const chk = card.querySelector(`input[name="question_${soalId}"][value="${optId}"]`);
-                        if (chk) chk.checked = true;
-                    });
-
-                } else if (soalType === 'text') {
-                    const textInput = card.querySelector(`input[name="question_${soalId}"]`);
-                    if (textInput) textInput.value = savedVal;
-                }
-            });
-        }
-
-        async function handleSubmitAnswers(e) {
-            if (e) e.preventDefault();
-
-            if (isTimeExpired) {
-                alert('Waktu pengerjaan telah habis.');
-                return;
-            }
-
-            const isValid = validateAndSaveCurrentPage();
-            if (!isValid) {
-                showGlobalAlert('Harap jawab seluruh pertanyaan pada halaman ini sebelum mengirimkan.', false);
-                return;
-            }
-
-            await processSubmit(false);
-        }
-
-        async function processSubmit(bypassValidation = false) {
-            hideGlobalAlert();
-
-            const btnSubmit = document.getElementById('btn-submit');
-            btnSubmit.disabled = true;
-            btnSubmit.innerHTML = `<span>⏳</span> Mengirim...`;
-
-            const formData = new FormData();
-            const payload = [];
-
-            let totalQuestionsCount = 0;
-            let answeredQuestionsCount = 0;
-
-            sortedPageNumbers.forEach(pageNum => {
-                const soalList = pagesData[pageNum] || [];
-                soalList.forEach(soal => {
-                    totalQuestionsCount++;
-                    const soalId = soal.id;
-                    const savedVal = userAnswersState[soalId];
-
-                    if (soal.type === 'radio') {
-                        if (savedVal !== undefined && savedVal !== null) {
-                            answeredQuestionsCount++;
-                            payload.push({
-                                jawaban: {
-                                    soal_id: soalId,
-                                    soal_option_id: Number(savedVal),
-                                    answer_text: null
-                                }
-                            });
-                        }
-                    } else if (soal.type === 'checkbox') {
-                        if (Array.isArray(savedVal) && savedVal.length > 0) {
-                            answeredQuestionsCount++;
-                            payload.push({
-                                jawaban: {
-                                    soal_id: soalId,
-                                    soal_option_id: savedVal,
-                                    answer_text: null
-                                }
-                            });
-                        }
-                    } else if (soal.type === 'text') {
-                        if (typeof savedVal === 'string' && savedVal.trim() !== '') {
-                            answeredQuestionsCount++;
-                            payload.push({
-                                jawaban: {
-                                    soal_id: soalId,
-                                    soal_option_id: null,
-                                    answer_text: savedVal.trim()
-                                }
-                            });
-                        }
-                    } else if (soal.type === 'file') {
-                        if (savedVal instanceof File) {
-                            answeredQuestionsCount++;
-                            formData.append('files', savedVal);
-                            payload.push({
-                                jawaban: {
-                                    soal_id: soalId,
-                                    soal_option_id: null,
-                                    answer_text: null
-                                }
-                            });
-                        }
-                    }
-                });
-            });
-
-            if (!bypassValidation && answeredQuestionsCount < totalQuestionsCount) {
-                showGlobalAlert('Harap isi seluruh pertanyaan dari semua halaman sebelum mengirimkan.', false);
-                btnSubmit.disabled = false;
-                btnSubmit.innerHTML = `<span>🚀</span> Kirim Jawaban`;
-                return;
-            }
-
-            if (payload.length === 0 && bypassValidation) {
-                showGlobalAlert('Waktu habis dan tidak ada jawaban yang terisi.', false);
-                setTimeout(() => { window.location.href = 'dashboard.html'; }, 2000);
-                return;
-            }
-
-            formData.append('data', JSON.stringify(payload));
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/form/submit?form_slug=${encodeURIComponent(formSlug)}`, {
-                    method: 'POST',
-                    headers: { 
-                        'Authorization': `Bearer ${token}` 
-                    },
-                    body: formData
-                });
-
-                const result = await response.json();
-
-                if (response.ok) {
-                    if (timerInterval) clearInterval(timerInterval);
-                    showGlobalAlert(result.message || 'Jawaban berhasil dikirim!', true);
-                    document.getElementById('form-fill').reset();
-                    
-                    setTimeout(() => {
-                        window.location.href = 'dashboard.html';
-                    }, 2000);
-
-                } else {
-                    showGlobalAlert(result.message || 'Gagal mengirimkan jawaban.', false);
-                    if (!isTimeExpired) {
-                        btnSubmit.disabled = false;
-                        btnSubmit.innerHTML = `<span>🚀</span> Kirim Jawaban`;
-                    }
-                }
-
-            } catch (err) {
-                console.error(err);
-                showGlobalAlert('Terjadi kesalahan koneksi saat mengirim jawaban.', false);
-                if (!isTimeExpired) {
-                    btnSubmit.disabled = false;
-                    btnSubmit.innerHTML = `<span>🚀</span> Kirim Jawaban`;
-                }
+            if (currentPageIndex === pagesData.length - 1) {
+                nextBtn.classList.add('hidden');
+                submitBtn.classList.remove('hidden');
+            } else {
+                nextBtn.classList.remove('hidden');
+                submitBtn.classList.add('hidden');
             }
         }
 
-        function showGlobalAlert(msg, isSuccess = true) {
-            const box = document.getElementById('alert-box');
-            box.textContent = msg;
-            box.className = `p-4 rounded-xl text-sm font-medium ${
-                isSuccess 
-                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                : 'bg-red-100 text-red-800 border border-red-200'
-            }`;
-            box.classList.remove('hidden');
-            box.scrollIntoView({ behavior: 'smooth' });
+        function handleFinishExam(e) {
+            e.preventDefault();
+            if (confirm('Apakah Anda yakin ingin mengirimkan jawaban ujian ini?')) {
+                alert('Jawaban berhasil diserahkan!');
+                window.location.href = 'dashboard.html';
+            }
         }
-
-        function hideGlobalAlert() {
-            document.getElementById('alert-box').classList.add('hidden');
-        }
-
-        // Catatan: Proses inisialisasi awal form sengaja menunggu user mengisi modal verifikasi token.
     </script>
 </body>
 

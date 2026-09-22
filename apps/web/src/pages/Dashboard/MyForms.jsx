@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import api, { FORM_API_URL, flattenForm } from "../../utils/api";
 import { addToTrash } from "./Trash";
 import AlertModal from "../../components/AlertModal";
-import { ImagePlus, Handshake, Plus, Search, PenLine, ClipboardList, Trash2 } from "lucide-react";
+import { ImagePlus, Handshake, Plus, Search, PenLine, ClipboardList, Trash2, FileText, Download, BookOpen, X, ChevronRight, Copy, Check } from "lucide-react";
 const CATEGORIES = ["All", "Survey", "Quiz / Ujian"];
 
 function getUsername() {
@@ -17,7 +17,8 @@ function getUsername() {
 /* ── Skeleton card ───────────────────────────────────────────── */
 function SkeletonCard() {
   return (
-    <div className="rounded-2xl bg-white border border-[#dceaf2] overflow-hidden min-h-[310px] flex flex-col animate-pulse">
+    <div className="rounded-2xl border overflow-hidden min-h-[310px] flex flex-col animate-pulse"
+      style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}>
       <div className="w-full h-[165px] bg-[#e8f0fb]" />
       <div className="px-[17px] py-[15px] flex-1 flex flex-col gap-3">
         <div className="h-2 w-[30%] rounded bg-[#e8f0fb]" />
@@ -221,6 +222,7 @@ export default function MyForms() {
   const [search, setSearch]         = useState("");
   const [showModal, setShowModal]   = useState(false);
   const [showJoin, setShowJoin]     = useState(false);
+  const [showGuide, setShowGuide]   = useState(false);
   const [alertModal, setAlertModal] = useState(null); // { type, title, message, onConfirm }
   const [confirmDelete, setConfirmDelete] = useState(null); // form to delete
 
@@ -278,10 +280,10 @@ export default function MyForms() {
           style={{ background: "linear-gradient(135deg, var(--fm-bg) 0%, var(--fm-bg-2) 55%, var(--fm-bg-3) 100%)", color: "var(--fm-text)" }}
         >
           {/* ── Header ─────────────────────────────── */}
-          <header className="flex items-center justify-between gap-4 mb-[25px] max-[800px]:flex-col max-[800px]:items-start">
+          <header className="flex items-center justify-between gap-4 mb-[25px] max-[800px]:flex-col max-[800px]:items-start pt-[52px] md:pt-0">
             <div>
-              <h1 className="text-[28px] font-extrabold tracking-tight text-[#102f56]">My Forms</h1>
-              <p className="mt-1.5 text-[13.5px] text-[#7290a9]">Halo, {username}! Kelola semua form yang kamu buat.</p>
+              <h1 className="text-[28px] font-extrabold tracking-tight" style={{ color: "var(--fm-text)" }}>My Forms</h1>
+              <p className="mt-1.5 text-[13.5px]" style={{ color: "var(--fm-text-2)" }}>Halo, {username}! Kelola semua form yang kamu buat.</p>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
               <button
@@ -302,40 +304,83 @@ export default function MyForms() {
           </header>
 
           {/* ── Search ─────────────────────────────── */}
-          <div className="flex items-center h-11 px-4 rounded-xl bg-white/90 border border-[#d9e8f1] mb-4 focus-within:border-[#3d91b2] focus-within:ring-4 focus-within:ring-[#3d91b2]/10 transition-all">
-            <Search size={19} className="text-[#3d91b2] mr-2.5 shrink-0" />
+          <div
+            className="flex items-center h-12 px-4 rounded-xl border mb-5 focus-within:ring-2 focus-within:ring-[#3d91b2] focus-within:border-transparent transition-all shadow-sm group"
+            style={{
+              backgroundColor: "var(--fm-card)",
+              borderColor: "var(--fm-card-border)",
+            }}
+          >
+            <Search size={18} className="text-[#3d91b2] mr-3 shrink-0" />
             <input
               type="text"
               placeholder="Search your forms..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="flex-1 bg-transparent outline-none text-[14px] text-[#183056] placeholder:text-[#9bb0bf]"
+              className="flex-1 bg-transparent! outline-none text-[14px] font-normal placeholder:text-gray-400 border-none! shadow-none! p-0"
+              style={{
+                backgroundColor: "transparent",
+                color: "var(--fm-text)",
+                border: "none",
+                outline: "none",
+                boxShadow: "none"
+              }}
             />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="text-xs px-2 py-1 rounded-md transition"
+                style={{
+                  color: "var(--fm-text-2)",
+                  backgroundColor: "var(--fm-hover)"
+                }}
+              >
+                Clear
+              </button>
+            )}
           </div>
 
-          {/* ── Category ───────────────────────────── */}
-          <div className="flex gap-2.5 mb-7 flex-wrap">
-            {CATEGORIES.map(c => (
-              <button
-                key={c}
-                className={`px-[18px] py-2 rounded-full text-[13px] font-medium border transition-all ${
-                  activeCategory === c
-                    ? "bg-[#183056] border-[#183056] text-white shadow-[0_4px_12px_rgba(24,48,86,0.25)]"
-                    : "border-[#d6e5ee] hover:border-[#3d91b2]"
-                }`}
-                style={activeCategory !== c ? { backgroundColor: "var(--fm-card)", color: "var(--fm-text-2)" } : {}}
-                onClick={() => setActive(c)}
-              >
-                {c}
-              </button>
-            ))}
+          {/* ── Category & Template Action ────────── */}
+          <div className="flex items-center justify-between gap-3 mb-7 flex-wrap">
+            <div className="flex gap-2.5 flex-wrap">
+              {CATEGORIES.map(c => (
+                <button
+                  key={c}
+                  className={`px-[18px] py-2 rounded-full text-[13px] font-medium border transition-all ${
+                    activeCategory === c
+                      ? "bg-[#183056] border-[#183056] text-white shadow-[0_4px_12px_rgba(24,48,86,0.25)]"
+                      : "border-[#d6e5ee] hover:border-[#3d91b2]"
+                  }`}
+                  style={activeCategory !== c ? { backgroundColor: "var(--fm-card)", color: "var(--fm-text-2)" } : {}}
+                  onClick={() => setActive(c)}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowGuide(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold border border-[#d6e5ee] hover:border-[#3d91b2] transition-all shadow-xs shrink-0 cursor-pointer"
+              style={{
+                backgroundColor: "var(--fm-card)",
+                color: "var(--fm-text)",
+                borderColor: "var(--fm-card-border)"
+              }}
+              title="Lihat Format & Unduh Template Soal"
+            >
+              <FileText size={16} className="text-[#3d91b2]" />
+              <span>Format & Template Soal</span>
+              <BookOpen size={14} className="text-gray-400 ml-0.5" />
+            </button>
           </div>
 
           {/* ── Section header ─────────────────────── */}
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-[18px] font-bold text-[#183056]">My Forms</h2>
-              <span className="block mt-1 text-[12px] text-[#87a1b5]">{loading ? "..." : `${filtered.length} forms`}</span>
+              <h2 className="text-[18px] font-bold" style={{ color: "var(--fm-text)" }}>My Forms</h2>
+              <span className="block mt-1 text-[12px]" style={{ color: "var(--fm-text-2)" }}>{loading ? "..." : `${filtered.length} forms`}</span>
             </div>
           </div>
 
@@ -411,9 +456,14 @@ export default function MyForms() {
 
           {/* ── Empty state ─────────────────────────── */}
           {!loading && filtered.length === 0 && (
-            <div className="text-center py-20 text-[#7892a6]">
-              <div className="w-[55px] h-[55px] mx-auto mb-4 rounded-2xl bg-[#e4f2f8] grid place-items-center"><ClipboardList size={25} className="text-[#3d91b2]" /></div>
-              <h3 className="text-[16px] font-bold text-[#183056] mb-1">{search ? "Form tidak ditemukan" : "Belum ada form"}</h3>
+            <div className="text-center py-20" style={{ color: "var(--fm-text-2)" }}>
+              <div className="w-[55px] h-[55px] mx-auto mb-4 rounded-2xl grid place-items-center"
+                style={{ backgroundColor: "var(--fm-hover)" }}>
+                <ClipboardList size={25} className="text-[#3d91b2]" />
+              </div>
+              <h3 className="text-[16px] font-bold mb-1" style={{ color: "var(--fm-text)" }}>
+                {search ? "Form tidak ditemukan" : "Belum ada form"}
+              </h3>
               <p className="text-[12.5px]">
                 {search
                   ? "Coba kata kunci lain atau pilih kategori berbeda."
@@ -438,6 +488,10 @@ export default function MyForms() {
 
       {showJoin && (
         <JoinModal onClose={() => setShowJoin(false)} onJoined={() => { setShowJoin(false); load(); }} />
+      )}
+
+      {showGuide && (
+        <TemplateGuideModal onClose={() => setShowGuide(false)} />
       )}
 
       {/* AlertModal — ganti browser alert/confirm */}
@@ -563,4 +617,243 @@ function JoinModal({ onClose, onJoined }) {
       </div>
     </div>
   , document.body);
+}
+
+/* ── Template Guide Modal ───────────────────────────────────── */
+function TemplateGuideModal({ onClose }) {
+  const [copiedIndex, setCopiedIndex] = useState(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const sections = [
+    {
+      type: "Pilihan Ganda (Satu Jawaban)",
+      tipe: "Tipe: radio",
+      tag: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800",
+      example: `1. Berapakah nilai dari akar persamaan √x + 16 jika x = 9?
+A. 17
+B. 19
+C. 21
+D. 25
+Kunci: B Tipe: radio`,
+      notes: [
+        "Nomor soal diakhiri titik (1.) atau kurung (1))",
+        "Pilihan jawaban pakai huruf kapital (A. / B. / C. / D.)",
+        "Kunci: diisi huruf jawaban yang benar",
+        "Tipe: radio untuk pilihan ganda satu jawaban",
+      ],
+    },
+    {
+      type: "Pilihan Ganda (Aljabar / Pecahan)",
+      tipe: "Tipe: radio",
+      tag: "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-300 dark:border-cyan-800",
+      example: `2. Bentuk sederhana dari pecahan matematika (a² - b²) / (a - b) adalah...
+A. a - b
+B. a + b
+C. a × b
+D. a / b
+Kunci: B Tipe: radio`,
+      notes: [
+        "Mendukung simbol matematika standar seperti ², ³, √, ±, ×, ÷, /",
+        "Kunci dan Tipe ditulis di baris setelah pilihan terakhir",
+      ],
+    },
+    {
+      type: "Kotak Centang (Banyak Jawaban)",
+      tipe: "Tipe: checkbox",
+      tag: "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800",
+      example: `3. Manakah bilangan prima di bawah ini?
+A. 2
+B. 4
+C. 5
+D. 9
+Kunci: A, C Tipe: checkbox`,
+      notes: [
+        "Kunci bisa lebih dari satu, pisahkan dengan tanda koma (Kunci: A, C)",
+        "Tipe: checkbox untuk multi-jawaban",
+      ],
+    },
+    {
+      type: "Jawaban Singkat / Esai",
+      tipe: "Tipe: text",
+      tag: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800",
+      example: `4. Sebutkan ibu kota negara Indonesia saat ini!
+Kunci: - Tipe: text`,
+      notes: [
+        "Tidak perlu menulis pilihan jawaban A/B/C/D",
+        "Tipe: text untuk isian teks bebas / esai",
+      ],
+    },
+  ];
+
+  const handleCopy = (text, index) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 1800);
+  };
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/55 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative rounded-3xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto border flex flex-col"
+        style={{
+          backgroundColor: "var(--fm-card)",
+          borderColor: "var(--fm-card-border)"
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div
+          className="sticky top-0 rounded-t-3xl border-b px-6 py-4 flex items-center justify-between z-10"
+          style={{
+            backgroundColor: "var(--fm-card)",
+            borderColor: "var(--fm-border)"
+          }}
+        >
+          <div className="flex items-center gap-2.5">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{ backgroundColor: "var(--fm-hover)", color: "#3d91b2" }}
+            >
+              <BookOpen size={20} />
+            </div>
+            <div>
+              <h3 className="text-[16px] font-bold" style={{ color: "var(--fm-text)" }}>
+                Panduan & Format Template Soal
+              </h3>
+              <p className="text-[12px]" style={{ color: "var(--fm-text-2)" }}>
+                Format penulisan soal teks / file Microsoft Word (.docx)
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+            style={{ color: "var(--fm-text-2)" }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="px-6 py-5 space-y-5">
+          {/* Info Banner */}
+          <div
+            className="rounded-2xl p-4 border text-[13px] leading-relaxed"
+            style={{
+              backgroundColor: "var(--fm-hover)",
+              borderColor: "var(--fm-border)",
+              color: "var(--fm-text)"
+            }}
+          >
+            Tulis soal Anda di file <strong className="text-[#3d91b2]">Microsoft Word (.docx)</strong> sesuai format di bawah. Sistem otomatis mendeteksi nomor soal, pilihan opsi, kunci jawaban, dan tipenya.
+          </div>
+
+          {/* Format Sections */}
+          {sections.map((s, idx) => (
+            <div key={s.type} className="space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <ChevronRight size={14} className="text-[#3d91b2]" />
+                  <span className={`text-[12px] font-bold px-2.5 py-0.5 rounded-full border ${s.tag}`}>{s.type}</span>
+                  <code
+                    className="text-[11.5px] px-2 py-0.5 rounded-lg font-mono border"
+                    style={{
+                      backgroundColor: "var(--fm-hover)",
+                      borderColor: "var(--fm-border)",
+                      color: "var(--fm-text)"
+                    }}
+                  >
+                    {s.tipe}
+                  </code>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleCopy(s.example, idx)}
+                  className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer"
+                  style={{
+                    backgroundColor: "var(--fm-card)",
+                    borderColor: "var(--fm-border)",
+                    color: copiedIndex === idx ? "#10b981" : "var(--fm-text-2)"
+                  }}
+                  title="Salin contoh teks ini"
+                >
+                  {copiedIndex === idx ? <Check size={13} /> : <Copy size={13} />}
+                  {copiedIndex === idx ? "Tersalin!" : "Salin Teks"}
+                </button>
+              </div>
+
+              {/* Code block */}
+              <pre
+                className="border rounded-xl px-4 py-3 text-[12.5px] font-mono whitespace-pre-wrap leading-relaxed overflow-x-auto"
+                style={{
+                  backgroundColor: "var(--fm-input-bg)",
+                  borderColor: "var(--fm-card-border)",
+                  color: "var(--fm-text)"
+                }}
+              >
+                {s.example}
+              </pre>
+
+              {/* Notes */}
+              <ul className="space-y-1 pl-1">
+                {s.notes.map((n, i) => (
+                  <li key={i} className="text-[12px] flex items-start gap-1.5" style={{ color: "var(--fm-text-2)" }}>
+                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-[#3d91b2] shrink-0" />
+                    {n}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+
+          {/* Aturan umum */}
+          <div
+            className="rounded-2xl p-4 space-y-2 border"
+            style={{
+              backgroundColor: "rgba(245, 158, 11, 0.08)",
+              borderColor: "rgba(245, 158, 11, 0.3)"
+            }}
+          >
+            <p className="text-[13px] font-bold text-amber-500">Aturan Penulisan:</p>
+            <ul className="space-y-1.5">
+              {[
+                "Nomor soal diakhiri titik (1.) atau kurung tutup (1)).",
+                "Pilihan jawaban pakai huruf kapital diakhiri titik (A.) atau kurung (A)).",
+                "Kunci jawaban ditulis: Kunci: B — untuk checkbox multi jawaban: Kunci: A, C",
+                "Tipe soal ditulis: Tipe: radio / checkbox / text",
+                "Kunci dan Tipe boleh di satu baris yang sama setelah opsi terakhir.",
+                "Pisahkan setiap butir soal dengan 1 baris kosong (Enter).",
+              ].map((r, i) => (
+                <li key={i} className="text-[12px] text-amber-600 dark:text-amber-400 flex items-start gap-1.5">
+                  <span className="mt-1 w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                  {r}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* CTA unduh */}
+          <div className="pt-1">
+            <a
+              href="/soal.docx"
+              download="Template_Soal_FormMaker.docx"
+              className="flex items-center justify-center gap-2 py-3 rounded-2xl text-white text-[13.5px] font-semibold hover:opacity-90 transition-all shadow-md"
+              style={{ backgroundColor: "#1a4fa0" }}
+            >
+              <Download size={16} /> Unduh Template File Word (.docx)
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
 }

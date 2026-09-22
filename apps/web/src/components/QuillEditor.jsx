@@ -4,6 +4,7 @@ import 'quill/dist/quill.snow.css';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { FORM_API_URL } from '../utils/api';
+import { LATEX_SYMBOLS } from '../utils/latexSymbols';
 
 // Toolbar tanpa tombol formula bawaan Quill (kita bikin sendiri)
 const TOOLBAR_OPTIONS = [
@@ -16,94 +17,11 @@ const TOOLBAR_OPTIONS = [
   ['code-block'],
 ];
 
-// ── Daftar shortcut simbol LaTeX per kategori ──────────────────────────────
-const LATEX_SYMBOLS = [
-  {
-    label: 'Dasar',
-    items: [
-      { display: 'x²',         latex: 'x^{2}',              tip: 'Pangkat' },
-      { display: 'xₙ',         latex: 'x_{n}',              tip: 'Indeks bawah' },
-      { display: '√x',         latex: '\\sqrt{x}',          tip: 'Akar kuadrat' },
-      { display: '∛x',         latex: '\\sqrt[3]{x}',       tip: 'Akar pangkat 3' },
-      { display: 'a/b',        latex: '\\frac{a}{b}',       tip: 'Pecahan' },
-      { display: '|x|',        latex: '|x|',                tip: 'Nilai mutlak' },
-      { display: 'xⁿ',         latex: 'x^{n}',              tip: 'Pangkat n' },
-      { display: '√(a²+b²)',   latex: '\\sqrt{a^2+b^2}',   tip: 'Teorema Pythagoras' },
-    ],
-  },
-  {
-    label: 'Aljabar',
-    items: [
-      { display: '±',          latex: '\\pm',               tip: 'Plus minus' },
-      { display: '×',          latex: '\\times',            tip: 'Kali' },
-      { display: '÷',          latex: '\\div',              tip: 'Bagi' },
-      { display: '≠',          latex: '\\neq',              tip: 'Tidak sama dengan' },
-      { display: '≤',          latex: '\\leq',              tip: 'Kurang dari sama dengan' },
-      { display: '≥',          latex: '\\geq',              tip: 'Lebih dari sama dengan' },
-      { display: '≈',          latex: '\\approx',           tip: 'Hampir sama' },
-      { display: '∝',          latex: '\\propto',           tip: 'Sebanding' },
-      { display: 'abc formula', latex: '\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}', tip: 'Rumus ABC' },
-    ],
-  },
-  {
-    label: 'Kalkulus',
-    items: [
-      { display: '∫',          latex: '\\int',                           tip: 'Integral' },
-      { display: '∫ₐᵇ',       latex: '\\int_{a}^{b}',                   tip: 'Integral tentu' },
-      { display: 'd/dx',       latex: '\\frac{d}{dx}',                   tip: 'Turunan' },
-      { display: '∂/∂x',      latex: '\\frac{\\partial}{\\partial x}',  tip: 'Turunan parsial' },
-      { display: 'lim',        latex: '\\lim_{x \\to \\infty}',          tip: 'Limit' },
-      { display: '∑',          latex: '\\sum_{i=1}^{n}',                 tip: 'Sigma / Jumlah' },
-      { display: '∏',          latex: '\\prod_{i=1}^{n}',               tip: 'Produk' },
-      { display: '∞',          latex: '\\infty',                         tip: 'Tak hingga' },
-    ],
-  },
-  {
-    label: 'Trigonometri',
-    items: [
-      { display: 'sin',        latex: '\\sin',              tip: 'Sinus' },
-      { display: 'cos',        latex: '\\cos',              tip: 'Kosinus' },
-      { display: 'tan',        latex: '\\tan',              tip: 'Tangen' },
-      { display: 'sin⁻¹',     latex: '\\sin^{-1}',         tip: 'Arcsin' },
-      { display: 'cos⁻¹',     latex: '\\cos^{-1}',         tip: 'Arccos' },
-      { display: 'tan⁻¹',     latex: '\\tan^{-1}',         tip: 'Arctan' },
-      { display: 'π',          latex: '\\pi',               tip: 'Pi' },
-      { display: 'θ',          latex: '\\theta',            tip: 'Theta' },
-    ],
-  },
-  {
-    label: 'Himpunan & Logika',
-    items: [
-      { display: '∈',          latex: '\\in',               tip: 'Elemen dari' },
-      { display: '∉',          latex: '\\notin',            tip: 'Bukan elemen dari' },
-      { display: '⊂',          latex: '\\subset',           tip: 'Himpunan bagian' },
-      { display: '∪',          latex: '\\cup',              tip: 'Gabungan' },
-      { display: '∩',          latex: '\\cap',              tip: 'Irisan' },
-      { display: '∅',          latex: '\\emptyset',         tip: 'Himpunan kosong' },
-      { display: '∀',          latex: '\\forall',           tip: 'Untuk semua' },
-      { display: '∃',          latex: '\\exists',           tip: 'Ada/terdapat' },
-    ],
-  },
-  {
-    label: 'Huruf Yunani',
-    items: [
-      { display: 'α',          latex: '\\alpha',            tip: 'Alpha' },
-      { display: 'β',          latex: '\\beta',             tip: 'Beta' },
-      { display: 'γ',          latex: '\\gamma',            tip: 'Gamma' },
-      { display: 'δ',          latex: '\\delta',            tip: 'Delta' },
-      { display: 'λ',          latex: '\\lambda',           tip: 'Lambda' },
-      { display: 'μ',          latex: '\\mu',               tip: 'Mu' },
-      { display: 'σ',          latex: '\\sigma',            tip: 'Sigma' },
-      { display: 'Δ',          latex: '\\Delta',            tip: 'Delta besar' },
-    ],
-  },
-];
-
 // ── Modal input LaTeX ──────────────────────────────────────────────────────
-function LatexModal({ onInsert, onClose }) {
+export function LatexModal({ onInsert, onClose, symbols = LATEX_SYMBOLS }) {
   const [latex, setLatex]       = useState('');
   const [mode, setMode]         = useState('inline'); // 'inline' | 'display'
-  const [activeTab, setActiveTab] = useState('Dasar');
+  const [activeTab, setActiveTab] = useState(symbols[0]?.label ?? 'Dasar');
   const inputRef                = useRef(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
@@ -132,7 +50,7 @@ function LatexModal({ onInsert, onClose }) {
     onClose();
   }
 
-  const currentCategory = LATEX_SYMBOLS.find(c => c.label === activeTab);
+  const currentCategory = symbols.find(c => c.label === activeTab) ?? symbols[0];
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
@@ -149,9 +67,10 @@ function LatexModal({ onInsert, onClose }) {
 
         {/* ── Symbol Palette ─────────────────────────────────────────── */}
         <div className="mb-4 rounded-xl border border-[#e2edf7] overflow-hidden">
-          {/* Tab kategori */}
+          {/* Tab kategori (disembunyikan kalau cuma 1 kategori) */}
+          {symbols.length > 1 && (
           <div className="flex overflow-x-auto bg-[#f7fafd] border-b border-[#e2edf7] scrollbar-hide">
-            {LATEX_SYMBOLS.map(cat => (
+            {symbols.map(cat => (
               <button
                 key={cat.label}
                 onClick={() => setActiveTab(cat.label)}
@@ -165,6 +84,7 @@ function LatexModal({ onInsert, onClose }) {
               </button>
             ))}
           </div>
+          )}
 
           {/* Grid simbol */}
           <div className="grid grid-cols-4 gap-1.5 p-3 bg-white">
@@ -407,8 +327,27 @@ export default function QuillEditor({ value, onChange, placeholder = 'Tulis pert
       };
     });
 
+    // Capture paste listener to preserve raw code and HTML document tags cleanly
+    const handlePaste = (e) => {
+      const text = e.clipboardData?.getData('text/plain');
+      // If pasting text that contains full HTML document tags or code that Quill's DOM parser would strip
+      if (text && /<(!doctype|html|head|meta|link|script|style|body|header|footer|nav)[\s>/]/i.test(text)) {
+        e.preventDefault();
+        e.stopPropagation();
+        const selection = quill.getSelection(true);
+        const idx = selection ? selection.index : quill.getLength();
+        quill.insertText(idx, text, 'user');
+        quill.setSelection(idx + text.length, 0);
+      }
+    };
+    editorContainer.addEventListener('paste', handlePaste, true);
+
     if (value) {
-      quill.clipboard.dangerouslyPasteHTML(value);
+      try {
+        quill.clipboard.dangerouslyPasteHTML(value);
+      } catch {
+        quill.setText(value);
+      }
     }
 
     quill.on('text-change', (delta, oldDelta, source) => {
@@ -419,6 +358,10 @@ export default function QuillEditor({ value, onChange, placeholder = 'Tulis pert
         onChange(isEmpty ? '' : html);
       }
     });
+
+    return () => {
+      editorContainer.removeEventListener('paste', handlePaste, true);
+    };
   }, []);
 
   useEffect(() => {
@@ -433,7 +376,11 @@ export default function QuillEditor({ value, onChange, placeholder = 'Tulis pert
     if (normValue !== normCurrent) {
       isUpdatingRef.current = true;
       if (normValue) {
-        quill.clipboard.dangerouslyPasteHTML(normValue);
+        try {
+          quill.clipboard.dangerouslyPasteHTML(normValue);
+        } catch {
+          quill.setText(normValue);
+        }
       } else {
         quill.setText('');
       }
@@ -454,7 +401,7 @@ export default function QuillEditor({ value, onChange, placeholder = 'Tulis pert
 
   return (
     <>
-      <div className="quill-wrapper rounded-xl border border-gray-200 overflow-hidden bg-white hover:border-[#1a4fa0] focus-within:border-[#1a4fa0] focus-within:ring-2 focus-within:ring-[#1a4fa0]/15 transition-all">
+      <div className="quill-wrapper rounded-xl border border-gray-200 bg-white hover:border-[#1a4fa0] focus-within:border-[#1a4fa0] focus-within:ring-2 focus-within:ring-[#1a4fa0]/15 transition-all">
         <div ref={containerRef} />
 
         {/* ── Tombol ekstra: LaTeX & Code ─────────────────────────────── */}

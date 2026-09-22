@@ -1,13 +1,13 @@
 const { Pool } = require("pg")
 require("dotenv").config()
 
-const sslConfig = { rejectUnauthorized: false }
+const sslConfig = process.env.ENV_MODE === 'development' ? { rejectUnauthorized: false } : false
 
 const pg = new Pool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASS,
-    database: process.env.DB_NAME || "postgres",
+    database: "postgres",
     ssl: sslConfig,
     port: Number(process.env.DB_PORT) || 6543
 })
@@ -16,7 +16,7 @@ const pool = new Pool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASS,
-    database: process.env.DB_NAME || "postgres",
+    database: process.env.DB_NAME_USER || "postgres",
     ssl: sslConfig,
     port: Number(process.env.DB_PORT) || 6543,
     max: 20,

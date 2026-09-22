@@ -4,1525 +4,856 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kelola Form & Respon - Dashboard</title>
+    <title>Kelola Soal & Pengaturan - Form Builder</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 
-<body class="bg-slate-50 min-h-screen text-slate-800 pb-20">
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
 
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm">
-        <div class="max-w-5xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-4">
+    <!-- Header Navbar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <button onclick="window.history.back()"
-                    class="p-2 hover:bg-slate-100 rounded-lg transition text-slate-600">
-                    ← Kembali
-                </button>
-                <h1 class="text-xl font-bold text-slate-800" id="form-title-header">Kelola Form</h1>
+                <a href="dashboard.html" class="text-slate-500 hover:text-slate-800 transition">
+                    <i class="fa-solid fa-arrow-left text-lg"></i>
+                </a>
+                <div>
+                    <h1 id="formTitleNav" class="text-base font-bold text-slate-900 leading-tight">Memuat Form...</h1>
+                    <span id="formSlugNav" class="text-xs text-slate-400 font-mono">slug: -</span>
+                </div>
             </div>
 
-            <div class="flex items-center gap-2 flex-wrap">
-                <span id="form-slug-badge"
-                    class="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-full text-xs font-mono font-semibold border border-indigo-100">
-                    Slug: Loading...
-                </span>
+            <!-- Tab Switcher & Aksi Utama -->
+            <div class="flex items-center gap-3">
+                <!-- Tab Bar: Soal | Setting -->
+                <div class="bg-slate-100 p-1 rounded-xl flex items-center gap-1 text-xs font-semibold">
+                    <button onclick="switchTab('soal')" id="tabSoalBtn"
+                        class="px-3.5 py-1.5 rounded-lg transition bg-white text-indigo-600 shadow-sm">
+                        <i class="fa-solid fa-list-check mr-1.5"></i> Soal
+                    </button>
+                    <button onclick="switchTab('setting')" id="tabSettingBtn"
+                        class="px-3.5 py-1.5 rounded-lg transition text-slate-600 hover:text-slate-900">
+                        <i class="fa-solid fa-gear mr-1.5"></i> Setting
+                    </button>
+                </div>
 
-                <button onclick="openSettingModal()" id="btn-open-setting"
-                    class="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center gap-1.5">
-                    ⚙️ Setting Form
+                <!-- Status Publik/Privat Switcher -->
+                <select id="formStatusSelect" onchange="updateFormStatus(this.value)"
+                    class="bg-white border border-slate-300 text-slate-700 text-xs font-semibold px-3 py-2 rounded-xl transition shadow-sm focus:outline-none focus:border-indigo-600">
+                    <option value="private">Privat</option>
+                    <option value="public">Publik</option>
+                </select>
+
+                <!-- Tombol Export Docx -->
+                <button onclick="handleExportDocx()"
+                    class="hidden sm:flex bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-2 rounded-xl transition items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-download text-emerald-600"></i> Export
                 </button>
-
-                <button onclick="openShareModal('collab')" id="btn-share-collab"
-                    class="px-3 py-1.5 bg-slate-600 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center gap-1.5">
-                    <span>🤝</span> Bagikan Collab
-                </button>
-
-                <button onclick="openShareModal('respondent')" id="btn-share-respondent"
-                    class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center gap-1.5">
-                    <span>🔗</span> Bagikan Responden
+                <button onclick="openSharePanel()"
+                    class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3.5 py-2 rounded-xl transition flex items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-share-nodes text-emerald-600"></i> Bagikan
                 </button>
             </div>
-        </div>
-
-        <div class="max-w-5xl mx-auto px-4 flex gap-8 border-t border-slate-100 mt-2">
-            <button id="tab-btn-soal" onclick="switchTab('soal')"
-                class="py-3 px-1 border-b-2 border-indigo-600 font-bold text-indigo-600 text-sm flex items-center gap-2 transition">
-                <span>📝</span> Pertanyaan
-            </button>
-            <button id="tab-btn-respon" onclick="switchTab('respon')"
-                class="py-3 px-1 border-b-2 border-transparent font-medium text-slate-500 hover:text-slate-800 text-sm flex items-center gap-2 transition">
-                <span>📊</span> Tanggapan / Respon
-                <span id="badge-total-submit"
-                    class="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
-            </button>
         </div>
     </header>
 
-    <main class="max-w-4xl mx-auto px-4 mt-8">
+    <!-- Main Content Container -->
+    <main class="max-w-4xl mx-auto px-4 py-8 flex-1 w-full space-y-8">
 
-        <div id="alert-box" class="hidden mb-6 p-4 rounded-lg text-sm font-medium"></div>
+        <!-- Global Alert / Notification -->
+        <div id="globalAlert" class="hidden p-4 rounded-xl text-sm font-medium border shadow-sm transition"></div>
 
-        <div id="tab-content-soal" class="space-y-10">
-            <section>
-                <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <span>📋</span> Soal yang Sudah Ada (Berdasarkan Halaman)
-                </h2>
-                <div id="existing-soal-list" class="space-y-6">
-                    <p class="text-sm text-slate-500 italic">Memuat daftar soal...</p>
+        <!-- ================= VIEW 1: KELOLA SOAL ================= -->
+        <div id="viewSoal" class="space-y-6">
+            <div class="flex items-center justify-between">
+                <h2 class="text-lg font-bold text-slate-900">Daftar Pertanyaan & Section</h2>
+                <div class="flex items-center gap-2">
+                    <button onclick="addSection()"
+                        class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3.5 py-2 rounded-xl transition flex items-center gap-2 shadow-sm">
+                        <i class="fa-solid fa-layer-group text-indigo-600"></i> Section Baru
+                    </button>
+                    <button onclick="openQuestionModal()"
+                        class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 rounded-xl transition flex items-center gap-2 shadow-sm shadow-indigo-200">
+                        <i class="fa-solid fa-plus"></i> Tambah Soal
+                    </button>
                 </div>
-            </section>
+            </div>
 
-            <hr class="border-slate-200">
+            <!-- Section Pages Container -->
+            <div id="pagesContainer" class="space-y-8">
+                <!-- Render Halaman & Soal secara Dinamis via JavaScript -->
+            </div>
 
-            <section>
-                <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-                    <div>
-                        <h2 class="text-lg font-bold text-slate-800">Tambah Soal Baru</h2>
-                        <p class="text-xs text-slate-500">Buat soal manual atau import secara instan dari dokumen Word
-                            (.docx).</p>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <button type="button" onclick="openImportModal()"
-                            class="px-3 py-2 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-xs font-semibold hover:bg-blue-100 transition flex items-center gap-1.5">
-                            <span>📄</span> Import Word (.docx)
-                        </button>
-                        <button type="button" onclick="addQuestionCard()"
-                            class="px-3 py-2 bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-lg text-xs font-semibold hover:bg-indigo-100 transition flex items-center gap-1.5">
-                            <span>+</span> Kartu Manual
-                        </button>
-                    </div>
+            <!-- Empty State -->
+            <div id="emptyStateSoal"
+                class="hidden text-center py-16 bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
+                <div
+                    class="w-16 h-16 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+                    <i class="fa-solid fa-clipboard-question"></i>
+                </div>
+                <h3 class="text-base font-bold text-slate-900">Belum Ada Soal</h3>
+                <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">Mulai buat pertanyaan untuk form atau section
+                    halaman pertama Anda sekarang.</p>
+                <button onclick="openQuestionModal()"
+                    class="mt-5 inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow-sm">
+                    <i class="fa-solid fa-plus"></i> Buat Soal Pertama
+                </button>
+            </div>
+        </div>
+
+        <!-- ================= VIEW 2: SETTING FORM ================= -->
+        <div id="viewSetting" class="hidden space-y-6">
+            <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6">
+                <div>
+                    <h2 class="text-base font-bold text-slate-900">Pengaturan Form</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Kelola konfigurasi ujian, durasi, token, dan banner form Anda.</p>
                 </div>
 
-                <form id="form-create-soal" onsubmit="handleSubmitSoal(event)" novalidate>
-                    <div id="questions-container" class="space-y-6"></div>
+                <hr class="border-slate-100">
 
-                    <div class="mt-8 flex justify-end">
-                        <button type="submit" id="btn-submit"
-                            class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-md transition text-sm flex items-center gap-2">
-                            🚀 Simpan Semua Soal Manual
+                <!-- Form Setting Inputs -->
+                <form id="formSettingForm" onsubmit="saveFormSetting(event)" class="space-y-5">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Token Respon</label>
+                            <input type="text" id="settingTokenRespon" placeholder="Contoh: TOKEN123"
+                                class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-600">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Durasi (Menit)</label>
+                            <input type="number" id="settingDuration" min="0" placeholder="60"
+                                class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-600">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Waktu Mulai (Start At)</label>
+                            <input type="datetime-local" id="settingStartAt"
+                                class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-600">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Warna Tema</label>
+                            <input type="color" id="settingThemeColor" value="#4f46e5"
+                                class="w-full h-11 rounded-xl border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:border-indigo-600 cursor-pointer bg-white">
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-3 pt-2">
+                        <input type="checkbox" id="settingIsRandom"
+                            class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300">
+                        <label for="settingIsRandom" class="text-xs font-semibold text-slate-700">Acak Soal (Randomized Questions)</label>
+                    </div>
+
+                    <div class="pt-4 flex justify-end">
+                        <button type="submit"
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition shadow-sm">
+                            Simpan Perubahan Setting
                         </button>
                     </div>
                 </form>
-            </section>
-        </div>
 
-        <div id="tab-content-respon" class="hidden space-y-8">
-            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
-                <div>
-                    <h3 class="text-2xl font-extrabold text-slate-800" id="stat-total-submit">0</h3>
-                    <p class="text-xs text-slate-500 font-medium mt-1">Total Tanggapan Masuk</p>
-                </div>
-                <div class="flex items-center gap-2 flex-wrap">
-                    <button onclick="switchResponSubTab('ringkasan')" id="btn-subtab-ringkasan"
-                        class="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-semibold border border-indigo-100">
-                        Ringkasan / Agregat
-                    </button>
-                    <button onclick="switchResponSubTab('detail')" id="btn-subtab-detail"
-                        class="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-semibold hover:bg-slate-200">
-                        Daftar Responden
-                    </button>
-                    
-                    <!-- TOMBOL DOWNLOAD EXCEL TAMBAHAN -->
-                    <button onclick="downloadExcel()" id="btn-download-excel"
-                        class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center gap-1.5">
-                        <span>📊</span> Download Excel
-                    </button>
-                </div>
-            </div>
+                <hr class="border-slate-100">
 
-            <div id="respon-subcontent-ringkasan" class="space-y-6">
-                <div id="respon-aggregate-container" class="space-y-6">
-                    <p class="text-sm text-slate-500 italic">Memuat statistik jawaban...</p>
-                </div>
-            </div>
-
-            <div id="respon-subcontent-detail" class="hidden space-y-4">
-                <div
-                    class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+                <!-- Banner Upload Section -->
+                <div class="space-y-4">
                     <div>
-                        <span
-                            class="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-100"
-                            id="current-respondent-badge">Responden 0 dari 0</span>
-                        <h4 class="font-bold text-slate-800 text-sm mt-1" id="current-respondent-id">Submit ID: -</h4>
+                        <h3 class="text-sm font-bold text-slate-900">Banner Form</h3>
+                        <p class="text-xs text-slate-500">Unggah banner berformat JPG, PNG, atau WEBP (Maksimal 5MB).</p>
                     </div>
 
-                    <div class="flex items-center gap-2">
-                        <button id="btn-prev-respondent" onclick="navigateRespondent(-1)"
-                            class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 rounded-lg text-xs font-semibold">◀
-                            Prev</button>
-                        <button id="btn-next-respondent" onclick="navigateRespondent(1)"
-                            class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold shadow-sm">Next
-                            ▶</button>
+                    <div id="bannerPreviewContainer" class="hidden mb-3">
+                        <img id="currentBannerImg" src="" alt="Banner Preview" class="h-40 w-full object-cover rounded-xl border border-slate-200">
                     </div>
-                </div>
 
-                <div id="respon-detail-cards-container" class="space-y-4">
-                    <p class="p-4 text-xs text-slate-400 italic bg-white rounded-xl border border-slate-200">Memuat
-                        detail respon...</p>
+                    <div class="flex items-center gap-3">
+                        <input type="file" id="bannerFileInput" accept=".jpg, .jpeg, .png, .webp"
+                            class="text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
+                        <button type="button" onclick="uploadBannerFile()"
+                            class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold px-4 py-2 rounded-xl transition shadow-sm">
+                            Upload Banner
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     </main>
 
-    <div id="modal-import-word"
-        class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 space-y-4 relative">
-            <div class="flex justify-between items-center border-b pb-3">
-                <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">📄 Import Soal dari Word</h3>
-                <button onclick="closeImportModal()"
-                    class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
-            </div>
-            <form id="form-import-docx" onsubmit="handleImportWord(event)" novalidate class="space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Pilih File .docx</label>
-                    <input type="file" id="input-docx-file" accept=".docx" required
-                        class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
-                </div>
-                <div class="flex justify-end gap-2 pt-2 border-t">
-                    <button type="button" onclick="closeImportModal()"
-                        class="px-4 py-2 bg-slate-100 text-slate-600 text-xs font-semibold rounded-lg hover:bg-slate-200">Batal</button>
-                    <button type="submit" id="btn-submit-import"
-                        class="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 shadow-sm">📥
-                        Upload & Import</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div id="modal-edit-soal"
-        class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <!-- Modal Form Tambah/Edit Soal -->
+    <div id="questionModal"
+        class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4 overflow-y-auto">
         <div
-            class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-xl border border-slate-100 space-y-4 relative max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center border-b pb-3">
-                <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">✏️ Edit Soal</h3>
-                <button onclick="closeEditModal()"
-                    class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
+            class="bg-white rounded-2xl shadow-xl max-w-xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-150">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 id="modalTitle" class="text-base font-bold text-slate-900">Tambah Soal Baru</h3>
+                <button onclick="closeQuestionModal()" class="text-slate-400 hover:text-slate-600 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
             </div>
 
-            <form id="form-edit-soal" onsubmit="handleUpdateSoal(event)" novalidate class="space-y-4">
-                <input type="hidden" id="edit-soal-id">
+            <!-- Modal Body (Form Input) -->
+            <div class="p-6 overflow-y-auto space-y-5 flex-1">
+                <input type="hidden" id="editSoalId">
 
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div id="container-edit-question-text" class="md:col-span-2">
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Pertanyaan Teks</label>
-                        <input type="text" id="edit-soal-question" required
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                    </div>
+                <!-- Pertanyaan -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Pertanyaan</label>
+                    <textarea id="inputQuestion" rows="3" placeholder="Tulis pertanyaan soal di sini..."
+                        class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"></textarea>
+                </div>
 
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Tipe Soal -->
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Halaman (Page)</label>
-                        <input type="number" id="edit-soal-page" min="1" value="1" required
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Tipe Soal</label>
+                        <select id="inputType" onchange="toggleOptionBuilder()"
+                            class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-600 bg-white">
+                            <option value="radio">Pilihan Ganda (Radio)</option>
+                            <option value="checkbox">Kotak Centang (Checkbox)</option>
+                            <option value="rating">Rating (Skala)</option>
+                            <option value="text">Teks Singkat</option>
+                            <option value="textarea">Esai / Paragraf</option>
+                        </select>
                     </div>
-
-                    <div id="container-edit-soal-score" class="hidden">
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Skor Soal</label>
-                        <input type="number" id="edit-soal-score" step="0.1"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                            placeholder="0">
+                    <input type="hidden" id="inputPage" value="1">
+                    <!-- Bobot Nilai (Score) -->
+                    <div id="modalScoreContainer" class="hidden">
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Bobot Nilai</label>
+                        <input type="number" id="inputScore" min="0" value="1"
+                            class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-600">
                     </div>
                 </div>
 
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Tipe Pertanyaan</label>
-                    <select id="edit-soal-type" onchange="toggleEditOptionSection()"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
-                        <option value="radio">Pilihan Ganda (Radio)</option>
-                        <option value="checkbox">Kotak Centang (Checkbox)</option>
-                        <option value="text">Isian Teks Singkat</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Gambar Soal (Opsional / Biarkan
-                        kosong jika tidak diubah)</label>
-                    <div id="edit-soal-current-image" class="mb-2"></div>
-                    <input type="file" id="edit-soal-image" accept="image/*"
-                        class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
-                </div>
-
-                <div id="edit-options-section" class="pt-3 border-t border-slate-100">
-                    <div class="flex justify-between items-center mb-2">
-                        <label class="block text-xs font-bold text-slate-700">Pilihan / Opsi Jawaban</label>
-                        <button type="button" onclick="addEditOptionRow()"
-                            class="text-xs text-indigo-600 hover:underline font-semibold">+ Tambah Opsi</button>
+                <!-- Gambar & Audio Opsional -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">URL Gambar (Opsional)</label>
+                        <input type="text" id="inputImage" placeholder="https://..."
+                            class="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:outline-none focus:border-indigo-600">
                     </div>
-                    <div id="edit-options-list" class="space-y-3"></div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">URL Audio (Opsional)</label>
+                        <input type="text" id="inputAudio" placeholder="https://..."
+                            class="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:outline-none focus:border-indigo-600">
+                    </div>
                 </div>
 
-                <div class="flex justify-end gap-2 pt-2 border-t">
-                    <button type="button" onclick="closeEditModal()"
-                        class="px-4 py-2 bg-slate-100 text-slate-600 text-xs font-semibold rounded-lg hover:bg-slate-200">Batal</button>
-                    <button type="submit" id="btn-submit-edit"
-                        class="px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 shadow-sm">💾
-                        Simpan Perubahan</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div id="modal-setting-form"
-        class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 space-y-4 relative">
-            <div class="flex justify-between items-center border-b pb-3">
-                <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">⚙️ Setting Form</h3>
-                <button onclick="closeSettingModal()"
-                    class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
-            </div>
-
-            <form id="form-update-setting" onsubmit="handleSaveSetting(event)" novalidate class="space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Durasi Pengerjaan (Menit)</label>
-                    <input type="number" id="setting-duration" min="1" required placeholder="Contoh: 60"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                <!-- Wajib Diisi Switch -->
+                <div class="flex items-center gap-3 pt-2">
+                    <input type="checkbox" id="inputIsRequired"
+                        class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300">
+                    <label for="inputIsRequired" class="text-xs font-semibold text-slate-700">Pertanyaan ini wajib diisi</label>
                 </div>
 
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Waktu Mulai (Start At)</label>
-                    <input type="datetime-local" id="setting-start-at" required
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                </div>
-
-                <div class="flex items-center gap-2 pt-1">
-                    <input type="checkbox" id="setting-is-random"
-                        class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer">
-                    <label for="setting-is-random" class="text-xs font-semibold text-slate-700 cursor-pointer">
-                        Acak Urutan Soal & Option (Is Random)
-                    </label>
-                </div>
-
-                <div class="flex justify-end gap-2 pt-3 border-t">
-                    <button type="button" onclick="closeSettingModal()"
-                        class="px-4 py-2 bg-slate-100 text-slate-600 text-xs font-semibold rounded-lg hover:bg-slate-200">Batal</button>
-                    <button type="submit" id="btn-submit-setting"
-                        class="px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 shadow-sm">💾
-                        Simpan Setting</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div id="modal-share-form"
-        class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-slate-100 space-y-4 relative">
-            <div class="flex justify-between items-center border-b pb-3">
-                <h3 class="font-bold text-slate-800 text-base flex items-center gap-2" id="share-modal-title">
-                    🔗 Bagikan Form
-                </h3>
-                <button onclick="closeShareModal()"
-                    class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
-            </div>
-
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Tautan Link</label>
-                    <div class="flex gap-2">
-                        <input type="text" id="share-link-input" readonly
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono bg-slate-50 text-slate-700 focus:outline-none">
-                        <button onclick="copyShareModalLink()" id="btn-modal-copy"
-                            class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition flex-shrink-0">
-                            Salin
+                <!-- Opsi Jawaban Container -->
+                <div id="optionSection" class="border-t border-slate-100 pt-5 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-bold text-slate-700 uppercase tracking-wider">Pilihan Opsi Jawaban</label>
+                        <button type="button" onclick="addOptionRow()"
+                            class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                            <i class="fa-solid fa-plus text-[10px]"></i> Tambah Opsi
                         </button>
                     </div>
+                    <div id="optionsListContainer" class="space-y-2.5"></div>
                 </div>
+            </div>
 
-                <div class="flex flex-col items-center justify-center border-t border-slate-100 pt-4 space-y-3">
-                    <label class="block text-xs font-semibold text-slate-700">Scan QR Code</label>
-
-                    <div id="qrcode-container" class="p-3 bg-white border border-slate-200 rounded-xl shadow-sm"></div>
-
-                    <button onclick="downloadQRCode()"
-                        class="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center justify-center gap-1.5">
-                        <span>📥</span> Unduh QR Code (.png)
-                    </button>
-                </div>
+            <!-- Modal Footer -->
+            <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <button onclick="closeQuestionModal()"
+                    class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-200 transition">Batal</button>
+                <button onclick="saveQuestionData()"
+                    class="px-5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition shadow-sm">Simpan Soal</button>
             </div>
         </div>
     </div>
 
+    <!-- JavaScript Integrasi Backend -->
     <script>
-        const API_BASE_URL = 'http://localhost:4000';
-        const token = localStorage.getItem('token');
-
-        if (!token) window.location.href = 'index.html';
+        const API_URL = 'http://localhost:3001';
 
         const urlParams = new URLSearchParams(window.location.search);
-        const formSlug = urlParams.get('form_slug');
-        const formId = urlParams.get('form_id');
+        const formSlugParam = urlParams.get('form_slug') || 'testing-1789868596072';
 
-        if (!formSlug || !formId) {
-            alert('Parameter form_slug atau form_id tidak ditemukan!');
-            window.location.href = 'my-form.html';
+        let currentForm = null;
+        let pagesSoalData = [];
+        let activeSectionPage = 1;
+
+        function getAuthToken() {
+            return localStorage.getItem('token') || '';
         }
 
-        document.getElementById('form-slug-badge').textContent = `Slug: ${formSlug}`;
-        const headers = { 'Authorization': `Bearer ${token}` };
-
-        let currentTokenCollab = null;
-        let globalSoalCache = [];
-        let currentScoreType = 'none';
-        let currentFormData = null;
-        let qrcodeObj = null;
+        function showGlobalAlert(message, type = 'success') {
+            const alertEl = document.getElementById('globalAlert');
+            alertEl.className = `p-4 rounded-xl text-sm font-medium border shadow-sm transition ${type === 'error' ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                }`;
+            alertEl.textContent = message;
+            alertEl.classList.remove('hidden');
+            setTimeout(() => alertEl.classList.add('hidden'), 5000);
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
-            const savedScoreType = localStorage.getItem(`score_type_${formSlug}`) || 'none';
-            currentScoreType = savedScoreType;
-
-            const selectEl = document.getElementById('select-score-type');
-            if (selectEl) selectEl.value = savedScoreType;
-
-            const btnSaveGenius = document.getElementById('btn-save-genius');
-            if (btnSaveGenius && savedScoreType === 'genius') btnSaveGenius.classList.remove('hidden');
-
-            fetchExistingSoal();
-            addQuestionCard();
+            fetchFormAndSoalDetail();
         });
 
-        // ==========================================
-        // FUNGSI TAMBAHAN UNTUK DOWNLOAD EXCEL
-        // ==========================================
-        async function downloadExcel() {
-            const btnDownload = document.getElementById('btn-download-excel');
-            const originalContent = btnDownload.innerHTML;
+        // Tab Switcher Function
+        function switchTab(tab) {
+            const viewSoal = document.getElementById('viewSoal');
+            const viewSetting = document.getElementById('viewSetting');
+            const tabSoalBtn = document.getElementById('tabSoalBtn');
+            const tabSettingBtn = document.getElementById('tabSettingBtn');
 
-            try {
-                btnDownload.disabled = true;
-                btnDownload.innerHTML = `<span>⏳</span> Mengunduh...`;
-
-                const res = await fetch(`${API_BASE_URL}/form/submit/export-excel?form_slug=${encodeURIComponent(formSlug)}`, {
-                    method: 'GET',
-                    headers: headers
-                });
-
-                if (!res.ok) {
-                    const errData = await res.json().catch(() => ({}));
-                    throw new Error(errData.message || 'Gagal mengunduh file Excel');
-                }
-
-                // Ambil filename dari header Content-Disposition jika tersedia
-                const contentDisposition = res.headers.get('Content-Disposition');
-                let filename = `Hasil_Submit_${formSlug}_${Date.now()}.xlsx`;
-
-                if (contentDisposition && contentDisposition.includes('filename=')) {
-                    const match = contentDisposition.match(/filename="?([^";]+)"?/);
-                    if (match && match[1]) {
-                        filename = match[1];
-                    }
-                }
-
-                // Buat blob dari stream data
-                const blob = await res.blob();
-                const blobUrl = window.URL.createObjectURL(blob);
-
-                // Buat elemen <a> sementara untuk trigger download
-                const link = document.createElement('a');
-                link.href = blobUrl;
-                link.download = filename;
-                document.body.appendChild(link);
-                link.click();
-
-                // Clean up
-                document.body.removeChild(link);
-                window.URL.revokeObjectURL(blobUrl);
-
-            } catch (err) {
-                console.error(err);
-                showAlert(err.message || 'Terjadi kesalahan saat mengunduh Excel.');
-            } finally {
-                btnDownload.disabled = false;
-                btnDownload.innerHTML = originalContent;
-            }
-        }
-
-        function switchTab(tabName) {
-            const btnSoal = document.getElementById('tab-btn-soal');
-            const btnRespon = document.getElementById('tab-btn-respon');
-            const contentSoal = document.getElementById('tab-content-soal');
-            const contentRespon = document.getElementById('tab-content-respon');
-
-            if (tabName === 'soal') {
-                btnSoal.className = "py-3 px-1 border-b-2 border-indigo-600 font-bold text-indigo-600 text-sm flex items-center gap-2 transition";
-                btnRespon.className = "py-3 px-1 border-b-2 border-transparent font-medium text-slate-500 hover:text-slate-800 text-sm flex items-center gap-2 transition";
-                contentSoal.classList.remove('hidden');
-                contentRespon.classList.add('hidden');
+            if (tab === 'soal') {
+                viewSoal.classList.remove('hidden');
+                viewSetting.classList.add('hidden');
+                tabSoalBtn.className = "px-3.5 py-1.5 rounded-lg transition bg-white text-indigo-600 shadow-sm";
+                tabSettingBtn.className = "px-3.5 py-1.5 rounded-lg transition text-slate-600 hover:text-slate-900";
             } else {
-                btnRespon.className = "py-3 px-1 border-b-2 border-indigo-600 font-bold text-indigo-600 text-sm flex items-center gap-2 transition";
-                btnSoal.className = "py-3 px-1 border-b-2 border-transparent font-medium text-slate-500 hover:text-slate-800 text-sm flex items-center gap-2 transition";
-                contentRespon.classList.remove('hidden');
-                contentSoal.classList.add('hidden');
-
-                fetchAggregateSubmitData();
-                fetchDetailSubmitData();
+                viewSoal.classList.add('hidden');
+                viewSetting.classList.remove('hidden');
+                tabSettingBtn.className = "px-3.5 py-1.5 rounded-lg transition bg-white text-indigo-600 shadow-sm";
+                tabSoalBtn.className = "px-3.5 py-1.5 rounded-lg transition text-slate-600 hover:text-slate-900";
+                populateSettingForm();
             }
         }
 
-        function switchResponSubTab(subTab) {
-            const btnRingkasan = document.getElementById('btn-subtab-ringkasan');
-            const btnDetail = document.getElementById('btn-subtab-detail');
-            const contentRingkasan = document.getElementById('respon-subcontent-ringkasan');
-            const contentDetail = document.getElementById('respon-subcontent-detail');
-
-            if (subTab === 'ringkasan') {
-                btnRingkasan.className = "px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-semibold border border-indigo-100";
-                btnDetail.className = "px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-semibold hover:bg-slate-200";
-                contentRingkasan.classList.remove('hidden');
-                contentDetail.classList.add('hidden');
-            } else {
-                btnDetail.className = "px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-semibold border border-indigo-100";
-                btnRingkasan.className = "px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-semibold hover:bg-slate-200";
-                contentDetail.classList.remove('hidden');
-                contentRingkasan.classList.add('hidden');
-            }
-        }
-
-        function showAlert(message, isSuccess = false) {
-            const alertBox = document.getElementById('alert-box');
-            alertBox.textContent = message;
-            alertBox.className = `mb-6 p-4 rounded-lg text-sm font-medium ${isSuccess ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'}`;
-            alertBox.classList.remove('hidden');
-            alertBox.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        function hideAlert() {
-            document.getElementById('alert-box').classList.add('hidden');
-        }
-
-        async function fetchExistingSoal() {
+        async function fetchFormAndSoalDetail() {
             try {
-                const res = await fetch(`${API_BASE_URL}/form/slug?slug=${encodeURIComponent(formSlug)}`, { headers });
-                const result = await res.json();
-
-                const container = document.getElementById('existing-soal-list');
-                container.innerHTML = '';
-
-                if (result.data) {
-                    currentFormData = result.data; // Menyimpan data form langsung
-                    if (result.data.title) document.getElementById('form-title-header').textContent = result.data.title;
-                    if (result.data.token_collab) currentTokenCollab = result.data.token_collab;
-                }
-
-                const rawPagesList = result.data && result.data.soal ? result.data.soal : [];
-                const pagesGroup = {};
-                globalSoalCache = [];
-
-                if (Array.isArray(rawPagesList) && rawPagesList.length > 0) {
-                    rawPagesList.forEach(group => {
-                        if (group.soal && Array.isArray(group.soal)) {
-                            const pageNum = (group.page === null || group.page === undefined) ? 1 : group.page;
-                            if (!pagesGroup[pageNum]) pagesGroup[pageNum] = [];
-                            group.soal.forEach(s => {
-                                const questionObj = { ...s, page: parseInt(pageNum) };
-                                pagesGroup[pageNum].push(questionObj);
-                                globalSoalCache.push(questionObj);
-                            });
-                        } else {
-                            const pageNum = (group.page === null || group.page === undefined) ? 1 : parseInt(group.page);
-                            if (!pagesGroup[pageNum]) pagesGroup[pageNum] = [];
-                            const questionObj = { ...group, page: pageNum };
-                            pagesGroup[pageNum].push(questionObj);
-                            globalSoalCache.push(questionObj);
-                        }
-                    });
-                }
-
-                const totalSoal = globalSoalCache.length;
-
-                if (res.ok && totalSoal > 0) {
-                    let globalIndex = 0;
-
-                    Object.keys(pagesGroup).sort((a, b) => Number(a) - Number(b)).forEach(pageNum => {
-                        const pageSection = document.createElement('div');
-                        pageSection.className = "space-y-4 bg-slate-100/70 p-4 rounded-2xl border border-slate-200";
-
-                        let pageHeader = `<div class="flex items-center justify-between border-b border-slate-200 pb-2 mb-3">
-                            <span class="text-xs font-bold text-slate-700 bg-white px-3 py-1 rounded-md border border-slate-200 shadow-sm">
-                               📄 Halaman ${pageNum}
-                            </span>
-                            <span class="text-[11px] text-slate-500 font-medium">${pagesGroup[pageNum].length} Soal</span>
-                        </div>`;
-
-                        let cardsHtml = '';
-                        pagesGroup[pageNum].forEach(soal => {
-                            globalIndex++;
-                            let scoreBadgeHtml = '';
-                            if (currentScoreType === 'genius') {
-                                const geniusScorePerSoal = (100 / totalSoal).toFixed(1);
-                                scoreBadgeHtml = `<span class="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-200">🎯 ${geniusScorePerSoal} Pts (Genius)</span>`;
-                            } else if (currentScoreType === 'manual') {
-                                const manualScore = soal.score !== undefined && soal.score !== null ? soal.score : 0;
-                                scoreBadgeHtml = `<span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200">⭐ ${manualScore} Pts</span>`;
-                            }
-
-                            let optionsHtml = '';
-                            if (soal.options && soal.options.length > 0) {
-                                optionsHtml = `<ul class="mt-3 space-y-2 pl-2 text-xs text-slate-600">` +
-                                    soal.options.map(opt => `
-                                        <li class="flex items-center gap-2">
-                                            <span class="w-2 h-2 rounded-full ${opt.is_correct ? 'bg-green-500' : 'bg-slate-300'}"></span>
-                                            <span class="${opt.is_correct ? 'font-bold text-green-700' : ''}">${opt.value}</span>
-                                            ${currentScoreType === 'manual' && opt.score !== undefined && opt.score !== null ? `<span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono font-semibold">Skor: ${opt.score}</span>` : ''}
-                                            ${opt.is_correct ? '<span class="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold">Jawaban Benar</span>' : ''}
-                                            ${opt.image ? `<img src="${API_BASE_URL}${opt.image}" class="h-8 w-8 object-cover rounded border ml-2" />` : ''}
-                                        </li>
-                                    `).join('') + `</ul>`;
-                            }
-
-                            cardsHtml += `
-                                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                                    <div class="flex items-start justify-between gap-4">
-                                        <div class="flex-1">
-                                            <div class="flex items-center gap-2 flex-wrap">
-                                                <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600 uppercase font-mono tracking-wider">${soal.type}</span>
-                                                ${scoreBadgeHtml}
-                                            </div>
-                                            <h4 class="font-semibold text-slate-800 mt-2 text-sm">${globalIndex}. ${soal.question}</h4>
-                                        </div>
-                                        <div class="flex items-center gap-3 flex-shrink-0">
-                                            ${soal.image ? `<img src="${API_BASE_URL}${soal.image}" class="h-16 w-16 object-cover rounded-lg border shadow-sm" />` : ''}
-                                            <button onclick="deleteSoal(${soal.id})" 
-                                                class="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-semibold transition border border-red-200 flex items-center gap-1">
-                                                🗑️ <span class="hidden sm:inline">Hapus</span>
-                                            </button>
-                                            <button onclick="openEditModal(${soal.id})" 
-                                                class="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-semibold transition border border-blue-200 flex items-center gap-1">
-                                                ✏️ <span class="hidden sm:inline">Edit</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    ${optionsHtml}
-                                </div>
-                            `;
-                        });
-
-                        pageSection.innerHTML = pageHeader + `<div class="space-y-3">${cardsHtml}</div>`;
-                        container.appendChild(pageSection);
-                    });
-
-                } else {
-                    container.innerHTML = `<p class="text-xs text-slate-400 italic">Belum ada soal pada form ini.</p>`;
-                }
-            } catch (err) {
-                console.error(err);
-                document.getElementById('existing-soal-list').innerHTML = `<p class="text-xs text-red-500">Gagal mengambil data soal eksisting.</p>`;
-            }
-        }
-
-        async function deleteSoal(soalId) {
-            if (!confirm('Apakah Anda yakin ingin menghapus soal ini?')) return;
-            hideAlert();
-
-            try {
-                const res = await fetch(`${API_BASE_URL}/form/soal/${soalId}`, {
-                    method: 'DELETE',
-                    headers: headers
+                const token = getAuthToken();
+                const response = await fetch(`${API_URL}/form/slug?slug=${formSlugParam}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
                 });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.message || "Gagal mengambil data form");
 
-                const result = await res.json();
-                if (res.ok) {
-                    showAlert(result.message || 'Berhasil Menghapus Soal', true);
-                    await fetchExistingSoal();
-                    if (currentScoreType === 'genius') await syncGeniusScores();
-                } else {
-                    showAlert(result.message || 'Gagal menghapus soal');
-                }
-            } catch (err) {
-                console.error(err);
-                showAlert('Terjadi kesalahan koneksi saat menghapus soal.');
+                const responseData = result.data || result;
+                currentForm = responseData.form || responseData;
+                pagesSoalData = responseData.soal || [];
+                
+                document.getElementById('formTitleNav').textContent = currentForm.title || 'Formulir Ujian';
+                document.getElementById('formSlugNav').textContent = `slug: ${currentForm.slug || formSlugParam}`;
+                document.getElementById('formStatusSelect').value = currentForm.status || 'private';
+
+                renderPagesAndSoal();
+            } catch (error) {
+                console.error(error);
+                showGlobalAlert(error.message, 'error');
             }
         }
 
-        async function syncGeniusScores() {
-            if (globalSoalCache.length === 0) return;
-            const newScorePerSoal = parseFloat((100 / globalSoalCache.length).toFixed(2));
-
-            for (const soal of globalSoalCache) {
-                const formData = new FormData();
-                const payload = {
-                    soal: {
-                        question: soal.question,
-                        type: soal.type,
-                        score: newScorePerSoal,
-                        page: parseInt(soal.page) || 1
+        // Ubah Status Publik / Privat (/form/public endpoint)
+        async function updateFormStatus(status) {
+            try {
+                const token = getAuthToken();
+                const response = await fetch(`${API_URL}/form?form_slug=${currentForm.slug}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
                     },
-                    options: (soal.options || []).map(o => ({
-                        id: o.id,
-                        value: o.value,
-                        is_correct: o.is_correct,
-                        score: o.score || 0
-                    }))
-                };
-                formData.append('data', JSON.stringify(payload));
-
-                await fetch(`${API_BASE_URL}/form/soal/${soal.id}`, {
-                    method: 'PATCH',
-                    headers: { 'Authorization': `Bearer ${token}` },
-                    body: formData
+                    body: JSON.stringify({ status })
                 });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.message || "Gagal mengubah status form");
+                showGlobalAlert(result.message || `Berhasil mengubah status ke ${status}`);
+            } catch (error) {
+                console.error(error);
+                showGlobalAlert(error.message, 'error');
             }
         }
 
-        let qCounter = 0;
-        function addQuestionCard() {
-            qCounter++;
-            const qId = qCounter;
-            const container = document.getElementById('questions-container');
-            const card = document.createElement('div');
-            card.className = "question-card bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4";
-            card.setAttribute('data-qid', qId);
+        // Isi form setting dari currentForm
+        function populateSettingForm() {
+            if (!currentForm) return;
+            document.getElementById('settingTokenRespon').value = currentForm.token_respon || '';
+            document.getElementById('settingDuration').value = currentForm.duration || '';
+            if (currentForm.start_at) {
+                const date = new Date(currentForm.start_at);
+                document.getElementById('settingStartAt').value = date.toISOString().slice(0, 16);
+            }
+            document.getElementById('settingThemeColor').value = currentForm.theme_color || '#4f46e5';
+            document.getElementById('settingIsRandom').checked = Boolean(currentForm.is_random);
 
-            const isManual = currentScoreType === 'manual';
-
-            card.innerHTML = `
-                <div class="flex justify-between items-center border-b border-slate-100 pb-3">
-                  <span class="font-bold text-slate-700 text-sm flex items-center gap-2">
-                    <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 text-xs flex items-center justify-center">#</span> Soal Baru
-                  </span>
-                  <button type="button" onclick="removeQuestionCard(this)" class="text-xs text-red-500 hover:text-red-700 font-medium">Hapus Soal</button>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div class="md:col-span-2 q-text-wrapper">
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Pertanyaan Teks</label>
-                    <input type="text" class="q-question w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Isikan pertanyaan...">
-                  </div>
-
-                  <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Halaman (Page)</label>
-                    <input type="number" min="1" value="1" class="q-page w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                  </div>
-
-                  <div class="create-score-container ${isManual ? '' : 'hidden'}">
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Skor Soal</label>
-                    <input type="number" step="0.1" class="q-score w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="0">
-                  </div>
-
-                  <div class="md:col-span-4">
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Tipe Pertanyaan</label>
-                    <select class="q-type w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white" onchange="toggleOptionSection(this, ${qId})">
-                      <option value="radio">Pilihan Ganda (Radio)</option>
-                      <option value="checkbox">Kotak Centang (Checkbox)</option>
-                      <option value="text">Isian Teks Singkat</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label class="block text-xs font-semibold text-slate-600 mb-1">Gambar Pertanyaan (Opsional)</label>
-                  <input type="file" accept="image/*" class="q-image w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
-                </div>
-
-                <div id="options-section-${qId}" class="options-container pt-3 border-t border-slate-100">
-                  <div class="flex justify-between items-center mb-2">
-                    <label class="block text-xs font-bold text-slate-700">Pilihan / Opsi Jawaban</label>
-                    <button type="button" onclick="addOptionRow(${qId})" class="text-xs text-indigo-600 hover:underline font-semibold">+ Tambah Opsi</button>
-                  </div>
-                  <div id="options-list-${qId}" class="space-y-3"></div>
-                </div>
-            `;
-
-            container.appendChild(card);
-            addOptionRow(qId);
-            addOptionRow(qId);
+            if (currentForm.banner) {
+                const bannerImg = document.getElementById('currentBannerImg');
+                bannerImg.src = `${API_URL}/${currentForm.banner}`;
+                document.getElementById('bannerPreviewContainer').classList.remove('hidden');
+            }
         }
 
-        function removeQuestionCard(btn) {
-            const card = btn.closest('.question-card');
-            if (document.querySelectorAll('.question-card').length > 1) card.remove();
-            else alert('Minimal harus ada 1 soal!');
+        // Update Setting Form (/form/setting endpoint PATCH)
+        async function saveFormSetting(event) {
+            event.preventDefault();
+            const token_respon = document.getElementById('settingTokenRespon').value;
+            const duration = parseInt(document.getElementById('settingDuration').value) || 0;
+            const start_atVal = document.getElementById('settingStartAt').value;
+            const start_at = start_atVal ? new Date(start_atVal).getTime() : null;
+            const is_random = document.getElementById('settingIsRandom').checked;
+            const theme_color = document.getElementById('settingThemeColor').value;
+
+            try {
+                const token = getAuthToken();
+                const response = await fetch(`${API_URL}/form/setting?form_slug=${currentForm.slug}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ token_respon, duration, start_at, is_random, theme_color })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.message || "Gagal memperbarui pengaturan");
+
+                currentForm = result.data || currentForm;
+                showGlobalAlert(result.message || "Berhasil Update Pengaturan!");
+            } catch (error) {
+                console.error(error);
+                showGlobalAlert(error.message, 'error');
+            }
         }
 
-        function toggleOptionSection(selectEl, qId) {
-            const section = document.getElementById(`options-section-${qId}`);
-            if (selectEl.value === 'text') section.classList.add('hidden');
-            else section.classList.remove('hidden');
-        }
-
-        function addOptionRow(qId) {
-            const container = document.getElementById(`options-list-${qId}`);
-            const row = document.createElement('div');
-            row.className = "option-row flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200";
-
-            const isManual = currentScoreType === 'manual';
-
-            row.innerHTML = `
-                <input type="checkbox" class="opt-is-correct w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500" title="Tandai sebagai jawaban benar">
-                <input type="text" class="opt-value flex-1 px-3 py-1.5 border border-slate-300 rounded-md text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Teks opsi...">
-                <input type="number" class="opt-score create-score-container ${isManual ? '' : 'hidden'} w-20 px-2 py-1.5 border border-slate-300 rounded-md text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Skor" value="0">
-                <input type="file" accept="image/*" class="opt-image text-xs text-slate-500 w-44 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-slate-200">
-                <button type="button" onclick="this.closest('.option-row').remove()" class="text-xs text-red-500 hover:text-red-700 px-1 font-bold">✕</button>
-            `;
-
-            container.appendChild(row);
-        }
-
-        async function handleSubmitSoal(e) {
-            e.preventDefault();
-            hideAlert();
-
-            const btnSubmit = document.getElementById('btn-submit');
-            btnSubmit.disabled = true;
-            btnSubmit.textContent = '⏳ Menyimpan...';
-
-            const formData = new FormData();
-            const payloadData = [];
-            const questionCards = document.querySelectorAll('.question-card');
-
-            const totalExisting = globalSoalCache.length;
-            const totalNew = questionCards.length;
-            const grandTotalSoal = totalExisting + totalNew;
-            const geniusScorePerSoal = grandTotalSoal > 0 ? parseFloat((100 / grandTotalSoal).toFixed(2)) : 0;
-
-            let hasError = false;
-
-            questionCards.forEach((card) => {
-                const questionInput = card.querySelector('.q-question');
-                const questionText = questionInput.value.trim();
-                const type = card.querySelector('.q-type').value;
-                const pageInput = card.querySelector('.q-page');
-                const pageVal = pageInput ? parseInt(pageInput.value) || 1 : 1;
-                const qImageInput = card.querySelector('.q-image');
-
-                if (!questionText) {
-                    hasError = true;
-                    questionInput.classList.add('border-red-500');
-                } else {
-                    questionInput.classList.remove('border-red-500');
-                }
-
-                let finalScore = 0;
-                if (currentScoreType === 'genius') {
-                    finalScore = geniusScorePerSoal;
-                } else if (currentScoreType === 'manual') {
-                    const scoreVal = card.querySelector('.q-score')?.value;
-                    finalScore = scoreVal ? parseFloat(scoreVal) : 0;
-                }
-
-                const soalObject = {
-                    question: questionText,
-                    type: type,
-                    score: finalScore,
-                    page: pageVal
-                };
-
-                if (qImageInput.files && qImageInput.files[0]) {
-                    const file = qImageInput.files[0];
-                    formData.append('soal_images', file);
-                    soalObject.image_filename = file.name;
-                }
-
-                const optionsArray = [];
-                if (type !== 'text') {
-                    const optionRows = card.querySelectorAll('.option-row');
-                    optionRows.forEach((row) => {
-                        const valInput = row.querySelector('.opt-value');
-                        const val = valInput.value.trim();
-                        const isCorrect = row.querySelector('.opt-is-correct').checked;
-                        const scoreInput = row.querySelector('.opt-score');
-                        const optImageInput = row.querySelector('.opt-image');
-
-                        if (!val) {
-                            hasError = true;
-                            valInput.classList.add('border-red-500');
-                        } else {
-                            valInput.classList.remove('border-red-500');
-                        }
-
-                        const optObject = {
-                            value: val,
-                            is_correct: isCorrect,
-                            score: (currentScoreType === 'manual' && scoreInput) ? parseFloat(scoreInput.value || 0) : 0
-                        };
-
-                        if (optImageInput.files && optImageInput.files[0]) {
-                            const file = optImageInput.files[0];
-                            formData.append('option_images', file);
-                            optObject.image_filename = file.name;
-                        }
-
-                        optionsArray.push(optObject);
-                    });
-                }
-
-                payloadData.push({ soal: soalObject, options: optionsArray });
-            });
-
-            if (hasError) {
-                showAlert('Harap isi semua teks pertanyaan dan opsi jawaban yang masih kosong!');
-                btnSubmit.disabled = false;
-                btnSubmit.textContent = '🚀 Simpan Semua Soal Manual';
+        // Update Banner Form (/form/banner endpoint PATCH)
+        async function uploadBannerFile() {
+            const fileInput = document.getElementById('bannerFileInput');
+            if (!fileInput.files[0]) {
+                alert('Pilih file banner terlebih dahulu!');
                 return;
             }
 
-            const finalPayload = payloadData.length === 1 ? payloadData[0] : payloadData;
-            formData.append('data', JSON.stringify(finalPayload));
-
-            try {
-                const res = await fetch(`${API_BASE_URL}/form/soal?form_slug=${encodeURIComponent(formSlug)}`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` },
-                    body: formData
-                });
-
-                const result = await res.json();
-
-                if (res.ok) {
-                    if (currentScoreType === 'genius') await syncGeniusScores();
-
-                    showAlert(result.message || 'Soal berhasil disimpan!', true);
-                    document.getElementById('questions-container').innerHTML = '';
-                    addQuestionCard();
-                    fetchExistingSoal();
-                } else {
-                    showAlert(result.message || 'Gagal menyimpan soal');
-                }
-            } catch (err) {
-                console.error(err);
-                showAlert('Terjadi kesalahan koneksi.');
-            } finally {
-                btnSubmit.disabled = false;
-                btnSubmit.textContent = '🚀 Simpan Semua Soal Manual';
-            }
-        }
-
-        function openEditModal(soalId) {
-            const soal = globalSoalCache.find(s => s.id === soalId);
-            if (!soal) return alert('Data soal tidak ditemukan!');
-
-            document.getElementById('edit-soal-id').value = soal.id;
-            document.getElementById('edit-soal-question').value = soal.question;
-            document.getElementById('edit-soal-type').value = soal.type;
-            document.getElementById('edit-soal-page').value = soal.page || 1;
-
-            const scoreContainer = document.getElementById('container-edit-soal-score');
-            const scoreTextWrapper = document.getElementById('container-edit-question-text');
-            const scoreInput = document.getElementById('edit-soal-score');
-
-            if (currentScoreType === 'manual') {
-                scoreContainer.classList.remove('hidden');
-                scoreTextWrapper.className = "md:col-span-2";
-                scoreInput.value = soal.score !== undefined ? soal.score : 0;
-            } else {
-                scoreContainer.classList.add('hidden');
-                scoreTextWrapper.className = "md:col-span-3";
-                scoreInput.value = 0;
-            }
-
-            const imgContainer = document.getElementById('edit-soal-current-image');
-            if (soal.image) {
-                imgContainer.innerHTML = `<p class="text-[11px] text-slate-500 mb-1">Gambar saat ini:</p>
-            <img src="${API_BASE_URL}${soal.image}" class="h-16 w-16 object-cover rounded-lg border shadow-sm">`;
-            } else {
-                imgContainer.innerHTML = '';
-            }
-
-            const optionsList = document.getElementById('edit-options-list');
-            optionsList.innerHTML = '';
-
-            if (soal.options && soal.options.length > 0) {
-                soal.options.forEach(opt => {
-                    addEditOptionRow(opt);
-                });
-            }
-
-            toggleEditOptionSection();
-            document.getElementById('modal-edit-soal').classList.remove('hidden');
-        }
-
-        function closeEditModal() {
-            document.getElementById('modal-edit-soal').classList.add('hidden');
-            document.getElementById('form-edit-soal').reset();
-        }
-
-        function toggleEditOptionSection() {
-            const type = document.getElementById('edit-soal-type').value;
-            const section = document.getElementById('edit-options-section');
-            if (type === 'text') section.classList.add('hidden');
-            else section.classList.remove('hidden');
-        }
-
-        function addEditOptionRow(optData = null) {
-            const container = document.getElementById('edit-options-list');
-            const row = document.createElement('div');
-            row.className = "edit-option-row flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200";
-
-            const optId = optData ? optData.id : '';
-            const val = optData ? optData.value : '';
-            const isCorrect = optData ? optData.is_correct : false;
-            const scoreVal = optData && optData.score !== undefined ? optData.score : 0;
-            const isManual = currentScoreType === 'manual';
-
-            row.innerHTML = `
-                <input type="hidden" class="edit-opt-id" value="${optId}">
-                <input type="checkbox" class="edit-opt-is-correct w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500" ${isCorrect ? 'checked' : ''} title="Tandai sebagai jawaban benar">
-                <input type="text" class="edit-opt-value flex-1 px-3 py-1.5 border border-slate-300 rounded-md text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none" value="${val}" placeholder="Teks opsi...">
-                <input type="number" class="edit-opt-score ${isManual ? '' : 'hidden'} w-20 px-2 py-1.5 border border-slate-300 rounded-md text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none" value="${scoreVal}" placeholder="Skor">
-                <input type="file" accept="image/*" class="edit-opt-image text-xs text-slate-500 w-44 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-slate-200">
-                <button type="button" onclick="this.closest('.edit-option-row').remove()" class="text-xs text-red-500 hover:text-red-700 px-1 font-bold">✕</button>
-            `;
-
-            container.appendChild(row);
-        }
-
-        async function handleUpdateSoal(e) {
-            e.preventDefault();
-            hideAlert();
-
-            const soalId = document.getElementById('edit-soal-id').value;
-            const questionText = document.getElementById('edit-soal-question').value.trim();
-            const type = document.getElementById('edit-soal-type').value;
-            const pageVal = parseInt(document.getElementById('edit-soal-page').value) || 1;
-            const qImageInput = document.getElementById('edit-soal-image');
-
-            if (!questionText) return alert('Pertanyaan teks tidak boleh kosong!');
-
-            const btnSubmit = document.getElementById('btn-submit-edit');
-            btnSubmit.disabled = true;
-            btnSubmit.textContent = '⏳ Menyimpan...';
-
-            let finalScore = 0;
-            if (currentScoreType === 'genius') {
-                const totalSoal = globalSoalCache.length;
-                finalScore = totalSoal > 0 ? parseFloat((100 / totalSoal).toFixed(2)) : 0;
-            } else if (currentScoreType === 'manual') {
-                const soalScoreInput = document.getElementById('edit-soal-score').value;
-                finalScore = soalScoreInput !== "" ? parseFloat(soalScoreInput) : 0;
-            }
-
             const formData = new FormData();
-            const soalObject = {
-                question: questionText,
-                type: type,
-                score: finalScore,
-                page: pageVal
-            };
-
-            if (qImageInput.files && qImageInput.files[0]) {
-                const file = qImageInput.files[0];
-                formData.append('soal_images', file);
-                soalObject.image_filename = file.name;
-            }
-
-            const optionsArray = [];
-            if (type !== 'text') {
-                const optionRows = document.querySelectorAll('.edit-option-row');
-                optionRows.forEach((row) => {
-                    const optId = row.querySelector('.edit-opt-id').value;
-                    const val = row.querySelector('.edit-opt-value').value.trim();
-                    const isCorrect = row.querySelector('.edit-opt-is-correct').checked;
-                    const scoreVal = row.querySelector('.edit-opt-score').value;
-                    const optImageInput = row.querySelector('.edit-opt-image');
-
-                    if (val) {
-                        const optObject = {
-                            id: optId ? Number(optId) : undefined,
-                            value: val,
-                            is_correct: isCorrect,
-                            score: (currentScoreType === 'manual' && scoreVal !== "") ? parseFloat(scoreVal) : 0
-                        };
-
-                        if (optImageInput.files && optImageInput.files[0]) {
-                            const file = optImageInput.files[0];
-                            formData.append('option_images', file);
-                            optObject.image_filename = file.name;
-                        }
-
-                        optionsArray.push(optObject);
-                    }
-                });
-            }
-
-            const payload = {
-                soal: soalObject,
-                options: optionsArray
-            };
-
-            formData.append('data', JSON.stringify(payload));
+            formData.append('banner', fileInput.files[0]);
 
             try {
-                const res = await fetch(`${API_BASE_URL}/form/soal/${soalId}`, {
+                const token = getAuthToken();
+                const response = await fetch(`${API_URL}/form/banner?form_slug=${currentForm.slug}`, {
                     method: 'PATCH',
                     headers: { 'Authorization': `Bearer ${token}` },
                     body: formData
                 });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.message || "Gagal mengunggah banner");
 
-                const result = await res.json();
-
-                if (res.ok) {
-                    showAlert(result.message || 'Soal berhasil diperbarui!', true);
-                    closeEditModal();
-                    fetchExistingSoal();
-                } else {
-                    showAlert(result.message || 'Gagal memperbarui soal');
-                }
-            } catch (err) {
-                console.error(err);
-                showAlert('Terjadi kesalahan koneksi saat memperbarui soal.');
-            } finally {
-                btnSubmit.disabled = false;
-                btnSubmit.textContent = '💾 Simpan Perubahan';
+                showGlobalAlert("Banner berhasil diperbarui!");
+                fetchFormAndSoalDetail();
+            } catch (error) {
+                console.error(error);
+                showGlobalAlert(error.message, 'error');
             }
         }
 
-        async function fetchAggregateSubmitData() {
-            try {
-                const res = await fetch(`${API_BASE_URL}/form/submit?form_slug=${encodeURIComponent(formSlug)}`, { headers });
-                const result = await res.json();
-                if (!res.ok) throw new Error(result.message || 'Gagal mengambil data respon');
-
-                const data = result.data || {};
-                const totalSubmit = data.total_submit !== undefined ? data.total_submit : 0;
-
-                document.getElementById('stat-total-submit').textContent = totalSubmit;
-                document.getElementById('badge-total-submit').textContent = totalSubmit;
-
-                const container = document.getElementById('respon-aggregate-container');
-                container.innerHTML = '';
-
-                const rawPages = data.questions || [];
-
-                const allQuestions = [];
-                if (Array.isArray(rawPages)) {
-                    rawPages.forEach(pageGroup => {
-                        if (pageGroup && Array.isArray(pageGroup.soal)) {
-                            pageGroup.soal.forEach(s => {
-                                allQuestions.push({
-                                    ...s,
-                                    page: pageGroup.page
-                                });
-                            });
-                        }
-                    });
-                }
-
-                if (allQuestions.length === 0) {
-                    container.innerHTML = `<p class="text-sm text-slate-400 italic">Belum ada soal atau jawaban tersedia.</p>`;
-                    return;
-                }
-
-                allQuestions.forEach((q, idx) => {
-                    const card = document.createElement('div');
-                    card.className = "bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3";
-
-                    const questionTitle = q.question || q.title || `Pertanyaan ${idx + 1}`;
-                    const optionsList = q.options || [];
-                    const textAnswersList = q.text_answers || q.answers || [];
-
-                    let bodyContent = '';
-
-                    if (Array.isArray(optionsList) && optionsList.length > 0) {
-                        bodyContent = optionsList.map(opt => {
-                            const count = opt.total_answer !== undefined ? opt.total_answer : (opt.count || 0);
-                            const optionText = opt.value || opt.option_value || 'Opsi';
-                            const percentage = totalSubmit > 0 ? Math.round((count / totalSubmit) * 100) : 0;
-
-                            return `
-                        <div class="space-y-1">
-                            <div class="flex justify-between text-xs font-medium">
-                                <span class="text-slate-700">${optionText} ${opt.is_correct ? '<span class="text-[10px] text-emerald-600 font-bold">(Kunci)</span>' : ''}</span>
-                                <span class="text-slate-500">${count} respon (${percentage}%)</span>
-                            </div>
-                            <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                                <div class="bg-indigo-600 h-2 rounded-full transition-all duration-500" style="width: ${percentage}%"></div>
-                            </div>
-                        </div>
-                    `;
-                        }).join('');
-                    } else if (Array.isArray(textAnswersList) && textAnswersList.length > 0) {
-                        bodyContent = `<ul class="space-y-1.5 pl-2 text-xs text-slate-600 max-h-40 overflow-y-auto">` +
-                            textAnswersList.map(ans => `<li class="p-2 bg-slate-50 rounded border border-slate-100">💬 ${typeof ans === 'object' ? (ans.answer || ans.text) : ans}</li>`).join('') +
-                            `</ul>`;
-                    } else {
-                        bodyContent = `<p class="text-xs text-slate-400 italic">Pertanyaan bertipe isian teks / belum ada tanggapan.</p>`;
-                    }
-
-                    const pageBadge = q.page ? `<span class="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 ml-2">Page ${q.page}</span>` : '';
-
-                    card.innerHTML = `
-                <div class="border-b border-slate-100 pb-2 flex justify-between items-center">
-                    <div>
-                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Pertanyaan ${idx + 1} (${q.type})</span>
-                        ${pageBadge}
-                    </div>
-                </div>
-                <h4 class="font-bold text-slate-800 text-sm mt-0.5">${questionTitle}</h4>
-                ${q.image ? `<img src="${API_BASE_URL}${q.image}" class="h-24 object-cover rounded-lg border my-2" />` : ''}
-                <div class="space-y-3 pt-1">${bodyContent}</div>
-            `;
-
-                    container.appendChild(card);
-                });
-            } catch (err) {
-                console.error('Error fetching aggregate data:', err);
-                document.getElementById('respon-aggregate-container').innerHTML = `<p class="text-xs text-red-500">Gagal memuat ringkasan tanggapan.</p>`;
-            }
+        function getSectionSettings(page) {
+            const key = `form-section-settings-${currentForm?.slug || formSlugParam}`;
+            const allSettings = JSON.parse(localStorage.getItem(key) || '{}');
+            return allSettings[page] || { mode: 'genius', maxScore: 100 };
         }
 
-        let globalDetailData = [];
-        let listSubmittedIds = [];
-        let currentRespondentIndex = 0;
-
-        async function fetchDetailSubmitData() {
-            try {
-                const res = await fetch(`${API_BASE_URL}/form/submit/detail?form_slug=${encodeURIComponent(formSlug)}`, { headers });
-                const result = await res.json();
-                if (!res.ok) throw new Error(result.message || 'Gagal mengambil detail');
-
-                const rawPages = result.data || [];
-                globalDetailData = [];
-
-                if (Array.isArray(rawPages)) {
-                    rawPages.forEach(pageGroup => {
-                        if (pageGroup && Array.isArray(pageGroup.soal)) {
-                            pageGroup.soal.forEach(s => {
-                                globalDetailData.push({
-                                    ...s,
-                                    page: pageGroup.page
-                                });
-                            });
-                        } else if (pageGroup && pageGroup.question) {
-                            globalDetailData.push(pageGroup);
-                        }
-                    });
-                }
-
-                const container = document.getElementById('respon-detail-cards-container');
-
-                if (globalDetailData.length === 0) {
-                    container.innerHTML = `<p class="p-4 text-xs text-slate-400 italic bg-white rounded-xl border border-slate-200">Belum ada data detail respon.</p>`;
-                    return;
-                }
-
-                const submittedIds = new Set();
-                globalDetailData.forEach(q => {
-                    const responses = q.responses || q.answers || [];
-                    responses.forEach(r => {
-                        const sId = r.submitted_id || r.submit_id || r.submission_id;
-                        if (sId !== undefined && sId !== null) submittedIds.add(sId);
-                    });
-                });
-
-                listSubmittedIds = Array.from(submittedIds);
-
-                if (listSubmittedIds.length === 0) {
-                    container.innerHTML = `<p class="p-4 text-xs text-slate-400 italic bg-white rounded-xl border border-slate-200">Belum ada respon yang disubmit.</p>`;
-                    return;
-                }
-
-                currentRespondentIndex = 0;
-                renderRespondentDetail();
-
-            } catch (err) {
-                console.error(err);
-                document.getElementById('respon-detail-cards-container').innerHTML = `<p class="p-4 text-xs text-red-500 bg-white rounded-xl border border-slate-200">Gagal memuat detail respon.</p>`;
-            }
+        function saveSectionSettingsData(page, mode, maxScore) {
+            const key = `form-section-settings-${currentForm?.slug || formSlugParam}`;
+            const allSettings = JSON.parse(localStorage.getItem(key) || '{}');
+            allSettings[page] = { mode, maxScore };
+            localStorage.setItem(key, JSON.stringify(allSettings));
         }
 
-        function renderRespondentDetail() {
-            const container = document.getElementById('respon-detail-cards-container');
-            const totalRespondents = listSubmittedIds.length;
-            if (totalRespondents === 0) return;
+        async function handleSectionScoreChange(page, newMode, newMaxScore) {
+            saveSectionSettingsData(page, newMode, newMaxScore);
+            renderPagesAndSoal();
+            await applySectionScoring(page);
+        }
 
-            const currentSubId = listSubmittedIds[currentRespondentIndex];
+        async function applySectionScoring(page) {
+            const sectionGroup = pagesSoalData.find(g => Number(g.page) === Number(page));
+            if (!sectionGroup || !sectionGroup.soal || !sectionGroup.soal.length) return;
 
-            document.getElementById('current-respondent-badge').textContent = `Responden ${currentRespondentIndex + 1} dari ${totalRespondents}`;
-            document.getElementById('current-respondent-id').textContent = `Submit ID #${currentSubId}`;
+            const settings = getSectionSettings(page);
+            const questions = sectionGroup.soal;
+            
+            let targetScore = 0;
+            if (settings.mode === 'none') {
+                targetScore = 0;
+            } else if (settings.mode === 'genius') {
+                targetScore = settings.maxScore / questions.length;
+            } else {
+                return;
+            }
 
-            document.getElementById('btn-prev-respondent').disabled = currentRespondentIndex === 0;
-            document.getElementById('btn-next-respondent').disabled = currentRespondentIndex === totalRespondents - 1;
+            await Promise.all(questions.map(soal => fetch(`${API_URL}/form/soal/${soal.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getAuthToken()}` },
+                body: JSON.stringify({ soal: { score: targetScore }, options: soal.options || [] })
+            })));
+            
+            await fetchFormAndSoalDetail();
+        }
 
+        function renderPagesAndSoal() {
+            const container = document.getElementById('pagesContainer');
+            const emptyState = document.getElementById('emptyStateSoal');
             container.innerHTML = '';
 
-            globalDetailData.forEach((q, idx) => {
-                const card = document.createElement('div');
-                card.className = "bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3";
+            const totalSoalCount = Array.isArray(pagesSoalData)
+                ? pagesSoalData.reduce((acc, curr) => acc + (curr.soal ? curr.soal.length : 0), 0)
+                : 0;
+            const savedPages = JSON.parse(localStorage.getItem(`form-pages-${currentForm?.slug || formSlugParam}`) || '[]');
+            const serverPages = Array.isArray(pagesSoalData) ? pagesSoalData : [];
+            const sections = [...serverPages];
+            savedPages.forEach(page => {
+                if (!sections.some(section => Number(section.page) === Number(page))) sections.push({ page, soal: [] });
+            });
+            if (!sections.length) sections.push({ page: 1, soal: [] });
+            sections.sort((a, b) => (Number(a.page) || 1) - (Number(b.page) || 1));
+            emptyState.classList.toggle('hidden', totalSoalCount > 0);
 
-                let scoreBadgeHtml = '';
-                if (currentScoreType === 'genius') {
-                    const scorePerSoal = globalDetailData.length > 0 ? (100 / globalDetailData.length).toFixed(1) : 0;
-                    scoreBadgeHtml = `<span class="text-[10px] bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full font-bold border border-indigo-100 flex items-center gap-1">🎯 ${scorePerSoal} Pts</span>`;
-                } else if (currentScoreType === 'manual') {
-                    const scorePerSoal = q.score !== undefined && q.score !== null ? q.score : 0;
-                    scoreBadgeHtml = `<span class="text-[10px] bg-amber-50 text-amber-800 px-2.5 py-0.5 rounded-full font-bold border border-amber-100 flex items-center gap-1">⭐ ${scorePerSoal} Pts</span>`;
-                }
+            sections.forEach((pageGroup) => {
+                const pageNum = pageGroup.page || 1;
+                const soalItems = pageGroup.soal || [];
+                const sectionTitle = getSectionTitle(pageNum);
+                const sectionSettings = getSectionSettings(pageNum);
 
-                const responses = q.responses || q.answers || [];
-                const respondentResponse = responses.find(r => (r.submitted_id || r.submit_id || r.submission_id) === currentSubId);
-                const rawAnswer = respondentResponse ? respondentResponse.answer : null;
+                let scoreDescText = 'Nilai dimatikan';
+                if (sectionSettings.mode === 'genius') scoreDescText = `Total ${sectionSettings.maxScore} dibagi rata`;
+                if (sectionSettings.mode === 'manual') scoreDescText = 'Nilai diatur manual per soal';
 
-                let selectedOptionIds = [];
-                if (rawAnswer !== null && rawAnswer !== undefined) {
-                    if (Array.isArray(rawAnswer)) {
-                        selectedOptionIds = rawAnswer.map(id => Number(id));
-                    } else if (typeof rawAnswer === 'number') {
-                        selectedOptionIds.push(rawAnswer);
-                    } else if (typeof rawAnswer === 'string' && (q.type === 'radio' || q.type === 'checkbox')) {
-                        selectedOptionIds = rawAnswer.split(',').map(id => Number(id.trim())).filter(id => !isNaN(id));
+                const pageSection = document.createElement('div');
+                pageSection.className = "space-y-4";
+
+                pageSection.innerHTML = `
+                    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+                        <div class="flex items-center justify-between gap-3">
+                            <div class="flex items-center gap-2">
+                                <span class="w-7 h-7 rounded-lg bg-indigo-600 text-white font-bold text-xs flex items-center justify-center shadow-sm">${pageNum}</span>
+                                <div>
+                                    <h2 class="text-sm font-bold text-slate-800">${sectionTitle}</h2>
+                                    <p class="text-xs text-slate-400">${soalItems.length} Pertanyaan • <span class="text-indigo-600 font-semibold">${scoreDescText}</span></p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" class="rename-section text-xs text-slate-500 hover:text-indigo-600" title="Ubah nama section"><i class="fa-solid fa-pen"></i></button>
+                                <button type="button" class="add-section-question text-xs font-semibold text-indigo-600 hover:text-indigo-800"><i class="fa-solid fa-plus"></i> Soal</button>
+                            </div>
+                        </div>
+                        <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center gap-3 text-xs">
+                            <span class="font-bold text-slate-700">Mode Nilai Section:</span>
+                            <label class="cursor-pointer flex items-center gap-1.5"><input type="radio" name="secMode_${pageNum}" value="none" ${sectionSettings.mode === 'none' ? 'checked' : ''} onchange="handleSectionScoreChange(${pageNum}, 'none', ${sectionSettings.maxScore})"> Tanpa Score</label>
+                            <label class="cursor-pointer flex items-center gap-1.5"><input type="radio" name="secMode_${pageNum}" value="genius" ${sectionSettings.mode === 'genius' ? 'checked' : ''} onchange="handleSectionScoreChange(${pageNum}, 'genius', document.getElementById('secMax_${pageNum}').value)"> Genius Score</label>
+                            <input id="secMax_${pageNum}" type="number" min="1" value="${sectionSettings.maxScore}" onchange="handleSectionScoreChange(${pageNum}, 'genius', this.value)" class="w-16 rounded-lg border border-slate-200 px-2 py-1 text-xs ${sectionSettings.mode !== 'genius' ? 'hidden' : ''}">
+                            <label class="cursor-pointer flex items-center gap-1.5"><input type="radio" name="secMode_${pageNum}" value="manual" ${sectionSettings.mode === 'manual' ? 'checked' : ''} onchange="handleSectionScoreChange(${pageNum}, 'manual', ${sectionSettings.maxScore})"> Manual</label>
+                        </div>
+                    </div>
+                    <div class="space-y-4" id="pageItems-${pageNum}"></div>
+                `;
+
+                container.appendChild(pageSection);
+                const itemsContainer = document.getElementById(`pageItems-${pageNum}`);
+                pageSection.querySelector('.add-section-question').addEventListener('click', () => openQuestionModal(pageNum));
+                pageSection.querySelector('.rename-section').addEventListener('click', () => renameSection(pageNum));
+
+                soalItems.forEach((soal, index) => {
+                    const options = soal.options || [];
+
+                    const card = document.createElement('div');
+                    card.className = "bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:border-indigo-200 transition space-y-4";
+
+                    let optionsHtml = '';
+                    if (['radio', 'checkbox', 'rating'].includes(soal.type)) {
+                        optionsHtml = `<div class="space-y-2 mt-3 pt-3 border-t border-slate-150">`;
+                        options.forEach(opt => {
+                            optionsHtml += `
+                                <div class="flex items-center justify-between text-xs py-1 px-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid ${opt.is_correct ? 'fa-circle-check text-emerald-600' : 'fa-circle text-slate-300'} text-xs"></i>
+                                        <span class="text-slate-700 font-medium">${opt.value}</span>
+                                    </div>
+                                    ${opt.is_correct ? '<span class="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold">Kunci Jawaban</span>' : ''}
+                                </div>
+                            `;
+                        });
+                        optionsHtml += `</div>`;
                     }
-                }
 
-                let optionsHtml = '';
-                if (q.type === 'file') {
-                    optionsHtml = `
-            <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono text-slate-700">
-                ${rawAnswer ? `
-                    <div class="space-y-2">
-                        <span class="text-slate-500 font-sans block">File Diunggah:</span>
-                        <a href="${API_BASE_URL}${rawAnswer}" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 font-sans font-semibold border border-blue-200">
-                            📎 Lihat File / Gambar
-                        </a>
-                        ${String(rawAnswer).match(/\.(jpeg|jpg|gif|png)$/i) ? `<img src="${API_BASE_URL}${rawAnswer}" class="h-32 object-cover rounded-lg border mt-2" />` : ''}
-                    </div>
-                ` : '<span class="text-slate-400 italic font-sans">Tidak ada file yang diunggah</span>'}
-            </div>`;
-                } else if (q.type === 'text') {
-                    optionsHtml = `
-            <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono text-slate-700">
-                ${rawAnswer ? rawAnswer : '<span class="text-slate-400 italic font-sans">Tidak dijawab</span>'}
-            </div>`;
-                } else if (Array.isArray(q.options) && q.options.length > 0) {
-                    optionsHtml = `<div class="space-y-2 mt-3">` +
-                        q.options.map(opt => {
-                            const isSelected = selectedOptionIds.includes(opt.id) || selectedOptionIds.includes(opt.value) || rawAnswer === opt.id || rawAnswer === opt.value;
-                            const activeBg = isSelected
-                                ? 'bg-indigo-50 border-indigo-500 text-indigo-900 font-semibold shadow-sm'
-                                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100';
-                            const activeIndicator = isSelected
-                                ? 'bg-indigo-600 border-indigo-600'
-                                : 'bg-white border-slate-300';
+                    card.innerHTML = `
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                                        Tipe: ${soal.type}
+                                    </span>
+                                    <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600">
+                                        Bobot: ${soal.score || 0}
+                                    </span>
+                                    ${soal.is_required ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600">Wajib</span>' : ''}
+                                </div>
+                                <h3 class="text-sm font-bold text-slate-900 mt-2">${index + 1}. ${soal.question}</h3>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <button type="button" class="edit-btn p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Edit Soal">
+                                    <i class="fa-solid fa-pen text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+                        ${soal.image ? `<div class="mt-2"><img src="${soal.image}" class="h-32 rounded-xl object-cover border border-slate-100"></div>` : ''}
+                        ${optionsHtml}
+                    `;
 
-                            return `
-                <div class="flex items-center justify-between p-3 border rounded-xl transition text-xs ${activeBg}">
-                    <div class="flex items-center gap-3">
-                        <span class="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${activeIndicator}">
-                            ${isSelected ? '<span class="w-1.5 h-1.5 bg-white rounded-full"></span>' : ''}
-                        </span>
-                        <span>${opt.value}</span>
-                        ${opt.image ? `<img src="${API_BASE_URL}${opt.image}" class="h-8 w-8 object-cover rounded border ml-2" />` : ''}
-                    </div>
-                    <div class="flex items-center gap-2">
-                        ${opt.is_correct ? '<span class="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">Kunci Jawaban</span>' : ''}
-                        ${isSelected ? '<span class="text-[10px] bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full font-bold">Dipilih Responden</span>' : ''}
-                    </div>
-                </div>`;
-                        }).join('') + `</div>`;
-                } else {
-                    optionsHtml = `<p class="text-xs text-slate-400 italic">Tidak ada opsi jawaban.</p>`;
-                }
+                    const editBtn = card.querySelector('.edit-btn');
+                    editBtn.addEventListener('click', () => editSoal(soal, options));
 
-                const pageBadge = q.page ? `<span class="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 ml-2">Halaman ${q.page}</span>` : '';
-                const soalImageHtml = q.image ? `<div class="mt-2"><img src="${API_BASE_URL}${q.image}" class="h-36 object-cover rounded-lg border shadow-sm" /></div>` : '';
-
-                card.innerHTML = `
-            <div class="border-b border-slate-100 pb-2 flex justify-between items-center">
-                <div class="flex items-center">
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Soal #${idx + 1} (${q.type})</span>
-                    ${pageBadge}
-                </div>
-                ${scoreBadgeHtml}
-            </div>
-            <h4 class="font-bold text-slate-800 text-sm">${q.question}</h4>
-            ${soalImageHtml}
-            ${optionsHtml}
-        `;
-
-                container.appendChild(card);
-            });
-        }
-
-        function navigateRespondent(direction) {
-            const newIndex = currentRespondentIndex + direction;
-            if (newIndex >= 0 && newIndex < listSubmittedIds.length) {
-                currentRespondentIndex = newIndex;
-                renderRespondentDetail();
-                document.getElementById('respon-subcontent-detail').scrollIntoView({ behavior: 'smooth' });
-            }
-        }
-
-        function openImportModal() { document.getElementById('modal-import-word').classList.remove('hidden'); }
-        function closeImportModal() {
-            document.getElementById('modal-import-word').classList.add('hidden');
-            document.getElementById('form-import-docx').reset();
-        }
-
-        async function handleImportWord(e) {
-            e.preventDefault();
-            hideAlert();
-
-            const fileInput = document.getElementById('input-docx-file');
-            const file = fileInput.files[0];
-            if (!file) return alert('Pilih file .docx terlebih dahulu!');
-
-            const btnSubmit = document.getElementById('btn-submit-import');
-            btnSubmit.disabled = true;
-            btnSubmit.textContent = '⏳ Mengunggah...';
-
-            const formData = new FormData();
-            formData.append('file', file);
-
-            try {
-                const res = await fetch(`${API_BASE_URL}/form/soal/import?form_slug=${encodeURIComponent(formSlug)}`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` },
-                    body: formData
+                    itemsContainer.appendChild(card);
                 });
-
-                const result = await res.json();
-                if (res.ok) {
-                    showAlert(result.message || 'Soal berhasil diimpor!', true);
-                    closeImportModal();
-                    await fetchExistingSoal();
-                    if (currentScoreType === 'genius') await syncGeniusScores();
-                } else {
-                    showAlert(result.message || 'Gagal mengimpor file Word');
-                }
-            } catch (err) {
-                console.error(err);
-                showAlert('Terjadi kesalahan koneksi.');
-            } finally {
-                btnSubmit.disabled = false;
-                btnSubmit.textContent = '📥 Upload & Import';
-            }
+            });
         }
 
-        function openShareModal(type) {
-            let shareUrl = '';
-            const modalTitle = document.getElementById('share-modal-title');
+        function openQuestionModal(page = activeSectionPage) {
+            activeSectionPage = page;
+            document.getElementById('editSoalId').value = '';
+            document.getElementById('modalTitle').textContent = 'Tambah Soal Baru';
+            document.getElementById('inputQuestion').value = '';
+            document.getElementById('inputType').value = 'radio';
+            document.getElementById('inputPage').value = String(page);
+            document.getElementById('inputScore').value = '1';
+            document.getElementById('inputImage').value = '';
+            document.getElementById('inputAudio').value = '';
+            document.getElementById('inputIsRequired').checked = false;
+            document.getElementById('optionsListContainer').innerHTML = '';
 
-            if (type === 'collab') {
-                if (!currentTokenCollab) return alert('Token collab belum tersedia.');
-                shareUrl = `${window.location.origin}/form/${formSlug}/collaborate?token=${currentTokenCollab}`;
-                modalTitle.innerHTML = '🤝 Bagikan untuk Collab';
+            const sectionSettings = getSectionSettings(page);
+            const scoreContainer = document.getElementById('modalScoreContainer');
+            if (sectionSettings.mode === 'manual') {
+                scoreContainer.classList.remove('hidden');
             } else {
-                const tokenCollabParam = currentTokenCollab ? currentTokenCollab : '';
-                shareUrl = `${window.location.origin}/Testing_untuk_BE/fill-form.html?slug=${formSlug}`;
-                modalTitle.innerHTML = '🔗 Bagikan Form Responden';
+                scoreContainer.classList.add('hidden');
             }
 
-            document.getElementById('share-link-input').value = shareUrl;
+            toggleOptionBuilder();
+            addOptionRow('Opsi A', true);
+            addOptionRow('Opsi B', false);
 
-            const qrContainer = document.getElementById('qrcode-container');
-            qrContainer.innerHTML = '';
-
-            qrcodeObj = new QRCode(qrContainer, {
-                text: shareUrl,
-                width: 200,
-                height: 200,
-                colorDark: "#0f172a",
-                colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.L
-            });
-
-            document.getElementById('modal-share-form').classList.remove('hidden');
+            document.getElementById('questionModal').classList.remove('hidden');
         }
 
-        function closeShareModal() {
-            document.getElementById('modal-share-form').classList.add('hidden');
+        function closeQuestionModal() {
+            document.getElementById('questionModal').classList.add('hidden');
         }
 
-        function copyShareModalLink() {
-            const input = document.getElementById('share-link-input');
-            navigator.clipboard.writeText(input.value).then(() => {
-                const btn = document.getElementById('btn-modal-copy');
-                const orig = btn.innerText;
-                btn.innerText = '✅ Tersalin!';
-                setTimeout(() => btn.innerText = orig, 2000);
-            });
+        function toggleOptionBuilder() {
+            const type = document.getElementById('inputType').value;
+            const optionSection = document.getElementById('optionSection');
+            if (['radio', 'checkbox', 'rating'].includes(type)) {
+                optionSection.classList.remove('hidden');
+            } else {
+                optionSection.classList.add('hidden');
+            }
         }
 
-        function downloadQRCode() {
-            const qrContainer = document.getElementById('qrcode-container');
-            const img = qrContainer.querySelector('img');
-            const canvas = qrContainer.querySelector('canvas');
+        function addOptionRow(value = '', isCorrect = false, optionId = '') {
+            const container = document.getElementById('optionsListContainer');
+            const rowId = 'opt_' + Math.random().toString(36).substring(2, 9);
 
-            let imageSrc = '';
-            if (img && img.src) {
-                imageSrc = img.src;
-            } else if (canvas) {
-                imageSrc = canvas.toDataURL("image/png");
+            const div = document.createElement('div');
+            div.className = "flex items-center gap-2";
+            div.id = rowId;
+            if (optionId) div.dataset.optionId = optionId;
+
+            div.innerHTML = `
+                <input type="radio" name="correct_answer_radio" ${isCorrect ? 'checked' : ''} class="text-indigo-600 focus:ring-indigo-500 h-4 w-4" title="Tandai sebagai jawaban benar">
+                <input type="text" value="${value.replace(/"/g, '&quot;')}" placeholder="Teks pilihan jawaban..." class="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-xs focus:outline-none focus:border-indigo-600 option-val-input">
+                <button type="button" onclick="document.getElementById('${rowId}').remove()" class="text-slate-400 hover:text-rose-600 p-1.5">
+                    <i class="fa-solid fa-trash text-xs"></i>
+                </button>
+            `;
+            container.appendChild(div);
+        }
+
+        function editSoal(soal, options) {
+            activeSectionPage = Number(soal.page) || 1;
+            document.getElementById('editSoalId').value = soal.id;
+            document.getElementById('modalTitle').textContent = 'Edit Soal & Opsi';
+            document.getElementById('inputQuestion').value = soal.question || '';
+            document.getElementById('inputType').value = soal.type || 'radio';
+            document.getElementById('inputPage').value = soal.page || 1;
+            document.getElementById('inputScore').value = soal.score || 1;
+            document.getElementById('inputImage').value = soal.image || '';
+            document.getElementById('inputAudio').value = soal.audio || '';
+            document.getElementById('inputIsRequired').checked = Boolean(soal.is_required);
+
+            const sectionSettings = getSectionSettings(activeSectionPage);
+            const scoreContainer = document.getElementById('modalScoreContainer');
+            if (sectionSettings.mode === 'manual') {
+                scoreContainer.classList.remove('hidden');
+            } else {
+                scoreContainer.classList.add('hidden');
             }
 
-            if (!imageSrc) return alert('QR Code belum siap untuk diunduh.');
+            toggleOptionBuilder();
+            const container = document.getElementById('optionsListContainer');
+            container.innerHTML = '';
 
-            const downloadLink = document.createElement('a');
-            downloadLink.href = imageSrc;
-            downloadLink.download = `QR_Form_${formSlug}.png`;
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            document.body.removeChild(downloadLink);
-        }
-
-        // Setting Modal Functions
-        function openSettingModal() {
-            if (currentFormData) {
-                if (currentFormData.duration) {
-                    document.getElementById('setting-duration').value = currentFormData.duration;
-                }
-                if (currentFormData.start_at) {
-                    const dateObj = new Date(currentFormData.start_at);
-                    const tzOffset = dateObj.getTimezoneOffset() * 60000;
-                    const localISOTime = (new Date(dateObj.getTime() - tzOffset)).toISOString().slice(0, 16);
-                    document.getElementById('setting-start-at').value = localISOTime;
-                }
-                document.getElementById('setting-is-random').checked = !!currentFormData.is_random;
+            if (options && options.length > 0) {
+                options.forEach(opt => {
+                    addOptionRow(opt.value, opt.is_correct, opt.id || '');
+                });
             }
 
-            document.getElementById('modal-setting-form').classList.remove('hidden');
+            document.getElementById('questionModal').classList.remove('hidden');
         }
 
-        function closeSettingModal() {
-            document.getElementById('modal-setting-form').classList.add('hidden');
-        }
+        async function saveQuestionData() {
+            const soalId = document.getElementById('editSoalId').value;
+            const question = document.getElementById('inputQuestion').value;
+            const type = document.getElementById('inputType').value;
+            const page = parseInt(document.getElementById('inputPage').value) || 1;
+            const image = document.getElementById('inputImage').value || null;
+            const audio = document.getElementById('inputAudio').value || null;
+            const is_required = document.getElementById('inputIsRequired').checked;
 
-        async function handleSaveSetting(e) {
-            e.preventDefault();
-            hideAlert();
-
-            const duration = parseInt(document.getElementById('setting-duration').value);
-            const startAtRaw = document.getElementById('setting-start-at').value;
-            const isRandom = document.getElementById('setting-is-random').checked;
-
-            if (!duration || !startAtRaw) {
-                return alert('Durasi dan Waktu Mulai wajib diisi!');
+            const sectionSettings = getSectionSettings(page);
+            let score = 1;
+            if (sectionSettings.mode === 'none') {
+                score = 0;
+            } else if (sectionSettings.mode === 'manual') {
+                score = parseInt(document.getElementById('inputScore').value) || 1;
+            } else if (sectionSettings.mode === 'genius') {
+                const sectionGroup = pagesSoalData.find(g => Number(g.page) === Number(page));
+                const currentCount = sectionGroup && sectionGroup.soal ? sectionGroup.soal.length : 0;
+                const totalQuestions = soalId ? currentCount : currentCount + 1;
+                score = totalQuestions > 0 ? sectionSettings.maxScore / totalQuestions : sectionSettings.maxScore;
             }
 
-            const btnSubmit = document.getElementById('btn-submit-setting');
-            btnSubmit.disabled = true;
-            btnSubmit.textContent = '⏳ Menyimpan...';
+            if (!question.trim()) {
+                alert('Pertanyaan wajib diisi!');
+                return;
+            }
 
-            const startAtTimestamp = new Date(startAtRaw).getTime();
+            const options = [];
+            if (['radio', 'checkbox', 'rating'].includes(type)) {
+                const optRows = document.querySelectorAll('#optionsListContainer > div');
+                optRows.forEach(row => {
+                    const valInput = row.querySelector('.option-val-input');
+                    const radioCheck = row.querySelector('input[type="radio"]');
+                    if (valInput && valInput.value.trim() !== '') {
+                        options.push({
+                            id: row.dataset.optionId ? Number(row.dataset.optionId) : undefined,
+                            value: valInput.value.trim(),
+                            is_correct: radioCheck ? radioCheck.checked : false
+                        });
+                    }
+                });
+            }
 
             const payload = {
-                duration: duration,
-                start_at: startAtTimestamp,
-                is_random: isRandom
+                soal: { question, type, page, score, image, audio, is_required },
+                options: options
             };
 
             try {
-                const res = await fetch(`${API_BASE_URL}/form/setting?form_slug=${encodeURIComponent(formSlug)}`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
+                const token = getAuthToken();
+                let response, result;
+
+                if (soalId) {
+                    response = await fetch(`${API_URL}/form/soal/${soalId}`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                } else {
+                    response = await fetch(`${API_URL}/form/soal?form_slug=${currentForm.slug}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ data: JSON.stringify(payload) })
+                    });
+                }
+
+                result = await response.json();
+                if (!response.ok) throw new Error(result.message || "Gagal menyimpan soal");
+
+                showGlobalAlert(result.message || "Berhasil menyimpan soal!");
+                closeQuestionModal();
+                await fetchFormAndSoalDetail();
+                
+                if (sectionSettings.mode === 'genius') {
+                    await applySectionScoring(page);
+                }
+            } catch (error) {
+                console.error(error);
+                alert(error.message);
+            }
+        }
+
+        async function handleExportDocx() {
+            try {
+                const token = getAuthToken();
+                showGlobalAlert("Mempersiapkan file export...", "success");
+
+                const response = await fetch(`${API_URL}/form/soal/export?form_slug=${currentForm.slug}`, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${token}` }
                 });
 
-                const result = await res.json();
+                if (!response.ok) throw new Error("Gagal mengexport dokumen Word");
 
-                if (res.ok) {
-                    showAlert(result.message || 'Berhasil Mengubah Waktu Pengerjaan', true);
-                    closeSettingModal();
-                    await fetchExistingSoal();
-                } else {
-                    showAlert(result.message || 'Gagal mengubah setting form');
-                }
-            } catch (err) {
-                console.error(err);
-                showAlert('Terjadi kesalahan koneksi saat menyimpan setting.');
-            } finally {
-                btnSubmit.disabled = false;
-                btnSubmit.textContent = '💾 Simpan Setting';
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${currentForm.title || 'soal'}.docx`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+
+                showGlobalAlert("Berhasil mengunduh dokumen Word!");
+            } catch (error) {
+                console.error(error);
+                showGlobalAlert(error.message, "error");
             }
+        }
+
+        function getSectionTitle(page) {
+            const key = `form-sections-${currentForm?.slug || formSlugParam}`;
+            const titles = JSON.parse(localStorage.getItem(key) || '{}');
+            return titles[page] || `Section ${page}`;
+        }
+
+        function renameSection(page) {
+            const title = prompt('Nama section:', getSectionTitle(page));
+            if (!title?.trim()) return;
+            const key = `form-sections-${currentForm?.slug || formSlugParam}`;
+            const titles = JSON.parse(localStorage.getItem(key) || '{}');
+            titles[page] = title.trim();
+            localStorage.setItem(key, JSON.stringify(titles));
+            renderPagesAndSoal();
+        }
+
+        function addSection() {
+            const pages = pagesSoalData.map(group => Number(group.page) || 1);
+            const nextPage = pages.length ? Math.max(...pages) + 1 : 1;
+            const key = `form-sections-${currentForm?.slug || formSlugParam}`;
+            const titles = JSON.parse(localStorage.getItem(key) || '{}');
+            titles[nextPage] = `Section ${nextPage}`;
+            localStorage.setItem(key, JSON.stringify(titles));
+            const pagesKey = `form-pages-${currentForm?.slug || formSlugParam}`;
+            const savedPages = JSON.parse(localStorage.getItem(pagesKey) || '[]');
+            if (!savedPages.includes(nextPage)) localStorage.setItem(pagesKey, JSON.stringify([...savedPages, nextPage]));
+            pagesSoalData.push({ page: nextPage, soal: [] });
+            renderPagesAndSoal();
+        }
+
+        function openSharePanel() {
+            if (!currentForm) return;
+            const fillLink = `${window.location.origin}${window.location.pathname.replace('create-soal.html', 'fill-form.html')}?slug=${encodeURIComponent(currentForm.slug)}`;
+            const collabLink = `${window.location.origin}${window.location.pathname.replace('create-soal.html', 'my-forms.html')}?form_slug=${encodeURIComponent(currentForm.slug)}&token_collab=${encodeURIComponent(currentForm.token?.token_collab || '')}`;
+            const content = `Link isi form:\n${fillLink}\n\nLink kolaborator:\n${collabLink}`;
+            navigator.clipboard?.writeText(content);
+            alert(content + '\n\nLink sudah disalin.');
         }
     </script>
 </body>

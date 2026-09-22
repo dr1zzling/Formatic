@@ -1,424 +1,502 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" class="h-full">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Forms - Manage Your Forms</title>
-    <!-- Tailwind CSS CDN -->
+    <title>My Forms Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
 </head>
 
-<body class="bg-slate-50 min-h-screen flex flex-col font-sans">
+<body class="bg-slate-50 min-h-full flex flex-col justify-between text-slate-800">
 
-    <!-- Navbar -->
-    <nav class="bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16 items-center">
-                <div class="flex items-center gap-3">
-                    <div class="bg-blue-600 text-white p-2 rounded-lg font-bold text-xl">F</div>
-                    <span class="font-bold text-xl text-slate-800">FormApp</span>
+    <header class="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-20">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div
+                    class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center text-white font-bold text-xl shadow-md shadow-indigo-200">
+                    F
                 </div>
-                <div class="flex items-center gap-4">
-                    <a href="dashboard.html"
-                        class="text-sm font-medium text-slate-600 hover:text-blue-600 transition">Dashboard</a>
-                    <a href="my-forms.html" class="text-sm font-medium text-blue-600 border-b-2 border-blue-600 py-4">My
-                        Forms</a>
-                    <span id="user-display"
-                        class="text-sm font-semibold text-slate-700 bg-slate-100 px-3 py-1 rounded-full">...</span>
-                    <button onclick="handleLogout()"
-                        class="text-sm font-medium text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition">Logout</button>
+                <div>
+                    <h1 class="text-lg font-bold text-slate-900 tracking-tight">Form Studio</h1>
+                    <p class="text-xs text-slate-500">Kelola dan buat form Anda dengan mudah</p>
                 </div>
             </div>
+            <div class="flex items-center space-x-3">
+                <div id="authStatus" class="text-xs px-3 py-1 rounded-full font-medium"></div>
+                <button id="openModalBtn"
+                    class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-200 transition-all flex items-center space-x-2">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Buat Form Baru</span>
+                </button>
+            </div>
         </div>
-    </nav>
+    </header>
 
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
-
-        <!-- Action Bar -->
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <main class="max-w-6xl w-full mx-auto px-4 py-8 flex-grow">
+        <div class="flex justify-between items-center mb-6">
             <div>
-                <h1 class="text-2xl font-bold text-slate-900">Kelola Form Saya</h1>
-                <p class="text-sm text-slate-500">Daftar form yang Anda buat atau di mana Anda menjadi kolaborator.</p>
+                <h2 class="text-xl font-bold text-slate-900">Form Saya</h2>
+                <p class="text-sm text-slate-500">Daftar semua form yang telah Anda buat di akun ini.</p>
             </div>
-            <div class="flex items-center gap-3">
-                <button onclick="openJoinModal()"
-                    class="inline-flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition">
-                    + Join Kolaborasi
-                </button>
-                <button onclick="openCreateModal()"
-                    class="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition">
-                    + Buat Form Baru
-                </button>
-            </div>
+            <button id="refreshBtn"
+                class="p-2 text-slate-600 hover:text-indigo-600 rounded-lg hover:bg-slate-100 transition-all"
+                title="Refresh Daftar">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+            </button>
         </div>
 
-        <!-- Alert Box -->
-        <div id="alert-box" class="hidden mb-6 p-4 rounded-lg text-sm font-medium"></div>
+        <!-- Global Alert Box -->
+        <div id="globalAlert" class="hidden mb-6 p-4 rounded-xl text-sm font-medium transition-all shadow-sm"></div>
 
         <!-- Forms Grid Container -->
-        <div id="forms-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <!-- Cards will be injected by JavaScript -->
-        </div>
-
-        <!-- Empty State -->
-        <div id="empty-state" class="hidden text-center py-16 bg-white rounded-xl border border-slate-200">
-            <svg class="mx-auto h-12 w-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                </path>
-            </svg>
-            <h3 class="mt-2 text-sm font-medium text-slate-900">Belum ada form</h3>
-            <p class="mt-1 text-sm text-slate-500">Mulai dengan membuat form baru atau bergabung sebagai kolaborator.
-            </p>
-            <div class="mt-6">
-                <button onclick="openCreateModal()"
-                    class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
-                    Buat Form
-                </button>
+        <div id="formsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Loading Skeletons State -->
+            <div class="bg-white rounded-2xl p-6 border border-slate-200 animate-pulse space-y-4">
+                <div class="h-32 bg-slate-100 rounded-xl"></div>
+                <div class="h-5 bg-slate-100 rounded w-3/4"></div>
+                <div class="h-4 bg-slate-100 rounded w-1/2"></div>
+            </div>
+            <div class="bg-white rounded-2xl p-6 border border-slate-200 animate-pulse space-y-4">
+                <div class="h-32 bg-slate-100 rounded-xl"></div>
+                <div class="h-5 bg-slate-100 rounded w-3/4"></div>
+                <div class="h-4 bg-slate-100 rounded w-1/2"></div>
             </div>
         </div>
 
+        <!-- Empty State (Initially Hidden) -->
+        <div id="emptyState"
+            class="hidden flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-slate-200 text-center space-y-4">
+            <div class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
+                <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+            </div>
+            <div>
+                <h3 class="text-base font-bold text-slate-800">Belum Ada Form</h3>
+                <p class="text-sm text-slate-500 mt-1">Anda belum membuat form apapun. Klik tombol di bawah untuk mulai
+                    membuat.</p>
+            </div>
+            <button onclick="openModal()"
+                class="px-5 py-2.5 bg-indigo-600 text-white font-medium text-sm rounded-xl hover:bg-indigo-700 transition shadow-md shadow-indigo-100">
+                Buat Form Pertama Anda
+            </button>
+        </div>
     </main>
 
-    <!-- MODAL: Buat Form Baru -->
-    <div id="modal-create"
-        class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
-            <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
-                <h3 class="font-bold text-slate-800">Buat Form Baru</h3>
-                <button onclick="closeModal('modal-create')"
-                    class="text-slate-400 hover:text-slate-600">&times;</button>
-            </div>
-            <form id="form-create" onsubmit="handleCreateForm(event)" class="p-6 space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Judul Form</label>
-                    <input type="text" id="create-title" required
-                        class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Kategori</label>
-                    <input type="text" id="create-category" placeholder="misal: Edukasi, Survei, Event" required
-                        class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Token Respon (Kunci Mengisi)</label>
-                    <input type="text" id="create-token-respon" placeholder="Password untuk responden" required
-                        class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Banner Form (Gambar)</label>
-                    <input type="file" id="create-banner" accept="image/*" required
-                        class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                </div>
-                <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
-                    <button type="button" onclick="closeModal('modal-create')"
-                        class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Batal</button>
-                    <button type="submit"
-                        class="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700">Simpan
-                        Form</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    <!-- Create Form Modal -->
+    <div id="formModal"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300">
+        <div id="modalContent"
+            class="bg-white w-full max-w-2xl mx-4 rounded-2xl shadow-2xl border border-slate-100 overflow-hidden transform scale-95 transition-all duration-300 max-h-[90vh] flex flex-col">
 
-    <!-- MODAL: Join Sebagai Kolaborator -->
-    <div id="modal-join"
-        class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-            <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
-                <h3 class="font-bold text-slate-800">Gabung Kolaborasi Form</h3>
-                <button onclick="closeModal('modal-join')" class="text-slate-400 hover:text-slate-600">&times;</button>
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h3 class="text-lg font-bold text-slate-900">Buat Form Baru</h3>
+                <button type="button" onclick="closeModal()"
+                    class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors">
+                    ✕
+                </button>
             </div>
-            <form id="form-join" onsubmit="handleJoinCollab(event)" class="p-6 space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Link Undangan Kolaborasi</label>
-                    <input type="url" id="join-link" required
-                        placeholder="Contoh: http://localhost:3000/form/judul-form-123?token=xyz123"
-                        class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                    <p class="text-xs text-slate-400 mt-1">Tempelkan link undangan kolaborasi yang Anda dapatkan.</p>
-                </div>
-                <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
-                    <button type="button" onclick="closeModal('modal-join')"
-                        class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Batal</button>
-                    <button type="submit"
-                        class="px-4 py-2 text-sm font-medium bg-slate-800 text-white rounded-lg hover:bg-slate-900">Gabung</button>
-                </div>
-            </form>
+
+            <!-- Modal Body Form -->
+            <div class="p-6 overflow-y-auto flex-grow">
+                <div id="modalAlert" class="hidden mb-4 p-3 rounded-xl text-xs font-medium"></div>
+
+                <form id="createForm" class="space-y-4">
+                    <!-- Title -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1.5">Judul Form <span
+                                class="text-rose-500">*</span></label>
+                        <input type="text" id="title" name="title" required
+                            class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm text-slate-700 bg-slate-50/50 hover:bg-white transition-all"
+                            placeholder="Contoh: Survey Kepuasan Pelanggan 2026">
+                    </div>
+
+                    <!-- Kategori Utama & Sub Kategori -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1.5">Kategori Utama <span
+                                    class="text-rose-500">*</span></label>
+                            <select id="primary_kategori" required disabled
+                                class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-slate-100 text-sm text-slate-700">
+                                <option value="">Memuat kategori...</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1.5">Sub Kategori <span
+                                    class="text-rose-500">*</span></label>
+                            <select id="sub_kategori" name="sub_kategori" required disabled
+                                class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-slate-100 text-sm text-slate-700 disabled:cursor-not-allowed">
+                                <option value="">Pilih kategori utama dahulu</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Token Respon & Theme Color -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <div class="flex justify-between items-center mb-1.5">
+                                <label class="block text-sm font-medium text-slate-700">Token Respon <span
+                                        class="text-rose-500">*</span></label>
+                                <button type="button" id="generateToken"
+                                    class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold">✨
+                                    Generate</button>
+                            </div>
+                            <input type="text" id="token_respon" name="token_respon" required
+                                class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-700 font-mono text-xs bg-slate-50/50"
+                                placeholder="token_respon_xyz">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1.5">Warna Tema</label>
+                            <div
+                                class="flex items-center gap-3 px-3 py-1.5 rounded-xl border border-slate-200 bg-white">
+                                <input type="color" id="theme_color" name="theme_color" value="#4f46e5"
+                                    class="w-8 h-8 rounded-lg border-0 cursor-pointer bg-transparent">
+                                <span id="colorHex" class="text-xs font-mono text-slate-600">#4f46e5</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Banner Upload -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1.5">Banner Form (Opsional)</label>
+                        <div class="flex items-center justify-center w-full">
+                            <label
+                                class="flex flex-col items-center justify-center w-full h-28 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition">
+                                <div class="flex flex-col items-center justify-center pt-3 pb-4 px-4 text-center">
+                                    <svg class="w-6 h-6 mb-1 text-slate-400" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12">
+                                        </path>
+                                    </svg>
+                                    <p class="text-xs text-slate-500"><span class="font-semibold">Klik unggah</span>
+                                        atau seret file</p>
+                                </div>
+                                <input type="file" id="banner" name="banner" accept="image/*" class="hidden" />
+                            </label>
+                        </div>
+                        <div id="bannerPreviewContainer" class="mt-2 hidden relative w-fit">
+                            <img id="bannerPreview" src="" alt="Preview"
+                                class="h-20 rounded-xl object-cover border border-slate-200 shadow-sm">
+                            <button type="button" id="removeBanner"
+                                class="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center shadow">×</button>
+                        </div>
+                    </div>
+
+                    <!-- Modal Footer Actions -->
+                    <div class="pt-4 border-t border-slate-100 flex items-center justify-end space-x-3">
+                        <button type="button" onclick="closeModal()"
+                            class="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium transition">
+                            Batal
+                        </button>
+                        <button type="submit" id="submitBtn"
+                            class="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-lg shadow-indigo-100 transition">
+                            Simpan Form
+                        </button>
+                    </div>
+                </form>
+            </div>
+
         </div>
     </div>
 
     <script>
-        const API_BASE_URL = 'http://localhost:4000';
-        const token = localStorage.getItem('token');
+        const API_URL = 'http://localhost:3001'; // Dapat disesuaikan ke 3002 jika diperlukan
 
-        if (!token) {
-            window.location.href = 'index.html';
-        }
-
-        const headers = {
-            'Authorization': `Bearer ${token}`
+        const getAuthToken = () => {
+            return localStorage.getItem('token') || localStorage.getItem('access_token');
         };
 
-        document.addEventListener('DOMContentLoaded', fetchMyForms);
+        window.addEventListener('DOMContentLoaded', () => {
+            checkAuthStatus();
+            fetchMyForms();
+            fetchPrimaryKategori();
+        });
 
-        function handleLogout() {
-            localStorage.removeItem('token');
-            window.location.href = 'index.html';
+        // Cek status autentikasi token
+        function checkAuthStatus() {
+            const token = getAuthToken();
+            const authStatus = document.getElementById('authStatus');
+            if (token) {
+                authStatus.textContent = "Authenticated";
+                authStatus.className = "text-xs px-3 py-1 rounded-full font-medium bg-emerald-50 text-emerald-600 border border-emerald-200";
+            } else {
+                authStatus.textContent = "Token Tidak Ditemukan";
+                authStatus.className = "text-xs px-3 py-1 rounded-full font-medium bg-rose-50 text-rose-600 border border-rose-200";
+                showGlobalAlert("Token akses tidak ditemukan di localStorage. Harap login terlebih dahulu.", "error");
+            }
         }
 
-        function showAlert(message, isSuccess = false) {
-            const alertBox = document.getElementById('alert-box');
-            alertBox.textContent = message;
-            alertBox.className = `mb-6 p-4 rounded-lg text-sm font-medium ${isSuccess ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'
-                }`;
-            alertBox.classList.remove('hidden');
-            alertBox.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        function hideAlert() {
-            document.getElementById('alert-box').classList.add('hidden');
-        }
-
-        function openCreateModal() { document.getElementById('modal-create').classList.remove('hidden'); }
-        function openJoinModal() { document.getElementById('modal-join').classList.remove('hidden'); }
-        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-
+        // 1. Fetch Daftar Form User dari GET /form/user
         async function fetchMyForms() {
-            hideAlert();
-            try {
-                const res = await fetch(`${API_BASE_URL}/form/user`, { headers });
-                const result = await res.json();
+            const formsGrid = document.getElementById('formsGrid');
+            const emptyState = document.getElementById('emptyState');
 
-                if (res.status === 401) {
-                    handleLogout();
+            try {
+                const token = getAuthToken();
+                const response = await fetch(`${API_URL}/form/user`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.message || "Gagal mengambil daftar form");
+
+                // Ambil array dari result.data.forms sesuai struktur JSON server Anda
+                const forms = result.data?.forms || result.forms || result.data || [];
+
+                // Validasi akhir pastikan benar-benar array
+                if (!Array.isArray(forms)) {
+                    throw new Error("Format data dari server tidak valid (bukan array)");
+                }
+
+                formsGrid.innerHTML = '';
+                if (forms.length === 0) {
+                    emptyState.classList.remove('hidden');
                     return;
                 }
 
-                if (res.ok) {
-                    const { username, forms } = result.data;
-                    document.getElementById('user-display').textContent = `@${username}`;
-                    renderForms(forms);
-                } else {
-                    showAlert(result.message || 'Gagal mengambil data form');
+                emptyState.classList.add('hidden');
+                forms.forEach(form => {
+                    const card = document.createElement('div');
+                    card.className = "bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between";
+
+                    const bannerUrl = form.banner ? (form.banner.startsWith('http') ? form.banner : `${API_URL}${form.banner}`) : 'https://placehold.co/600x200/e2e8f0/64748b?text=No+Banner';
+
+                    // Ambil warna tema dan token dari objek bersarang (nested object)
+                    const themeColor = form.setting?.theme_color || '#4f46e5';
+                    const tokenRespon = form.token?.token_respon || '-';
+                    const accessType = form.access_type || 'Member';
+                    const subCategory = form.kategori?.sub_kategori || '-';
+
+                    card.innerHTML = `
+                        <div>
+                            <div class="h-32 w-full bg-slate-100 relative overflow-hidden">
+                                <img src="${bannerUrl}" alt="Banner" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/600x200/e2e8f0/64748b?text=Banner'">
+                                <div class="absolute top-3 right-3 w-4 h-4 rounded-full border-2 border-white shadow" style="background-color: ${themeColor}"></div>
+                            </div>
+                            <div class="p-5 space-y-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100">
+                                        Token: ${tokenRespon}
+                                    </span>
+                                    <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-slate-100 text-slate-600">
+                                        ${accessType}
+                                    </span>
+                                </div>
+                                <h3 class="text-base font-bold text-slate-900 line-clamp-1">${form.title}</h3>
+                                <p class="text-xs text-slate-500">Kategori: <span class="capitalize font-medium text-slate-700">${subCategory}</span></p>
+                            </div>
+                        </div>
+                        <div class="px-5 py-3 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+                            <span class="text-xs text-slate-400 font-mono">Slug: /${form.slug}</span>
+                            <a href="create-soal.html?form_slug=${encodeURIComponent(form.slug)}" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">Kelola Form →</a>
+                        </div>
+                    `;
+                    formsGrid.appendChild(card);
+                });
+
+            } catch (error) {
+                console.error(error);
+                formsGrid.innerHTML = '';
+                showGlobalAlert(error.message, "error");
+            }
+        }
+        // Modal Handlers
+        const modal = document.getElementById('formModal');
+        const modalContent = document.getElementById('modalContent');
+
+        function openModal() {
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            modalContent.classList.remove('scale-95');
+        }
+
+        function closeModal() {
+            modal.classList.add('opacity-0', 'pointer-events-none');
+            modalContent.classList.add('scale-95');
+            document.getElementById('createForm').reset();
+            document.getElementById('bannerPreviewContainer').classList.add('hidden');
+            document.getElementById('sub_kategori').disabled = true;
+            document.getElementById('sub_kategori').classList.add('bg-slate-100');
+            document.getElementById('colorHex').textContent = '#4f46e5';
+            hideModalAlert();
+        }
+
+        document.getElementById('openModalBtn').addEventListener('click', openModal);
+        document.getElementById('refreshBtn').addEventListener('click', fetchMyForms);
+
+        // 2. Fetch Primary Kategori
+        async function fetchPrimaryKategori() {
+            try {
+                const token = getAuthToken();
+                const response = await fetch(`${API_URL}/kategori/primary`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error("Gagal ambil kategori utama");
+
+                const selectPrimary = document.getElementById('primary_kategori');
+                const items = result.data || result;
+
+                selectPrimary.innerHTML = '<option value="">-- Pilih Kategori Utama --</option>';
+                if (Array.isArray(items)) {
+                    items.forEach(cat => {
+                        const opt = document.createElement('option');
+                        opt.value = cat.id;
+                        opt.textContent = cat.name;
+                        selectPrimary.appendChild(opt);
+                    });
+                    selectPrimary.disabled = false;
+                    selectPrimary.classList.remove('bg-slate-100');
                 }
-            } catch (err) {
-                showAlert('Terjadi kesalahan jaringan atau server mati');
+            } catch (e) {
+                console.error(e);
             }
         }
 
-        function renderForms(forms) {
-            const container = document.getElementById('forms-container');
-            const emptyState = document.getElementById('empty-state');
-            container.innerHTML = '';
+        // 3. Fetch Sub Kategori Berdasarkan Primary ID
+        document.getElementById('primary_kategori').addEventListener('change', async function () {
+            const primaryId = this.value;
+            const selectSub = document.getElementById('sub_kategori');
+            selectSub.innerHTML = '<option value="">Memuat sub kategori...</option>';
 
-            if (!forms || forms.length === 0) {
-                emptyState.classList.remove('hidden');
+            if (!primaryId) {
+                selectSub.disabled = true;
+                selectSub.classList.add('bg-slate-100');
                 return;
             }
 
-            emptyState.classList.add('hidden');
+            try {
+                const token = getAuthToken();
+                const response = await fetch(`${API_URL}/kategori/sub/${primaryId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await response.json();
+                const subs = result.data || result;
 
-            forms.forEach(item => {
-                const isCreator = item.access_type === 'Creator';
-                const isPublic = item.form_status === 'public';
-                const bannerUrl = item.form_banner ? `${API_BASE_URL}${item.form_banner}` : 'https://via.placeholder.com/400x150';
+                selectSub.innerHTML = '<option value="">-- Pilih Sub Kategori --</option>';
+                if (Array.isArray(subs) && subs.length > 0) {
+                    subs.forEach(sub => {
+                        const opt = document.createElement('option');
+                        opt.value = sub.id;
+                        opt.textContent = sub.name;
+                        selectSub.appendChild(opt);
+                    });
+                    selectSub.disabled = false;
+                    selectSub.classList.remove('bg-slate-100');
+                } else {
+                    selectSub.innerHTML = '<option value="">Tidak ada sub kategori</option>';
+                    selectSub.disabled = true;
+                }
+            } catch (e) {
+                console.error(e);
+                selectSub.innerHTML = '<option value="">Gagal memuat sub kategori</option>';
+            }
+        });
 
-                const card = document.createElement('div');
-                card.className = "bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition flex flex-col justify-between";
+        // 4. Token Generator Random
+        document.getElementById('generateToken').addEventListener('click', () => {
+            const rand = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
+            document.getElementById('token_respon').value = rand.substring(0, 16);
+        });
 
-                card.innerHTML = `
-        <div>
-          <!-- Banner Image -->
-          <div class="h-36 bg-slate-100 relative">
-            <img src="${bannerUrl}" alt="${item.form_title}" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/400x150?text=No+Banner'">
-            <span class="absolute top-3 left-3 bg-white/90 backdrop-blur-sm text-slate-700 text-xs font-semibold px-2.5 py-1 rounded-md shadow-sm">
-              ${item.category}
-            </span>
-            <span class="absolute top-3 right-3 text-xs font-semibold px-2.5 py-1 rounded-md shadow-sm ${isCreator ? 'bg-indigo-600 text-white' : 'bg-emerald-600 text-white'}">
-              ${item.access_type}
-            </span>
-          </div>
-        </div>
+        // 5. Theme Color Picker Live Sync
+        const colorInput = document.getElementById('theme_color');
+        colorInput.addEventListener('input', (e) => {
+            document.getElementById('colorHex').textContent = e.target.value;
+        });
 
-        <!-- Card Actions -->
-        <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
-          <!-- Tombol Ke Halaman Kelola Soal -->
-          <a href="create-soal.html?form_slug=${encodeURIComponent(item.form_slug)}&form_id=${item.form_id}" 
-             class="text-xs font-semibold px-3 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition flex items-center gap-1">
-             📝 Kelola Soal
-          </a>
+        // 6. Banner Preview Handler
+        const bannerInput = document.getElementById('banner');
+        bannerInput.addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (evt) {
+                    document.getElementById('bannerPreview').src = evt.target.result;
+                    document.getElementById('bannerPreviewContainer').classList.remove('hidden');
+                }
+                reader.readAsDataURL(file);
+            }
+        });
 
-          <div class="flex items-center gap-1">
-            ${isCreator ? `
-              <button onclick="toggleFormStatus('${item.form_slug}', '${isPublic ? 'private' : 'public'}')" class="text-xs font-medium px-2.5 py-1.5 rounded-md border border-slate-300 hover:bg-slate-100 transition">
-                ${isPublic ? 'Private' : 'Public'}
-              </button>
-              <button onclick="deleteForm('${item.form_slug}')" class="text-xs font-medium px-2.5 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-md transition">
-                Hapus
-              </button>
-            ` : `
-              <span class="text-xs text-slate-400 italic">Kolaborator</span>
-            `}
-          </div>
-        </div>
-      `;
+        document.getElementById('removeBanner').addEventListener('click', () => {
+            bannerInput.value = '';
+            document.getElementById('bannerPreviewContainer').classList.add('hidden');
+        });
 
-                container.appendChild(card);
-            });
-        }
-
-        async function handleCreateForm(e) {
+        // 7. Submit Form POST /form
+        document.getElementById('createForm').addEventListener('submit', async function (e) {
             e.preventDefault();
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Menyimpan...';
 
-            const title = document.getElementById('create-title').value;
-            const category = document.getElementById('create-category').value;
-            const token_respon = document.getElementById('create-token-respon').value;
-            const bannerFile = document.getElementById('create-banner').files[0];
-
+            const token = getAuthToken();
             const formData = new FormData();
-            formData.append('title', title);
-            formData.append('category', category);
-            formData.append('token_respon', token_respon);
-            formData.append('banner', bannerFile);
+            formData.append('title', document.getElementById('title').value);
+            formData.append('sub_kategori', document.getElementById('sub_kategori').value);
+            formData.append('token_respon', document.getElementById('token_respon').value);
+            formData.append('theme_color', document.getElementById('theme_color').value);
+
+            const bannerFile = bannerInput.files[0];
+            if (bannerFile) {
+                formData.append('banner', bannerFile);
+            }
 
             try {
-                const res = await fetch(`${API_BASE_URL}/form`, {
+                const response = await fetch(`${API_URL}/form`, {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    },
+                    headers: { 'Authorization': `Bearer ${token}` },
                     body: formData
                 });
 
-                const result = await res.json();
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.message || "Gagal membuat form");
 
-                if (res.ok) {
-                    showAlert(result.message || 'Form berhasil dibuat!', true);
-                    closeModal('modal-create');
-                    document.getElementById('form-create').reset();
-                    fetchMyForms();
-                } else {
-                    showAlert(result.message || 'Gagal membuat form');
-                }
-            } catch (err) {
-                showAlert('Tidak dapat terhubung ke server');
+                // Berhasil: Tutup modal & Refresh grid form user
+                closeModal();
+                showGlobalAlert("Form berhasil dibuat!", "success");
+                fetchMyForms();
+            } catch (error) {
+                showModalAlert(error.message, "error");
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Simpan Form';
             }
+        });
+
+        function showGlobalAlert(message, type) {
+            const alert = document.getElementById('globalAlert');
+            alert.textContent = message;
+            alert.className = `mb-6 p-4 rounded-xl text-sm font-medium shadow-sm ${type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`;
+            alert.classList.remove('hidden');
         }
 
-        async function handleJoinCollab(e) {
-            e.preventDefault();
-
-            const linkInput = document.getElementById('join-link').value.trim();
-
-            if (!linkInput) {
-                showAlert('Link undangan kolaborasi wajib diisi');
-                return;
-            }
-
-            let formSlug = '';
-            let tokenCollab = '';
-
-            try {
-                const parsedUrl = new URL(linkInput);
-
-                // 1. Ekstraksi token dari Query Parameter (?token=... atau ?token_collab=...)
-                tokenCollab = parsedUrl.searchParams.get('token') ||
-                    parsedUrl.searchParams.get('token_collab') ||
-                    parsedUrl.searchParams.get('token_respon');
-
-                // 2. Ekstraksi form_slug dari Pathname (misal: /form/judul-form-123 atau /form/judul-form-123/collaborate)
-                const pathSegments = parsedUrl.pathname.split('/').filter(Boolean);
-                const formIdx = pathSegments.indexOf('form');
-
-                if (formIdx !== -1 && pathSegments[formIdx + 1]) {
-                    formSlug = pathSegments[formIdx + 1];
-                } else if (pathSegments.length > 0) {
-                    // Fallback: mengambil segment pertama dari path jika struktur route berbeda
-                    formSlug = pathSegments[0];
-                }
-
-            } catch (err) {
-                showAlert('Format URL/Link tidak valid. Pastikan menyertakan http:// atau https://');
-                return;
-            }
-
-            // Validasi hasil ekstraksi
-            if (!formSlug || !tokenCollab) {
-                showAlert('URL tidak memiliki parameter form_slug atau token kolaborasi yang valid');
-                return;
-            }
-
-            try {
-                const res = await fetch(`${API_BASE_URL}/form/share?form_slug=${encodeURIComponent(formSlug)}`, {
-                    method: 'POST',
-                    headers: {
-                        ...headers,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ token_collab: tokenCollab })
-                });
-
-                const result = await res.json();
-
-                if (res.ok) {
-                    showAlert(result.message || 'Berhasil bergabung sebagai kolaborator!', true);
-                    closeModal('modal-join');
-                    document.getElementById('form-join').reset();
-                    fetchMyForms();
-                } else {
-                    showAlert(result.message || 'Gagal bergabung');
-                }
-            } catch (err) {
-                showAlert('Tidak dapat terhubung ke server');
-            }
+        function showModalAlert(message, type) {
+            const alert = document.getElementById('modalAlert');
+            alert.textContent = message;
+            alert.className = `mb-4 p-3 rounded-xl text-xs font-medium ${type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`;
+            alert.classList.remove('hidden');
         }
 
-        async function toggleFormStatus(form_slug, newStatus) {
-            try {
-                const res = await fetch(`${API_BASE_URL}/form?form_slug=${encodeURIComponent(form_slug)}`, {
-                    method: 'PATCH',
-                    headers: {
-                        ...headers,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ status: newStatus })
-                });
-
-                const result = await res.json();
-
-                if (res.ok) {
-                    showAlert(result.message, true);
-                    fetchMyForms();
-                } else {
-                    showAlert(result.message || 'Gagal merubah status');
-                }
-            } catch (err) {
-                showAlert('Tidak dapat terhubung ke server');
-            }
-        }
-
-        async function deleteForm(form_slug) {
-            if (!confirm('Apakah Anda yakin ingin menghapus form ini?')) return;
-
-            try {
-                const res = await fetch(`${API_BASE_URL}/form?form_slug=${encodeURIComponent(form_slug)}`, {
-                    method: 'DELETE',
-                    headers
-                });
-
-                const result = await res.json();
-
-                if (res.ok) {
-                    showAlert(result.message, true);
-                    fetchMyForms();
-                } else {
-                    showAlert(result.message || 'Gagal menghapus form');
-                }
-            } catch (err) {
-                showAlert('Tidak dapat terhubung ke server');
-            }
+        function hideModalAlert() {
+            document.getElementById('modalAlert').classList.add('hidden');
         }
     </script>
 </body>
