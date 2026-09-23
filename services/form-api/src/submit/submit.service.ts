@@ -67,8 +67,7 @@ export class SubmitService {
       .first()
 
     if (!getStatus) {
-
-      if (form.token_respon == null) {
+      if (form.token_respon === null || form.token_respon == "") {
         const insertFormSubmit = await this.changeFormSubmit("insert", req.id, form.id, 1, req.username)
         return {
           message: "Berhasil",

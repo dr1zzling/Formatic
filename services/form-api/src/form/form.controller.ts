@@ -123,6 +123,15 @@ export class FormController {
     return this.formService.updateBanner(req.user, form_slug, banner);
   }
 
+  @Patch('/description')
+  updateDescription(
+    @Request() req,
+    @Query('form_slug', ValidateFormExist) form_slug: string,
+    @Body('description') description: string
+  ){
+    return this.formService.updateDescription(req.user, form_slug, description)
+  }
+
   // Delete Banner Form
   @Delete('/banner')
   @UseGuards(JwtAuthGuard)

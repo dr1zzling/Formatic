@@ -78,6 +78,7 @@ export class FormService {
         slug: 'forms.slug',
         title: 'forms.title',
         banner: 'forms.banner',
+        description: 'forms.description',
 
         token_respon: 'forms.token_respon',
         token_collab: 'forms.token_collab',
@@ -294,6 +295,18 @@ export class FormService {
     return {
       message: "Berhasil Update Banner",
       data: { banner: bannerPath }
+    }
+  }
+
+  // Update Description
+  async updateDescription(req: { id: number }, form: any, description: string){
+    await this.knexService.connection("forms")
+    .update({ description: description })
+    .where("id", form.id)
+
+    return {
+      message: "Berhasil Update Description",
+      data: { description: description}
     }
   }
 

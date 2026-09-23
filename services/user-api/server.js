@@ -32,27 +32,27 @@ function isPasswordStrong(password) {
     return minLength && hasLowerCase && hasUpperCase && hasNumber
 }
 
-const loginLimit = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 5,
-    message: {
-        status: 429,
-        error: "Terlalu Banyak Percobaan Login, Silakan Coba Lagi Nanti"
-    },
-    standardHeaders: 'draft-8',
-    legacyHeaders: false,
-})
+// const loginLimit = rateLimit({
+//     windowMs: 15 * 60 * 1000,
+//     max: 5,
+//     message: {
+//         status: 429,
+//         error: "Terlalu Banyak Percobaan Login, Silakan Coba Lagi Nanti"
+//     },
+//     standardHeaders: 'draft-8',
+//     legacyHeaders: false,
+// })
 
-const registerLimit = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 2,
-    message: {
-        status: 429,
-        error: "Terlalu Banyak Percobaan Register, Silakan Coba Lagi Nanti"
-    },
-    standardHeaders: 'draft-8',
-    legacyHeaders: false,
-})
+// const registerLimit = rateLimit({
+//     windowMs: 15 * 60 * 1000,
+//     max: 2,
+//     message: {
+//         status: 429,
+//         error: "Terlalu Banyak Percobaan Register, Silakan Coba Lagi Nanti"
+//     },
+//     standardHeaders: 'draft-8',
+//     legacyHeaders: false,
+// })
 
 async function queryWithLimit(text, params) {
     return limit(() => pool.query(text, params))
@@ -74,7 +74,7 @@ async function userExist(username) {
 }
 
 // Register
-app.post('/user/register', registerLimit, async (req, res) => {
+app.post('/user/register', /* registerLimit */ async (req, res) => {
     try {
         const { username, password } = req.body
 
@@ -127,7 +127,7 @@ app.post('/user/register', registerLimit, async (req, res) => {
 })
 
 // Login
-app.post('/user/login', loginLimit, async (req, res) => {
+app.post('/user/login', /* loginLimit */ async (req, res) => {
     try {
         const { username, password } = req.body
         if (!username || !password) {
