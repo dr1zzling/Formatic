@@ -546,15 +546,16 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
   /// Hanya soal wajib diisi (is_required true, atau null untuk legacy) yang
   /// dicek belum dijawab; soal opsional (explicit false) boleh dilewati.
   bool _validateCurrentPage() {
+    final l10n = FormaticLocalizations.of(context);
     for (final q in _currentPageSoal) {
       if (!_isRequiredSoal(q)) continue;
       if (!_hasAnswered(q)) {
         final qText = stripHtmlTags(q['question']?.toString() ?? '');
+        final displayQuestion = qText.isEmpty
+            ? l10n.questionNoText
+            : (qText.length > 40 ? '${qText.substring(0, 40)}...' : qText);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(
-            '"${qText.isEmpty ? 'Soal ini' : (qText.length > 40 ? '${qText.substring(0, 40)}...' : qText)}" '
-            'belum dijawab.',
-          ),
+          content: Text(l10n.questionNotAnswered(displayQuestion)),
           backgroundColor: AppColors.error,
           duration: const Duration(seconds: 2),
         ));
@@ -1335,13 +1336,13 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
                    const SizedBox(height: 24),
                    const Divider(color: AppColors.inputBorder),
                   const SizedBox(height: 20),
-                  _buildInfoRow(
-                      icon: Icons.quiz_outlined,
-                      label: 'Jumlah Soal',
-                      value: '${_questions.length} Pertanyaan'),
-                  const SizedBox(height: 12),
-                  _buildInfoRow(
-                      icon: Icons.timer_outlined, label: 'Durasi', value: durationText),
+_buildInfoRow(
+                       icon: Icons.quiz_outlined,
+                       label: l10n.jumlahSoal,
+                       value: l10n.questionsLabel(_questions.length)),
+                   const SizedBox(height: 12),
+                   _buildInfoRow(
+                       icon: Icons.timer_outlined, label: l10n.duration, value: durationText),
                   if (_tokenNeeded) ...[
                     const SizedBox(height: 24),
                     const Divider(color: AppColors.inputBorder),

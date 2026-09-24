@@ -21,7 +21,7 @@ class MyFormsScreenState extends State<MyFormsScreen>
   @override
   bool get wantKeepAlive => true;
   int _selectedTab = 0;
-  String _username = 'User';
+  String _username = '';
   bool _isLoading = true;
   String _searchQuery = '';
   String _selectedCategory = 'All';
@@ -86,7 +86,7 @@ class MyFormsScreenState extends State<MyFormsScreen>
               form is Map ? form['setting'] : null;
           return {
             'id': (form['form_id'] ?? form['id'] ?? '').toString(),
-            'title': form['form_title'] ?? form['title'] ?? 'Untitled Form',
+            'title': form['form_title'] ?? form['title'] ?? l10n.untitledForm,
             'slug': form['form_slug'] ?? form['slug'] ?? '',
             'questions': 0,
             'responses': 0,
@@ -209,16 +209,16 @@ class MyFormsScreenState extends State<MyFormsScreen>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Join Kolaborasi',
+            Text(
+              l10n.joinDialogTitle,
               style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary),
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Tempelkan link undangan yang diberikan pemilik form:',
+            Text(
+              l10n.joinDialogBody,
               style:
                   TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
@@ -227,8 +227,7 @@ class MyFormsScreenState extends State<MyFormsScreen>
               controller: linkController,
               style: const TextStyle(fontSize: 14),
               decoration: InputDecoration(
-                hintText:
-                    '.../form/{slug}/collaborate?token=...',
+                hintText: l10n.joinLinkHint,
                 hintStyle:
                     const TextStyle(color: AppColors.textHint, fontSize: 13),
                 filled: true,
@@ -299,9 +298,8 @@ class MyFormsScreenState extends State<MyFormsScreen>
     } catch (_) {}
 
     if (slug.isEmpty || token.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text(
-            'Link tidak valid. Pastikan link undangan lengkap.'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(l10n.joinInvalid),
         backgroundColor: AppColors.error,
       ));
       return;
@@ -318,7 +316,7 @@ class MyFormsScreenState extends State<MyFormsScreen>
   }
 
   Future<void> _confirmDeleteToTrash(Map<String, dynamic> form) async {
-    final title = form['title'] as String? ?? 'Form';
+    final title = form['title'] as String? ?? l10n.untitledForm;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -330,10 +328,7 @@ class MyFormsScreenState extends State<MyFormsScreen>
             Text(l10n.deleteFormTitle),
           ],
         ),
-        content: Text(
-          'Form "$title" akan dipindahkan ke Trash. '
-          'Kamu bisa memulihkannya dalam 30 hari.',
-        ),
+        content: Text(l10n.deleteFormBody(title)),
         actions: [
           TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
@@ -425,14 +420,14 @@ ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(color: const Color(0xFFD9E6F6)),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(Icons.group_add_outlined,
                               size: 15, color: AppColors.primary),
                           SizedBox(width: 5),
                           Text(
-                            'Join',
+                            l10n.join,
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -464,7 +459,9 @@ ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                     ),
                     child: Center(
                       child: Text(
-                        _username.isNotEmpty ? _username[0].toUpperCase() : 'U',
+                        _username.isNotEmpty
+                            ? _username[0].toUpperCase()
+                            : l10n.genericUser[0].toUpperCase(),
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -566,7 +563,7 @@ decoration: InputDecoration(
                         ),
                         child: Center(
                           child: Text(
-                            cat,
+                            _localizedCategoryLabel(cat),
                             style: TextStyle(
                               color: isSelected
                                   ? Colors.white
@@ -593,9 +590,9 @@ decoration: InputDecoration(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
-                  _buildTab('Semua', 0),
+                  _buildTab(l10n.catAll, 0),
                   const SizedBox(width: 10),
-                  _buildTab('Dibagikan', 1),
+                  _buildTab(l10n.tabShared, 1),
                 ],
               ),
             ),
@@ -657,6 +654,15 @@ decoration: InputDecoration(
     );
   }
 
+  String _localizedCategoryLabel(String raw) {
+    final lower = raw.toLowerCase().trim();
+    if (lower == 'ujian') return l10n.catUjian;
+    if (lower == 'survei') return l10n.catSurvei;
+    if (lower == 'pengumpulan data') return l10n.catPengumpulanData;
+    if (lower == 'all' || lower == 'semua') return l10n.catAll;
+    return raw;
+  }
+
   Widget _buildTab(String label, int index) {
     final isSelected = _selectedTab == index;
     return GestureDetector(
@@ -716,7 +722,7 @@ decoration: InputDecoration(
             ),
             const SizedBox(height: 24),
             Text(
-              'No Forms Yet',
+              l10n.noFormsTitle,
               style: Theme.of(context).textTheme.displayMedium?.copyWith(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -724,7 +730,7 @@ decoration: InputDecoration(
             ),
             const SizedBox(height: 12),
             Text(
-              'Create your first form to get started',
+              l10n.noFormsBody,
               style: Theme.of(
                 context,
               ).textTheme.bodyMedium?.copyWith(fontSize: 15),

@@ -24,6 +24,13 @@ async function migrate() {
             password TEXT
         )    
         `)
+
+        // PERBAIKAN: tabel bisa al bestaan zonder `email` kolom (voorgaande
+        // migraties). Voeg de kolom idempotent toe zodat OTP-verificatie
+        // (register/login, beide vereisen `email`) blijft werken.
+        await pool.query(`
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR
+        `)
         console.log("Berhasil Membuat Table User")
 
         const userModel = [

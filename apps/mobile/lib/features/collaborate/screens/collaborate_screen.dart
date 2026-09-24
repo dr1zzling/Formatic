@@ -102,7 +102,7 @@ class _CollaborateScreenState extends State<CollaborateScreen> {
         ),
         const SizedBox(height: 12),
         Text(
-          'Form: ${widget.formSlug}',
+          l10n.collaborateFormLabel(widget.formSlug),
           style: const TextStyle(
               fontSize: 13,
               color: AppColors.textSecondary,

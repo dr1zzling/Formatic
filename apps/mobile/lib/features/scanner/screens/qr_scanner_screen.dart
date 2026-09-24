@@ -142,7 +142,7 @@ Text(
               autofocus: true,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                hintText: 'contoh: survey-kepuasan-1234567890',
+                hintText: l10n.scanSlugHint,
                 hintStyle:
                     TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13),
                 filled: true,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 
 class MyFormCard extends StatelessWidget {
   final String title;
@@ -25,6 +26,19 @@ class MyFormCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = FormaticLocalizations.of(context);
+    final roleLabel = role.toUpperCase() == 'CREATOR'
+        ? l10n.formCreatorRole
+        : role;
+    final String visibilityLabel;
+    if (visibility?.toLowerCase() == 'private') {
+      visibilityLabel = l10n.formPrivate;
+    } else if (visibility?.toLowerCase() == 'public') {
+      visibilityLabel = l10n.formPublic;
+    } else {
+      visibilityLabel = visibility ?? '';
+    }
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -49,15 +63,15 @@ class MyFormCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: role == 'CREATOR'
+                    color: roleLabel == l10n.formCreatorRole
                         ? AppColors.primary.withOpacity(0.10)
                         : AppColors.textSecondary.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    role,
+                    roleLabel,
                     style: TextStyle(
-                      color: role == 'CREATOR'
+                      color: roleLabel == l10n.formCreatorRole
                           ? AppColors.primary
                           : AppColors.textSecondary,
                       fontSize: 11,
@@ -109,7 +123,7 @@ class MyFormCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '$questions Questions',
+                  l10n.questionsLabel(questions),
                   style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
@@ -125,7 +139,7 @@ class MyFormCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    '$responses Responses',
+                    l10n.responsesLabel(responses ?? 0),
                     style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
@@ -142,7 +156,7 @@ class MyFormCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    visibility!,
+                    visibilityLabel,
                     style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/localizations/formatic_localizations.dart';
-import '../../home/screens/home_screen.dart';
+import 'otp_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -14,6 +14,7 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
@@ -23,6 +24,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void dispose() {
     _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -35,9 +37,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _isLoading = true;
       });
 
+      final email = _emailController.text.trim();
       final result = await AuthService.register(
         username: _usernameController.text.trim(),
         password: _passwordController.text,
+        email: email,
       );
 
       if (!mounted) return;
@@ -46,8 +50,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
       });
 
       if (result['success'] && mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => OtpScreen(
+              email: email,
+              verify: (otp) => AuthService.verifyRegister(email: email, otp: otp),
+              resend: () => AuthService.register(
+                username: _usernameController.text.trim(),
+                password: _passwordController.text,
+                email: email,
+              ),
+            ),
+          ),
         );
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -257,6 +271,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ),
                             prefixIcon: Icon(
                               Icons.person_outline,
+                              color: AppColors.textHint,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        // Email
+                        Text(
+                          l10n.email,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.navy,
+                            fontFamily: 'Plus Jakarta Sans',
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _emailController,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return l10n.emailRequired;
+                            }
+                            if (!value.contains(RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$'))) {
+                              return l10n.emailInvalid;
+                            }
+                            return null;
+                          },
+                          decoration: InputDecoration(
+                            hintText: l10n.emailHint,
+                            hintStyle: TextStyle(
+                              color: AppColors.textHint,
+                              fontSize: 13,
+                            ),
+                            prefixIcon: Icon(
+                              Icons.mail_outline,
                               color: AppColors.textHint,
                               size: 20,
                             ),

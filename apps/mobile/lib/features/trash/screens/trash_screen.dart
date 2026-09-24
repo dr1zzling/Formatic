@@ -117,7 +117,7 @@ class _TrashScreenState extends State<TrashScreen> {
     final l10n = FormaticLocalizations.of(context);
     final item = _items[index];
     final slug = item['slug'] as String? ?? '';
-    final title = item['title'] as String? ?? 'Form';
+    final title = item['title'] as String? ?? l10n.untitledForm;
 
     final ok = await showDialog<bool>(
       context: context,
@@ -251,7 +251,7 @@ ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                     child: Text(
                       _username.isNotEmpty
                           ? _username[0].toUpperCase()
-                          : 'U',
+                          : l10n.genericUser[0].toUpperCase(),
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -428,7 +428,19 @@ class _TrashItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = FormaticLocalizations.of(context);
     final category = item['category'] as String? ?? '';
+    final String categoryLabel;
+    final lowerCat = category.toLowerCase().trim();
+    if (lowerCat == 'ujian') {
+      categoryLabel = l10n.catUjian;
+    } else if (lowerCat == 'survei') {
+      categoryLabel = l10n.catSurvei;
+    } else if (lowerCat == 'pengumpulan data') {
+      categoryLabel = l10n.catPengumpulanData;
+    } else {
+      categoryLabel = category;
+    }
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -464,7 +476,7 @@ class _TrashItem extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item['title'] as String? ?? 'Form',
+                      item['title'] as String? ?? l10n.untitledForm,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -478,7 +490,7 @@ class _TrashItem extends StatelessWidget {
                       children: [
                         if (category.isNotEmpty) ...[
                           Text(
-                            category,
+                            categoryLabel,
                             style: const TextStyle(
                               fontSize: 11,
                               color: AppColors.textSecondary,

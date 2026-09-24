@@ -62,6 +62,19 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     }
   }
 
+  String _localizedCategoryLabel(String raw) {
+    final lower = raw.toLowerCase().trim();
+    if (lower == 'ujian') return FormaticLocalizations.of(context).catUjian;
+    if (lower == 'survei') return FormaticLocalizations.of(context).catSurvei;
+    if (lower == 'pengumpulan data') {
+      return FormaticLocalizations.of(context).catPengumpulanData;
+    }
+    if (lower == 'semua' || lower == 'all') {
+      return FormaticLocalizations.of(context).catAll;
+    }
+    return raw;
+  }
+
   List<Map<String, dynamic>> get _filtered {
     return _forms.where((f) {
       final title = (f['title'] as String? ?? '').toLowerCase();
@@ -150,7 +163,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                       ),
                     ),
                     child: Text(
-                      cat,
+                      _localizedCategoryLabel(cat),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: selected
@@ -217,8 +230,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
             const Icon(Icons.explore_outlined,
                 size: 64, color: AppColors.textSecondary),
             const SizedBox(height: 16),
-            const Text(
-              'Tidak ada form',
+            Text(
+              FormaticLocalizations.of(context).noFormsFoundTitle,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -226,8 +239,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Belum ada form publik yang tersedia.',
+            Text(
+              FormaticLocalizations.of(context).noFormsFoundBody,
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.textSecondary),
             ),
@@ -246,11 +259,20 @@ class _DiscoveryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = FormaticLocalizations.of(context);
     final banner = form['banner'] as String? ?? '';
     final category = form['category'] as String? ?? '';
     final bannerUrl = banner.isNotEmpty
         ? '${ApiConfig.formApiBaseUrl}$banner'
         : null;
+
+    String categoryLabel(String raw) {
+      final lower = raw.toLowerCase().trim();
+      if (lower == 'ujian') return l10n.catUjian;
+      if (lower == 'survei') return l10n.catSurvei;
+      if (lower == 'pengumpulan data') return l10n.catPengumpulanData;
+      return raw;
+    }
 
     return GestureDetector(
       onTap: onTap,
@@ -308,7 +330,7 @@ class _DiscoveryCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        category,
+                        categoryLabel(category),
                         style: const TextStyle(
                           fontSize: 9,
                           fontWeight: FontWeight.w700,
@@ -332,8 +354,8 @@ class _DiscoveryCard extends StatelessWidget {
                       const Icon(Icons.visibility_outlined,
                           size: 13, color: AppColors.textHint),
                       const SizedBox(width: 4),
-                      const Text(
-                        'Lihat soal',
+                      Text(
+                        l10n.viewQuestions,
                         style: TextStyle(
                             fontSize: 11, color: AppColors.textHint),
                       ),
@@ -421,7 +443,8 @@ class _FormPreviewSheetState extends State<_FormPreviewSheet> {
           .where((f) =>
               (f['access_type'] ?? '').toString().toUpperCase() == 'CREATOR')
           .map((f) => {
-                'title': f['form_title'] ?? f['title'] ?? 'Untitled',
+                'title': f['form_title'] ?? f['title'] ??
+                    FormaticLocalizations.of(context).untitled,
                 'slug': f['form_slug'] ?? f['slug'] ?? '',
               })
           .toList();
@@ -477,7 +500,7 @@ class _FormPreviewSheetState extends State<_FormPreviewSheet> {
       ));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(result['message'] ?? 'Gagal menyalin soal.'),
+        content: Text(result['message'] ?? l10n.copyFailed),
         backgroundColor: AppColors.error,
       ));
     }
@@ -488,9 +511,8 @@ class _FormPreviewSheetState extends State<_FormPreviewSheet> {
     await _loadMyForms();
     if (!mounted) return;
     if (_myForms.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text(
-            'Tidak ada form milik Anda. Buat form terlebih dahulu.'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(l10n.noOwnForms),
         backgroundColor: AppColors.warning,
       ));
       return;
@@ -506,8 +528,8 @@ class _FormPreviewSheetState extends State<_FormPreviewSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Salin ke Form Saya',
+            Text(
+              l10n.copyToMyForms,
               style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -515,7 +537,7 @@ class _FormPreviewSheetState extends State<_FormPreviewSheet> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Pilih form tujuan (${_soal.length} soal akan disalin):',
+              l10n.copyDialogBody(_soal.length),
               style: const TextStyle(
                   fontSize: 13, color: AppColors.textSecondary),
             ),
@@ -740,8 +762,8 @@ class _FormPreviewSheetState extends State<_FormPreviewSheet> {
                                       color: Colors.white))
                               : const Icon(Icons.copy_all, size: 18),
                           label: Text(_isCopying
-                              ? 'Menyalin...'
-                              : 'Salin ${_soal.length} Soal ke Form Saya'),
+                              ? l10n.copying
+                              : l10n.copyQuestionsButton(_soal.length)),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,

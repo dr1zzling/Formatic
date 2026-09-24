@@ -258,6 +258,7 @@ child: Text(
   }
 
   Widget _buildEmpty() {
+    final l10n = FormaticLocalizations.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(40),
@@ -275,8 +276,8 @@ child: Text(
                   size: 40, color: AppColors.primary),
             ),
             const SizedBox(height: 20),
-            const Text(
-              'Belum ada riwayat',
+            Text(
+              l10n.historyEmptyTitle,
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -284,8 +285,8 @@ child: Text(
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Riwayat pengisian form akan muncul\ndi sini setelah kamu submit form.',
+            Text(
+              l10n.historyEmptyBody,
               textAlign: TextAlign.center,
               style: TextStyle(
                   fontSize: 14, color: AppColors.textSecondary),
@@ -312,7 +313,19 @@ class _HistoryItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = FormaticLocalizations.of(context);
     final category = item['category'] as String? ?? '';
+    final String categoryLabel;
+    final lowerCat = category.toLowerCase().trim();
+    if (lowerCat == 'ujian') {
+      categoryLabel = l10n.catUjian;
+    } else if (lowerCat == 'survei') {
+      categoryLabel = l10n.catSurvei;
+    } else if (lowerCat == 'pengumpulan data') {
+      categoryLabel = l10n.catPengumpulanData;
+    } else {
+      categoryLabel = category;
+    }
     final isQuiz = category.toLowerCase().contains('ujian') ||
         category.toLowerCase().contains('quiz');
 
@@ -354,7 +367,7 @@ class _HistoryItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    item['title'] as String? ?? 'Form',
+                    item['title'] as String? ?? l10n.untitledForm,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -375,7 +388,7 @@ class _HistoryItem extends StatelessWidget {
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            category,
+                            categoryLabel,
                             style: const TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
@@ -389,7 +402,7 @@ class _HistoryItem extends StatelessWidget {
                           size: 12, color: AppColors.success),
                       const SizedBox(width: 4),
                       Text(
-                        'Selesai · $relativeTime',
+                        '${l10n.completedLabel} · $relativeTime',
                         style: const TextStyle(
                           fontSize: 11,
                           color: AppColors.textSecondary,

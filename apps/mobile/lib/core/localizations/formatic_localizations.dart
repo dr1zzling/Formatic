@@ -45,8 +45,14 @@ abstract class FormaticLocalizations {
   String get username;
   String get usernameHint;
   String get usernameRequired;
+  String get loginIdentifier;
+  String get loginIdentifierHint;
   String get password;
   String get passwordRequired;
+  String get email;
+  String get emailHint;
+  String get emailRequired;
+  String get emailInvalid;
   String get forgotPassword;
   String get signIn;
   String get noAccountYet;
@@ -79,6 +85,21 @@ abstract class FormaticLocalizations {
   String get resetSuccessSubtitle;
   String get goToLogin;
 
+  // ── Auth: OTP ────────────────────────────────────────────────────────────
+  String get otpTitle;
+  String otpBody(String email);
+  String get otpCodeLabel;
+  String get otpVerify;
+  String get otpVerifying;
+  String get otpVerifyFailed;
+  String get otpInvalidCode;
+  String get otpResendHint;
+  String get otpResend;
+  String otpResendCooldown(int seconds);
+  String get otpResent;
+  String get otpResendFailed;
+  String get otpWrongEmail;
+
   // ── Bottom navigation / Home ────────────────────────────────────────────
   String get tabHome;
   String get tabMyForms;
@@ -105,6 +126,49 @@ abstract class FormaticLocalizations {
   String get catUjian;
   String get catSurvei;
   String get catPengumpulanData;
+
+  // ── Cards / meta ─────────────────────────────────────────────────────────
+  String responsesLabel(int count);
+
+  // ── Create form / description ───────────────────────────────────────────
+  String get formDescriptionLabel;
+  String get formDescriptionHint;
+  String get formDescriptionSection;
+  String get formDescriptionSubtitle;
+  String get formDescriptionInputHint;
+  String get subCategoryLoadFailed;
+  String get themeColorOptional;
+  String get pts;
+
+  // ── Form editor ──────────────────────────────────────────────────────────
+  String get statusSaveFailed;
+  String get descriptionSaveFailed;
+  String get settingsSaveFailed;
+  String get bannerUploadButton;
+  String get bannerFormTitle;
+  String get bannerFormSubtitle;
+
+  // ── QR scanner ───────────────────────────────────────────────────────────
+  String get scanSlugHint;
+
+  // ── Import Word ──────────────────────────────────────────────────────────
+  String get importPickDialogTitle;
+  String importPickErrorMessage(String detail);
+  String importReadErrorMessage(String detail);
+  String get importInvalidFile;
+  String get importPickFirst;
+  String get importFailedMessage;
+  String get importTemplateHint;
+  String importSuccessBody(int count, String filename, String formTitle);
+  String get importSubtitle;
+  String get importTapToChoose;
+  String importFileReady(String size);
+  String get importOnlyDocx;
+  String get importSeeTemplate;
+  String get importButton;
+  String get importChooseFirst;
+  String get importTemplateContentNote;
+  String get importTemplateInstructions;
 
   // ── Profile ─────────────────────────────────────────────────────────────
   String get profile;
@@ -251,6 +315,28 @@ abstract class FormaticLocalizations {
   String get noQuestionsYet;
   String get noQuestionsBody;
   String get addQuestion;
+  String get questionType;
+  String get questionPage;
+  String get questionPageHelper;
+  String get questionLabel;
+  String get mathKeyboard;
+  String get closeMath;
+  String get questionRequiredError;
+  String get optionalScore;
+  String get optionalImage;
+  String get addImage;
+  String get optionalAudio;
+  String get addAudio;
+  String get ratingScale;
+  String get ratingPreview;
+  String get answerOptions;
+  String get correctAnswerHint;
+  String optionPlaceholder(int index);
+  String correctOptionMessage(int index);
+  String get updateQuestion;
+  String get saveQuestion;
+  String get replaceFile;
+  String get audioPreviewAfterSave;
   String get deleteQuestion;
   String deleteQuestionBody(String question);
   String get questionDeleted;
@@ -554,9 +640,21 @@ class FormaticLocalizationsId extends FormaticLocalizations {
   @override
   String get usernameRequired => 'Silakan masukkan nama pengguna';
   @override
+  String get loginIdentifier => 'Nama Pengguna / Email';
+  @override
+  String get loginIdentifierHint => 'Nama atau email';
+  @override
   String get password => 'Kata Sandi';
   @override
   String get passwordRequired => 'Silakan masukkan kata sandi';
+  @override
+  String get email => 'Email';
+  @override
+  String get emailHint => 'your@email.com';
+  @override
+  String get emailRequired => 'Silakan masukkan email';
+  @override
+  String get emailInvalid => 'Silakan masukkan email yang valid';
   @override
   String get forgotPassword => 'Lupa kata sandi?';
   @override
@@ -620,6 +718,33 @@ class FormaticLocalizationsId extends FormaticLocalizations {
   @override
 
   @override
+  String get otpTitle => 'Cek email kamu';
+  @override
+  String otpBody(String email) => 'Kami mengirim kode verifikasi 6 digit ke $email';
+  @override
+  String get otpCodeLabel => 'KODE OTP';
+  @override
+  String get otpVerify => 'Verifikasi';
+  @override
+  String get otpVerifying => 'Memverifikasi...';
+  @override
+  String get otpVerifyFailed => 'Kode OTP salah atau sudah kadaluarsa. Periksa kode dan coba lagi.';
+  @override
+  String get otpInvalidCode => 'Kode OTP harus terdiri dari 6 angka';
+  @override
+  String get otpResendHint => 'Masih belum sampai? ';
+  @override
+  String get otpResend => 'Kirim ulang kode';
+  @override
+  String otpResendCooldown(int seconds) => 'Kirim ulang ($seconds s)';
+  @override
+  String get otpResent => 'Kode baru terkirim ke email kamu.';
+  @override
+  String get otpResendFailed => 'Gagal mengirim ulang kode.';
+  @override
+  String get otpWrongEmail => 'salah email?';
+
+  @override
   String get tabHome => 'Home';
   @override
   String get tabMyForms => 'My Forms';
@@ -667,6 +792,93 @@ class FormaticLocalizationsId extends FormaticLocalizations {
   String get catSurvei => 'Survei';
   @override
   String get catPengumpulanData => 'Pengumpulan Data';
+
+  @override
+  String responsesLabel(int count) => '$count Jawaban';
+  @override
+  String get formDescriptionLabel => 'Deskripsi (Opsional)';
+  @override
+  String get formDescriptionHint => 'Tambahkan deskripsi form';
+  @override
+  String get formDescriptionSection => 'DESKRIPSI FORM';
+  @override
+  String get formDescriptionSubtitle => 'Tambahkan penjelasan yang akan dilihat peserta.';
+  @override
+  String get formDescriptionInputHint => 'Masukkan deskripsi form';
+  @override
+  String get subCategoryLoadFailed => 'Gagal memuat sub-kategori';
+  @override
+  String get themeColorOptional => 'WARNA TEMA (OPSIONAL)';
+  @override
+  String get pts => 'pts';
+  @override
+  String get statusSaveFailed => 'Gagal menyimpan status form.';
+  @override
+  String get descriptionSaveFailed => 'Gagal menyimpan deskripsi.';
+  @override
+  String get settingsSaveFailed => 'Gagal menyimpan pengaturan.';
+  @override
+  String get bannerUploadButton => 'Upload';
+  @override
+  String get bannerFormTitle => 'Banner Form';
+  @override
+  String get bannerFormSubtitle => 'Upload gambar banner untuk form (opsional).';
+  @override
+  String get scanSlugHint => 'Contoh: survey-kepuasan-1234567890';
+  @override
+  String get importPickDialogTitle => 'Pilih file .docx';
+  @override
+  String importPickErrorMessage(String detail) => 'Gagal membuka file picker: $detail';
+  @override
+  String importReadErrorMessage(String detail) => 'Gagal membaca file: $detail';
+  @override
+  String get importInvalidFile => 'File yang dipilih bukan file .docx yang valid. Silakan pilih ulang.';
+  @override
+  String get importPickFirst => 'Pilih file .docx terlebih dahulu.';
+  @override
+  String get importFailedMessage => 'Gagal mengimpor soal.';
+  @override
+  String get importTemplateHint => 'Pastikan format mengikuti template_import.docx yang tersedia di repositori.';
+  @override
+  String importSuccessBody(int count, String filename, String formTitle) =>
+      'Berhasil mengimpor $count soal dari file $filename ke form "$formTitle".';
+  @override
+  String get importSubtitle => 'Impor soal dari file .docx ke form ini';
+  @override
+  String get importTapToChoose => 'Tap untuk memilih file .docx';
+  @override
+  String importFileReady(String size) => '$size · siap diimpor (ketuk untuk ganti)';
+  @override
+  String get importOnlyDocx => 'Hanya menerima file .docx';
+  @override
+  String get importSeeTemplate => 'Lihat format template';
+  @override
+  String get importButton => 'Import Soal';
+  @override
+  String get importChooseFirst => 'Pilih file terlebih dahulu';
+  @override
+  String get importTemplateContentNote =>
+      'Ini adalah isi file template resmi (template_import.docx). Buat file .docx Anda '
+      'mengikuti pola yang sama: setiap soal diawali nomor, pilihan jawaban dilengkapi '
+      'Kunci dan Tipe.';
+  @override
+  String get importTemplateInstructions =>
+      'File template (template_import.docx) tersedia di folder apps/mobile.\n\n'
+      'Format soal di dalam file .docx harus mengikuti urutan berikut (satu soal per blok):\n\n'
+      '1. Pertanyaan soal...\n'
+      'A. Pilihan pertama\n'
+      'B. Pilihan kedua\n'
+      'C. Pilihan ketiga\n'
+      'Kunci: A\n'
+      'Tipe: radio\n\n'
+      'Keterangan:\n'
+      '• Nomor soal diawali angka, contoh "1." atau "1)"\n'
+      '• Pilihan jawaban diawali huruf A/B/C, contoh "A." atau "A)"\n'
+      '• "Kunci:" atau "Jawaban:" diisi huruf pilihan benar (A/B/C). Lebih dari satu huruf '
+      '(misal "A,C") otomatis menjadi tipe checkbox.\n'
+      '• "Tipe:" (opsional) berisi radio, checkbox, text, atau file. Tanpa baris tipe, '
+      'soal otomatis radio/checkbox bila ada pilihan, atau text bila tanpa pilihan.\n\n'
+      'Catatan: tipe "rating" tidak didukung oleh database backend saat ini.';
 
   @override
   String get profile => 'Profile';
@@ -939,7 +1151,51 @@ class FormaticLocalizationsId extends FormaticLocalizations {
   @override
   String get noQuestionsBody => 'Start adding questions to your form';
   @override
-  String get addQuestion => 'Add Question';
+  String get addQuestion => 'Tambah Soal';
+  @override
+  String get questionType => 'Tipe Soal';
+  @override
+  String get questionPage => 'Halaman';
+  @override
+  String get questionPageHelper => 'Halaman penempatan soal';
+  @override
+  String get questionLabel => 'Pertanyaan';
+  @override
+  String get mathKeyboard => 'Matematika';
+  @override
+  String get closeMath => 'Tutup Matematika';
+  @override
+  String get questionRequiredError => 'Pertanyaan tidak boleh kosong';
+  @override
+  String get optionalScore => 'Skor Soal (Opsional)';
+  @override
+  String get optionalImage => 'Gambar (Opsional)';
+  @override
+  String get addImage => 'Tambah Gambar';
+  @override
+  String get optionalAudio => 'Audio (Opsional)';
+  @override
+  String get addAudio => 'Tambah Audio';
+  @override
+  String get ratingScale => 'Skala Rating';
+  @override
+  String get ratingPreview => 'Preview: Bintang 1–5';
+  @override
+  String get answerOptions => 'Pilihan Jawaban';
+  @override
+  String get correctAnswerHint => 'Centang ✓ untuk menandai jawaban benar';
+  @override
+  String optionPlaceholder(int index) => 'Opsi $index';
+  @override
+  String correctOptionMessage(int index) => 'Opsi $index ditandai sebagai jawaban benar';
+  @override
+  String get updateQuestion => 'Perbarui Soal';
+  @override
+  String get saveQuestion => 'Simpan Soal';
+  @override
+  String get replaceFile => 'Ganti';
+  @override
+  String get audioPreviewAfterSave => 'Preview audio tersedia setelah soal disimpan.';
   @override
   String get deleteQuestion => 'Hapus Soal';
   @override
@@ -1443,9 +1699,21 @@ class FormaticLocalizationsEn extends FormaticLocalizations {
   @override
   String get usernameRequired => 'Please enter your username';
   @override
+  String get loginIdentifier => 'Username / Email';
+  @override
+  String get loginIdentifierHint => 'Username or email';
+  @override
   String get password => 'Password';
   @override
   String get passwordRequired => 'Please enter your password';
+  @override
+  String get email => 'Email';
+  @override
+  String get emailHint => 'your@email.com';
+  @override
+  String get emailRequired => 'Please enter your email';
+  @override
+  String get emailInvalid => 'Please enter a valid email address';
   @override
   String get forgotPassword => 'Forgot password?';
   @override
@@ -1509,6 +1777,33 @@ class FormaticLocalizationsEn extends FormaticLocalizations {
   @override
 
   @override
+  String get otpTitle => 'Check your email';
+  @override
+  String otpBody(String email) => 'We sent a 6-digit verification code to $email';
+  @override
+  String get otpCodeLabel => 'OTP CODE';
+  @override
+  String get otpVerify => 'Verify';
+  @override
+  String get otpVerifying => 'Verifying...';
+  @override
+  String get otpVerifyFailed => 'The OTP code is wrong or has expired. Please check the code and try again.';
+  @override
+  String get otpInvalidCode => 'The OTP code must be 6 digits';
+  @override
+  String get otpResendHint => "Haven't received it? ";
+  @override
+  String get otpResend => 'Resend code';
+  @override
+  String otpResendCooldown(int seconds) => 'Resend ($seconds s)';
+  @override
+  String get otpResent => 'A new code has been sent to your email.';
+  @override
+  String get otpResendFailed => 'Failed to resend the code.';
+  @override
+  String get otpWrongEmail => 'Wrong email?';
+
+  @override
   String get tabHome => 'Home';
   @override
   String get tabMyForms => 'My Forms';
@@ -1556,6 +1851,93 @@ class FormaticLocalizationsEn extends FormaticLocalizations {
   String get catSurvei => 'Survey';
   @override
   String get catPengumpulanData => 'Data Collection';
+
+  @override
+  String responsesLabel(int count) => '$count Responses';
+  @override
+  String get formDescriptionLabel => 'Description (Optional)';
+  @override
+  String get formDescriptionHint => 'Add a description to your form';
+  @override
+  String get formDescriptionSection => 'FORM DESCRIPTION';
+  @override
+  String get formDescriptionSubtitle => 'Add an explanation participants will see.';
+  @override
+  String get formDescriptionInputHint => 'Enter form description';
+  @override
+  String get subCategoryLoadFailed => 'Failed to load sub categories';
+  @override
+  String get themeColorOptional => 'THEME COLOR (OPTIONAL)';
+  @override
+  String get pts => 'pts';
+  @override
+  String get statusSaveFailed => 'Failed to save form status.';
+  @override
+  String get descriptionSaveFailed => 'Failed to save description.';
+  @override
+  String get settingsSaveFailed => 'Failed to save settings.';
+  @override
+  String get bannerUploadButton => 'Upload';
+  @override
+  String get bannerFormTitle => 'Form Banner';
+  @override
+  String get bannerFormSubtitle => 'Upload a banner image for the form (optional).';
+  @override
+  String get scanSlugHint => 'Example: survey-kepuasan-1234567890';
+  @override
+  String get importPickDialogTitle => 'Choose a .docx file';
+  @override
+  String importPickErrorMessage(String detail) => 'Failed to open the file picker: $detail';
+  @override
+  String importReadErrorMessage(String detail) => 'Failed to read the file: $detail';
+  @override
+  String get importInvalidFile => 'The selected file is not a valid .docx file. Please choose again.';
+  @override
+  String get importPickFirst => 'Choose a .docx file first.';
+  @override
+  String get importFailedMessage => 'Failed to import questions.';
+  @override
+  String get importTemplateHint => 'Make sure the format follows the template_import.docx available in the repository.';
+  @override
+  String importSuccessBody(int count, String filename, String formTitle) =>
+      'Successfully imported $count questions from $filename into form "$formTitle".';
+  @override
+  String get importSubtitle => 'Import questions from a .docx file into this form';
+  @override
+  String get importTapToChoose => 'Tap to choose a .docx file';
+  @override
+  String importFileReady(String size) => '$size · ready to import (tap to change)';
+  @override
+  String get importOnlyDocx => 'Only .docx files are accepted';
+  @override
+  String get importSeeTemplate => 'View template format';
+  @override
+  String get importButton => 'Import Questions';
+  @override
+  String get importChooseFirst => 'Choose a file first';
+  @override
+  String get importTemplateContentNote =>
+      'This is the content of the official template file (template_import.docx). Build '
+      'your .docx file following the same pattern: each question starts with a number, '
+      'and answer choices include Key and Type.';
+  @override
+  String get importTemplateInstructions =>
+      'The template file (template_import.docx) is available in the apps/mobile folder.\n\n'
+      'The format of each question inside the .docx must follow this order (one question per block):\n\n'
+      '1. Question text...\n'
+      'A. First choice\n'
+      'B. Second choice\n'
+      'C. Third choice\n'
+      'Key: A\n'
+      'Type: radio\n\n'
+      'Notes:\n'
+      '• The question number starts with a digit, e.g. "1." or "1)"\n'
+      '• Answer choices start with letters A/B/C, e.g. "A." or "A)"\n'
+      '• "Key:" or "Answer:" holds the letter of the correct choice (A/B/C). More than one '
+      'letter (e.g. "A,C") automatically becomes a checkbox question.\n'
+      '• "Type:" (optional) can be radio, checkbox, text, or file. Without a type line, '
+      'the question automatically becomes radio/checkbox when it has choices, or text when it has none.\n\n'
+      'Note: type "rating" is not supported by the backend database at this time.';
 
   @override
   String get profile => 'Profile';
@@ -1829,6 +2211,50 @@ class FormaticLocalizationsEn extends FormaticLocalizations {
   String get noQuestionsBody => 'Start adding questions to your form';
   @override
   String get addQuestion => 'Add Question';
+  @override
+  String get questionType => 'Question Type';
+  @override
+  String get questionPage => 'Page';
+  @override
+  String get questionPageHelper => 'Page where the question is placed';
+  @override
+  String get questionLabel => 'Question';
+  @override
+  String get mathKeyboard => 'Math';
+  @override
+  String get closeMath => 'Close Math';
+  @override
+  String get questionRequiredError => 'Question cannot be empty';
+  @override
+  String get optionalScore => 'Question Score (Optional)';
+  @override
+  String get optionalImage => 'Image (Optional)';
+  @override
+  String get addImage => 'Add Image';
+  @override
+  String get optionalAudio => 'Audio (Optional)';
+  @override
+  String get addAudio => 'Add Audio';
+  @override
+  String get ratingScale => 'Rating Scale';
+  @override
+  String get ratingPreview => 'Preview: 1–5 Stars';
+  @override
+  String get answerOptions => 'Answer Options';
+  @override
+  String get correctAnswerHint => 'Check ✓ to mark the correct answer';
+  @override
+  String optionPlaceholder(int index) => 'Option $index';
+  @override
+  String correctOptionMessage(int index) => 'Option $index marked as correct';
+  @override
+  String get updateQuestion => 'Update Question';
+  @override
+  String get saveQuestion => 'Save Question';
+  @override
+  String get replaceFile => 'Replace';
+  @override
+  String get audioPreviewAfterSave => 'Audio preview is available after the question is saved.';
   @override
   String get deleteQuestion => 'Delete Question';
   @override

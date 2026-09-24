@@ -44,14 +44,14 @@ class _ImportWordScreenState extends State<ImportWordScreen> {
     List<PlatformFile> files;
     try {
       files = await FilePickerPlatform.instance.pickFiles(
-        dialogTitle: 'Pilih file .docx',
+        dialogTitle: l10n.importPickDialogTitle,
         type: FileType.custom,
         allowedExtensions: ['docx'],
       );
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = 'Gagal membuka file picker: ${e.toString()}';
+        _errorMessage = l10n.importPickErrorMessage(e.toString());
       });
       return;
     }
@@ -68,7 +68,7 @@ class _ImportWordScreenState extends State<ImportWordScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = 'Gagal membaca file: ${e.toString()}';
+        _errorMessage = l10n.importReadErrorMessage(e.toString());
       });
       return;
     }
@@ -81,8 +81,7 @@ class _ImportWordScreenState extends State<ImportWordScreen> {
         _fileName = null;
         _fileBytes = null;
         _fileSize = 0;
-        _errorMessage =
-            'File yang dipilih bukan file .docx yang valid. Silakan pilih ulang.';
+        _errorMessage = l10n.importInvalidFile;
       });
       return;
     }
@@ -119,7 +118,7 @@ class _ImportWordScreenState extends State<ImportWordScreen> {
     final fileName = _fileName;
     if (fileBytes == null || fileName == null) {
       setState(() {
-        _errorMessage = 'Pilih file .docx terlebih dahulu. ${_formatTemplateHint()}';
+        _errorMessage = '${l10n.importPickFirst} ${l10n.importTemplateHint}';
       });
       return;
     }
@@ -165,7 +164,7 @@ class _ImportWordScreenState extends State<ImportWordScreen> {
       setState(() {
         _isLoading = false;
         _errorMessage =
-            result['message'] ?? 'Gagal mengimpor soal. ${_formatTemplateHint()}';
+            '${l10n.importFailedMessage} ${l10n.importTemplateHint}';
       });
     }
   }
@@ -239,7 +238,7 @@ class _ImportWordScreenState extends State<ImportWordScreen> {
           ],
         ),
         content: Text(
-          'Berhasil mengimpor $count soal dari file $_fileName ke form "${widget.formTitle}".',
+          l10n.importSuccessBody(count, _fileName ?? '', widget.formTitle),
         ),
         actions: [
           TextButton(
@@ -252,10 +251,6 @@ child: Text(
         ],
       ),
     );
-  }
-
-  String _formatTemplateHint() {
-    return 'Pastikan format mengikuti template_import.docx yang tersedia di repositori.';
   }
 
   Future<void> _showTemplateFormat() async {
@@ -305,11 +300,10 @@ title: Row(
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Text(
-                  'Ini adalah isi file template resmi (template_import.docx). '
-                  'Buat file .docx Anda mengikuti pola yang sama: setiap soal '
-                  'diawali nomor, pilihan jawaban dilengkapi Kunci dan Tipe.',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                Text(
+                  l10n.importTemplateContentNote,
+                  style: TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary),
                 ),
               ],
             ),
@@ -317,8 +311,8 @@ title: Row(
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
-                'Tutup',
+              child: Text(
+                l10n.close,
                 style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600),
               ),
             ),
@@ -341,26 +335,8 @@ title: Row(
             Text(l10n.importTemplateDocx),
           ],
         ),
-        content: const SingleChildScrollView(
-          child: Text(
-            'File template (template_import.docx) tersedia di folder apps/mobile.\n\n'
-            'Format soal di dalam file .docx harus mengikuti urutan berikut (satu soal per blok):\n\n'
-            '1. Pertanyaan soal...\n'
-            'A. Pilihan pertama\n'
-            'B. Pilihan kedua\n'
-            'C. Pilihan ketiga\n'
-            'Kunci: A\n'
-            'Tipe: radio\n\n'
-            'Keterangan:\n'
-            '• Nomor soal diawali angka, contoh "1." atau "1)"\n'
-            '• Pilihan jawaban diawali huruf A/B/C, contoh "A." atau "A)"\n'
-            '• "Kunci:" atau "Jawaban:" diisi huruf pilihan benar (A/B/C). '
-            'Lebih dari satu huruf (misal "A,C") otomatis menjadi tipe checkbox.\n'
-            '• "Tipe:" (opsional) berisi radio, checkbox, text, atau file. '
-            'Tanpa baris tipe, soal otomatis radio/checkbox bila ada pilihan, '
-            'atau text bila tanpa pilihan.\n\n'
-            'Catatan: tipe "rating" tidak didukung oleh database backend saat ini.',
-          ),
+        content: SingleChildScrollView(
+          child: Text(l10n.importTemplateInstructions),
         ),
         actions: [
           TextButton(
@@ -385,9 +361,9 @@ title: Row(
           onPressed: () => Navigator.of(context).pop(),
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
         ),
-        title: const Text(
-          'Import Word',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+        title: Text(
+          l10n.importTemplateDocx,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
         ),
       ),
       body: SingleChildScrollView(
@@ -402,7 +378,7 @@ title: Row(
             ),
             const SizedBox(height: 8),
             Text(
-              'Impor soal dari file .docx ke form ini',
+              l10n.importSubtitle,
               style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
               textAlign: TextAlign.center,
             ),
@@ -431,7 +407,7 @@ title: Row(
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      hasFile ? _fileName! : 'Tap to choose .docx file',
+                      hasFile ? _fileName! : l10n.importTapToChoose,
                       style: TextStyle(
                         fontSize: 15,
                         color: hasFile ? AppColors.textPrimary : AppColors.textSecondary,
@@ -442,8 +418,8 @@ title: Row(
                     const SizedBox(height: 6),
                     Text(
                       hasFile
-                          ? '${_formatSize(_fileSize)} · siap diimpor (ketuk untuk ganti)'
-                          : 'Hanya menerima file .docx',
+                          ? l10n.importFileReady(_formatSize(_fileSize))
+                          : l10n.importOnlyDocx,
                       style: TextStyle(
                         fontSize: 12,
                         color: hasFile ? AppColors.success : AppColors.textHint,
@@ -460,9 +436,9 @@ title: Row(
             TextButton.icon(
               onPressed: _showTemplateFormat,
               icon: const Icon(Icons.help_outline, color: AppColors.primary),
-              label: const Text(
-                'Lihat format template',
-                style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600),
+              label: Text(
+                l10n.importSeeTemplate,
+                style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600),
               ),
             ),
 
@@ -514,7 +490,7 @@ title: Row(
                       ),
                     )
                   : Text(
-                      hasFile ? 'Import Soal' : 'Pilih file terlebih dahulu',
+                      hasFile ? l10n.importButton : l10n.importChooseFirst,
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
             ),

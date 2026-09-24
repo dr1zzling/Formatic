@@ -156,11 +156,11 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           child: Row(
             children: [
-              _summaryChip('Total', total, AppColors.primary),
+              _summaryChip(l10n.total, total, AppColors.primary),
               const SizedBox(width: 10),
-              _summaryChip('Progress', progress, AppColors.warning),
+              _summaryChip(l10n.progress, progress, AppColors.warning),
               const SizedBox(width: 10),
-              _summaryChip('Selesai', completed, AppColors.success),
+              _summaryChip(l10n.statusCompleted, completed, AppColors.success),
               const SizedBox(width: 10),
               _summaryChip(l10n.statusReset, reset, AppColors.textSecondary),
             ],
@@ -201,7 +201,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
   Widget _buildCard(Map<String, dynamic> item) {
     final userId = item['user_id'];
     final userIdInt = userId is num ? userId.toInt() : int.tryParse(userId?.toString() ?? '');
-    final username = item['user_username']?.toString() ?? 'Unknown';
+    final username = item['user_username']?.toString() ?? l10n.unknown;
     final status = item['status']?.toString() ?? '';
     // "attemps" sesuai nama field di backend (typo intentional, bukan "attempts")
     final attemps = item['attemps'];
@@ -214,9 +214,9 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
     final isResetting = userIdInt != null && _resettingIds.contains(userIdInt);
 
     Color sc; IconData si; String sl;
-    if (isCompleted) { sc = AppColors.success; si = Icons.check_circle_outline; sl = 'Selesai'; }
-    else if (isProgress) { sc = AppColors.warning; si = Icons.hourglass_top; sl = 'Sedang Mengerjakan'; }
-    else if (isReset) { sc = AppColors.textSecondary; si = Icons.refresh; sl = 'Direset'; }
+    if (isCompleted) { sc = AppColors.success; si = Icons.check_circle_outline; sl = l10n.statusCompleted; }
+    else if (isProgress) { sc = AppColors.warning; si = Icons.hourglass_top; sl = l10n.statusInProgress; }
+    else if (isReset) { sc = AppColors.textSecondary; si = Icons.refresh; sl = l10n.statusReset; }
     else { sc = AppColors.textHint; si = Icons.help_outline; sl = status; }
 
     return Container(
@@ -255,7 +255,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                             decoration: BoxDecoration(color: AppColors.textHint.withOpacity(0.15), borderRadius: BorderRadius.circular(6)),
-                            child: Text('ke-$attempsInt', style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                            child: Text(l10n.attemptLabel(attempsInt), style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
                           ),
                         ],
                       ],
@@ -343,9 +343,9 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
         ? total.toInt()
         : int.tryParse(total?.toString() ?? '');
     if (totalInt != null && totalInt > 0) {
-      return 'Halaman $currentInt/$totalInt';
+      return l10n.pageOf(currentInt, totalInt);
     }
-    return 'Halaman $currentInt';
+    return l10n.pageOnly(currentInt);
   }
 
   String _fmt(dynamic raw) {

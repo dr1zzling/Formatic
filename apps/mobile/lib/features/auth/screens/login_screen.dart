@@ -4,7 +4,7 @@ import '../../../core/services/auth_service.dart';
 import '../../../core/localizations/formatic_localizations.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
-import '../../home/screens/home_screen.dart';
+import 'otp_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -45,8 +45,18 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       if (result['success'] && mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        final email = result['email']?.toString() ?? '';
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => OtpScreen(
+              email: email,
+              verify: (otp) => AuthService.verifyLogin(email: email, otp: otp),
+              resend: () => AuthService.login(
+                username: _usernameController.text.trim(),
+                password: _passwordController.text,
+              ),
+            ),
+          ),
         );
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -246,9 +256,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         const SizedBox(height: 28),
-                        // Username
+                        // Username / Email
                         Text(
-                          l10n.username,
+                          l10n.loginIdentifier,
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -266,7 +276,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             return null;
                           },
                           decoration: InputDecoration(
-                            hintText: l10n.usernameHint,
+                            hintText: l10n.loginIdentifierHint,
                             hintStyle: TextStyle(
                               color: AppColors.textHint,
                               fontSize: 13,

@@ -26,6 +26,7 @@ class FormDetailScreen extends StatefulWidget {
 }
 
 class _FormDetailScreenState extends State<FormDetailScreen> {
+  FormaticLocalizations get l10n => FormaticLocalizations.of(context);
   List<Map<String, dynamic>> _questions = [];
   bool _isLoading = true;
   String _errorMessage = '';
@@ -365,7 +366,7 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
                       .then((_) => _loadQuestions());
                 },
                 icon: const Icon(Icons.add, color: AppColors.primary),
-                label: const Text(
+                label: Text(
                   l10n.add,
                   style: TextStyle(
                     color: AppColors.primary,

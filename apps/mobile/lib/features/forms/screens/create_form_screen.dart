@@ -115,7 +115,7 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
         _subCategories = [];
         _selectedSubId = null;
         _categoriesError =
-            result['message']?.toString() ?? 'Gagal memuat sub-kategori';
+            result['message']?.toString() ?? l10n.subCategoryLoadFailed;
       });
     }
   }

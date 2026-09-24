@@ -65,11 +65,11 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
   // Controller untuk input skor — diinisialisasi di initState, dispose di dispose()
   late final TextEditingController _scoreController;
 
-  final List<Map<String, dynamic>> _questionTypes = [
-    {'value': 'radio',    'label': 'Single Choice',  'icon': Icons.radio_button_checked},
-    {'value': 'checkbox', 'label': 'Multiple Choice', 'icon': Icons.check_box},
-    {'value': 'text',     'label': 'Text Input',      'icon': Icons.text_fields},
-    {'value': 'file',     'label': 'File Upload',     'icon': Icons.upload_file},
+  List<Map<String, dynamic>> _questionTypes(FormaticLocalizations l10n) => [
+    {'value': 'radio', 'label': l10n.singleChoiceLabel, 'icon': Icons.radio_button_checked},
+    {'value': 'checkbox', 'label': l10n.multipleChoiceLabel, 'icon': Icons.check_box},
+    {'value': 'text', 'label': l10n.textAnswerLabel, 'icon': Icons.text_fields},
+    {'value': 'file', 'label': l10n.fileUploadLabel, 'icon': Icons.upload_file},
   ];
 
   @override
@@ -542,8 +542,8 @@ SnackBar(
           SnackBar(
             content: Text(
               _isEditing
-                  ? 'Soal berhasil diperbarui!'
-                  : 'Soal berhasil ditambahkan!',
+                  ? l10n.saved
+                  : l10n.formCreated,
             ),
             backgroundColor: AppColors.success,
           ),
@@ -552,7 +552,7 @@ SnackBar(
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['message'] ?? 'Gagal menyimpan soal'),
+            content: Text(result['message'] ?? l10n.saveFailed),
             backgroundColor: AppColors.error,
           ),
         );
@@ -582,7 +582,7 @@ SnackBar(
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
         ),
         title: Text(
-          _isEditing ? 'Edit Soal' : 'Tambah Soal',
+          _isEditing ? l10n.edit : l10n.addQuestion,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -601,9 +601,9 @@ SnackBar(
                       color: AppColors.primary,
                     ),
                   )
-                : const Text(
-                    'Simpan',
-                    style: TextStyle(
+                : Text(
+                    l10n.save,
+                    style: const TextStyle(
                       color: AppColors.primary,
                       fontWeight: FontWeight.w700,
                       fontSize: 15,
@@ -651,12 +651,12 @@ SnackBar(
             const SizedBox(height: 24),
 
             // ── Tipe Soal ─────────────────────────────────────────
-            _buildSectionLabel('Tipe Soal'),
+            _buildSectionLabel(l10n.questionType),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: _questionTypes.map((type) {
+              children: _questionTypes(FormaticLocalizations.of(context)).map((type) {
                 final isSelected = _selectedType == type['value'];
                 return GestureDetector(
                   onTap: () {
@@ -731,7 +731,7 @@ SnackBar(
             const SizedBox(height: 24),
 
             // ── Halaman ───────────────────────────────────────────
-            _buildSectionLabel('Halaman'),
+            _buildSectionLabel(l10n.questionPage),
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -745,9 +745,9 @@ SnackBar(
                   const Icon(Icons.description_outlined,
                       size: 20, color: AppColors.primary),
                   const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Halaman penempatan soal',
+Expanded(
+                     child: Text(
+                       l10n.questionPageHelper,
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -797,7 +797,7 @@ SnackBar(
             // ── WYSIWYG Editor ────────────────────────────────────
             Row(
               children: [
-                Expanded(child: _buildSectionLabel('Pertanyaan')),
+                Expanded(child: _buildSectionLabel(l10n.questionLabel)),
                 if (_mathKeyboardSupported(context))
                   TextButton.icon(
                     onPressed: () {
@@ -810,7 +810,7 @@ SnackBar(
                       size: 18,
                     ),
                     label: Text(
-                      _showMathKeyboard ? 'Tutup Matematika' : 'Matematika',
+                      _showMathKeyboard ? l10n.closeMath : l10n.mathKeyboard,
                     ),
                     style: TextButton.styleFrom(
                       foregroundColor: AppColors.primary,
@@ -930,7 +930,7 @@ SnackBar(
               Padding(
                 padding: const EdgeInsets.only(top: 6, left: 4),
                 child: Text(
-                  'Pertanyaan tidak boleh kosong',
+                  l10n.questionRequiredError,
                   style: TextStyle(
                     fontSize: 12,
                     color: AppColors.error,
@@ -990,14 +990,14 @@ SnackBar(
             const SizedBox(height: 24),
 
             // ── Skor Soal ─────────────────────────────────────────
-            _buildSectionLabel('Skor Soal (Opsional)'),
+            _buildSectionLabel(l10n.optionalScore),
             const SizedBox(height: 10),
             _buildScoreInput(),
 
             const SizedBox(height: 24),
 
             // ── Gambar ────────────────────────────────────────────
-            _buildSectionLabel('Gambar (Opsional)'),
+            _buildSectionLabel(l10n.optionalImage),
             const SizedBox(height: 10),
             if (_selectedImageBytes == null && _existingImageUrl == null)
               GestureDetector(
@@ -1018,8 +1018,8 @@ SnackBar(
                         color: AppColors.primary,
                       ),
                       const SizedBox(width: 10),
-                      const Text(
-                        'Tambah Gambar',
+Text(
+                         l10n.addImage,
                         style: TextStyle(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w600,
@@ -1043,7 +1043,7 @@ SnackBar(
 
             // ── Audio ─────────────────────────────────────────────
             const SizedBox(height: 24),
-            _buildSectionLabel('Audio (Opsional)'),
+            _buildSectionLabel(l10n.optionalAudio),
             const SizedBox(height: 10),
             if (_selectedAudioBytes == null && _existingAudioUrl == null)
               GestureDetector(
@@ -1064,8 +1064,8 @@ SnackBar(
                         color: AppColors.primary,
                       ),
                       const SizedBox(width: 10),
-                      const Text(
-                        'Tambah Audio',
+Text(
+                         l10n.addAudio,
                         style: TextStyle(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w600,
@@ -1091,7 +1091,7 @@ SnackBar(
             if (_needsOptions()) ...[
               const SizedBox(height: 24),
               if (_selectedType == 'rating') ...[
-                _buildSectionLabel('Skala Rating'),
+                _buildSectionLabel(l10n.ratingScale),
                 const SizedBox(height: 10),
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -1103,7 +1103,7 @@ SnackBar(
                   child: Column(
                     children: [
                       Text(
-                        'Preview: Bintang 1–5',
+                        l10n.ratingPreview,
                         style: TextStyle(
                           fontSize: 13,
                           color: AppColors.textSecondary,
@@ -1127,7 +1127,7 @@ SnackBar(
               ] else ...[
                 Row(
                   children: [
-                    Expanded(child: _buildSectionLabel('Pilihan Jawaban')),
+                    Expanded(child: _buildSectionLabel(l10n.answerOptions)),
                     TextButton.icon(
                       onPressed: _addOption,
                       icon: const Icon(Icons.add_rounded, size: 18),
@@ -1146,7 +1146,7 @@ SnackBar(
                 Padding(
                   padding: const EdgeInsets.only(top: 2, bottom: 10),
                   child: Text(
-                    'Centang ✓ untuk menandai jawaban benar',
+                    l10n.correctAnswerHint,
                     style: TextStyle(fontSize: 12, color: AppColors.textHint),
                   ),
                 ),
@@ -1274,7 +1274,7 @@ SnackBar(
                                 controller: controller,
                                 focusNode: focusNode,
                                 config: QuillEditorConfig(
-                                  placeholder: 'Opsi ${index + 1}',
+                                  placeholder: l10n.optionPlaceholder(index + 1),
                                   padding:
                                       const EdgeInsets.all(10),
                                   autoFocus: false,
@@ -1326,7 +1326,7 @@ SnackBar(
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'Opsi ${_correctOptionIndex! + 1} ditandai sebagai jawaban benar',
+                          l10n.correctOptionMessage(_correctOptionIndex! + 1),
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppColors.success,
@@ -1365,7 +1365,7 @@ SnackBar(
                         ),
                       )
                     : Text(
-                        _isEditing ? 'Perbarui Soal' : 'Simpan Soal',
+                        _isEditing ? l10n.updateQuestion : l10n.saveQuestion,
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -1488,6 +1488,7 @@ SnackBar(
   }
 
   Widget _buildImagePreview() {
+    final l10n = FormaticLocalizations.of(context);
     return Stack(
       children: [
         Container(
@@ -1563,13 +1564,13 @@ SnackBar(
                 color: Colors.black.withOpacity(0.65),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
+child: Row(
+                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.edit_rounded, color: Colors.white, size: 14),
                   SizedBox(width: 4),
                   Text(
-                    'Ganti',
+                    l10n.replaceFile,
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 12,
@@ -1586,6 +1587,7 @@ SnackBar(
   }
 
   Widget _buildAudioPreview() {
+    final l10n = FormaticLocalizations.of(context);
     final String label = _selectedAudioName ??
         _existingAudioUrl?.split('/').last ??
         'Audio';
@@ -1652,8 +1654,8 @@ SnackBar(
                 color: AppColors.background,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Text(
-                'Preview audio tersedia setelah soal disimpan.',
+child: Text(
+                 l10n.audioPreviewAfterSave,
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
             ),

@@ -235,7 +235,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           onChanged: (_) => setState(() => _error = ''),
           validator: (v) {
             if (v == null || v.isEmpty) return l10n.enterYourPassword;
-            if (v.length < 6) return l10n.pwMin8;
+            if (v.length < 8) return l10n.pwMin8;
+            if (!v.contains(RegExp(r'[A-Z]'))) return l10n.pwUpper;
+            if (!v.contains(RegExp(r'[a-z]'))) return l10n.pwLower;
+            if (!v.contains(RegExp(r'[0-9]'))) return l10n.pwNumber;
             return null;
           },
         ),

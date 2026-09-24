@@ -14,7 +14,9 @@ static String get formApiBaseUrl => kIsWeb
 
   // User API Endpoints
   static const String loginEndpoint = '/user/login';
+  static const String verifyLoginEndpoint = '/user/verify-login';
   static const String registerEndpoint = '/user/register';
+  static const String verifyRegisterEndpoint = '/user/verify-register';
   static const String forgotPasswordEndpoint = '/user/forgot-password';
 
   // Form API Endpoints

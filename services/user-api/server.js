@@ -1,4 +1,12 @@
 require("dotenv").config()
+// dotenv overschrijft bestaande process-env vars niet (default). Als de shell
+// een lege SECRET="" meeneemt, blijft die leeg en faalt jwtToken() (→ 500 bij
+// OTP verify). Verwijder daarom een lege/whitespace SECRET zodat dotenv de
+// waarde uit `.env` kan laden. Een niet-lege SECRET blijft onaangeraakt.
+if (typeof process.env.SECRET === 'string' && process.env.SECRET.trim() === '') {
+    delete process.env.SECRET
+    require("dotenv").config()
+}
 const express = require("express")
 const app = express()
 const jwt = require("jsonwebtoken")
@@ -195,6 +203,7 @@ app.post('/user/verify-register', async (req, res) => {
             token: token
         })
     } catch (err) {
+        console.error('[verify-register] error:', err.message)
         return res.status(500).json({ 
             status: 500, 
             message: "Internal Server Error", error: err.message 
@@ -327,6 +336,7 @@ app.post('/user/verify-login', async (req, res) => {
             token: token
         })
     } catch (err) {
+        console.error('[verify-login] error:', err.message)
         return res.status(500).json({ 
             status: 500, 
             message: "Internal Server Error", error: err.message 

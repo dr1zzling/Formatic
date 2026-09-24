@@ -14,7 +14,8 @@ class AuthService {
     }
   }
 
-  // Login
+  // Login — Step 1: verifikasi username/email + password.
+  // Backend kirim OTP ke email dan return `email` (token hanya di step 2).
   static Future<Map<String, dynamic>> login({
     required String username,
     required String password,
@@ -26,8 +27,56 @@ class AuthService {
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'username': username,
+          'data': username,
           'password': password,
+        }),
+      ).timeout(ApiConfig.timeout);
+
+      final data = _safeDecode(response.body);
+
+      if (response.statusCode == 200) {
+        final email = data['email']?.toString();
+        if (email == null || email.isEmpty) {
+          return {
+            'success': false,
+            'message': data['message'],
+          };
+        }
+        await StorageService.saveUsername(username);
+
+        return {
+          'success': true,
+          'message': data['message'],
+          'email': email,
+        };
+      } else {
+        return {
+          'success': false,
+          'message': data['message'],
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Connection error: ${e.toString()}',
+      };
+    }
+  }
+
+  // Login — Step 2: verifikasi OTP yang dikirim ke email.
+  static Future<Map<String, dynamic>> verifyLogin({
+    required String email,
+    required String otp,
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.userApiBaseUrl}${ApiConfig.verifyLoginEndpoint}');
+      
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'otp': otp,
         }),
       ).timeout(ApiConfig.timeout);
 
@@ -42,7 +91,6 @@ class AuthService {
           };
         }
         await StorageService.saveToken(token);
-        await StorageService.saveUsername(username);
         
         return {
           'success': true,
@@ -63,10 +111,11 @@ class AuthService {
     }
   }
 
-  // Register
+  // Register — Step 1: username + email + password → OTP dikirim ke email.
   static Future<Map<String, dynamic>> register({
     required String username,
     required String password,
+    required String email,
   }) async {
     try {
       final url = Uri.parse('${ApiConfig.userApiBaseUrl}${ApiConfig.registerEndpoint}');
@@ -77,6 +126,47 @@ class AuthService {
         body: jsonEncode({
           'username': username,
           'password': password,
+          'email': email,
+        }),
+      ).timeout(ApiConfig.timeout);
+
+      final data = _safeDecode(response.body);
+
+      if (response.statusCode == 200) {
+        await StorageService.saveUsername(username);
+
+        return {
+          'success': true,
+          'message': data['message'],
+        };
+      } else {
+        return {
+          'success': false,
+          'message': data['message'],
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Connection error: ${e.toString()}',
+      };
+    }
+  }
+
+  // Register — Step 2: verifikasi OTP + buat akun, return token.
+  static Future<Map<String, dynamic>> verifyRegister({
+    required String email,
+    required String otp,
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.userApiBaseUrl}${ApiConfig.verifyRegisterEndpoint}');
+      
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'otp': otp,
         }),
       ).timeout(ApiConfig.timeout);
 
@@ -91,8 +181,7 @@ class AuthService {
           };
         }
         await StorageService.saveToken(token);
-        await StorageService.saveUsername(username);
-        
+
         return {
           'success': true,
           'message': data['message'],

@@ -46,7 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Navigator.of(context).push(MaterialPageRoute(
           builder: (context) => FormEditorScreen(
             formId: result['form_id']?.toString() ?? '',
-            formTitle: result['form_title'] ?? 'Untitled',
+            formTitle: result['form_title'] ?? l10n.untitled,
             formSlug: slug,
             formStatus: result['form_status'],
           ),
@@ -262,7 +262,9 @@ class _HomeContentState extends State<_HomeContent>
           return {
             'id': (form['id'] ?? '').toString(),
             'form_id': form['id'],
-            'title': form['title'] ?? form['form_title'] ?? 'Untitled Form',
+            'title': form['title'] ??
+                form['form_title'] ??
+                FormaticLocalizations.of(context).untitledForm,
             'slug': form['slug'] ?? form['form_slug'] ?? '',
             // Backend menaruh status di form.setting.status (bukan top-level)
             'status': setting is Map
@@ -321,7 +323,8 @@ class _HomeContentState extends State<_HomeContent>
         Navigator.of(context).push(MaterialPageRoute(
           builder: (_) => FormEditorScreen(
             formId: result['form_id']?.toString() ?? '',
-            formTitle: result['form_title'] ?? 'Untitled',
+            formTitle: result['form_title'] ??
+                FormaticLocalizations.of(context).untitled,
             formSlug: slug,
             formStatus: result['form_status'],
           ),

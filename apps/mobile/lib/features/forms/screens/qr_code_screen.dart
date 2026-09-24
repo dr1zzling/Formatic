@@ -22,6 +22,7 @@ class QrCodeScreen extends StatefulWidget {
 }
 
 class _QrCodeScreenState extends State<QrCodeScreen> {
+  FormaticLocalizations get l10n => FormaticLocalizations.of(context);
   Uint8List? _qrCodeBytes;
   bool _isLoading = true;
   String _errorMessage = '';
@@ -85,9 +86,10 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
   }
 
   void _copyLink() {
+    final l10n = FormaticLocalizations.of(context);
     Clipboard.setData(ClipboardData(text: widget.formSlug));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      SnackBar(
         content: Text(l10n.qrCopied),
         backgroundColor: AppColors.success,
       ),
@@ -95,9 +97,10 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
   }
 
   void _shareQrCode() {
+    final l10n = FormaticLocalizations.of(context);
     // TODO: Implement share functionality using share_plus package
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      SnackBar(
         content: Text(l10n.qrShareSoon),
         backgroundColor: AppColors.primary,
       ),
@@ -326,7 +329,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
             onPressed: () {
               // TODO: Implement download functionality
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
+                SnackBar(
                   content: Text(l10n.qrDownloadSoon),
                   backgroundColor: AppColors.primary,
                 ),

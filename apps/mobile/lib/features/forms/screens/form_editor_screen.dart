@@ -227,14 +227,14 @@ class _FormEditorScreenState extends State<FormEditorScreen>
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['message'] as String? ?? 'Perubahan berhasil disimpan.'),
+            content: Text(result['message'] as String? ?? l10n.saved),
             backgroundColor: const Color(0xFF10B981),
           ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['message'] as String? ?? 'Gagal menyimpan perubahan.'),
+            content: Text(result['message'] as String? ?? l10n.saveFailed),
             backgroundColor: AppColors.error,
           ),
         );
@@ -299,7 +299,7 @@ class _FormEditorScreenState extends State<FormEditorScreen>
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result['message'] ?? 'Failed to update status'),
+          content: Text(result['message'] ?? l10n.statusSaveFailed),
           backgroundColor: AppColors.error,
         ),
       );
@@ -341,7 +341,7 @@ SnackBar(
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['message'] ?? 'Failed to delete form'),
+            content: Text(result['message'] ?? l10n.deletedFailed),
             backgroundColor: AppColors.error,
           ),
         );
@@ -2034,7 +2034,7 @@ class _ResponsesTabState extends State<_ResponsesTab> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['message'] ?? 'Gagal mengunduh file Excel.'),
+            content: Text(result['message'] ?? l10n.excelFailed),
             backgroundColor: AppColors.error,
           ),
         );
@@ -2967,7 +2967,7 @@ class _SettingsTabState extends State<_SettingsTab>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
 
-          _buildSectionLabel('DESKRIPSI FORM'),
+          _buildSectionLabel(l10n.formDescriptionSection),
           const SizedBox(height: 8),
           _buildCard(
             child: Column(
@@ -2975,16 +2975,16 @@ class _SettingsTabState extends State<_SettingsTab>
               children: [
                 _buildCardHeader(
                   icon: Icons.description_outlined,
-                  title: 'Deskripsi Form',
-                  subtitle: 'Tambahkan penjelasan yang akan dilihat peserta.',
+                  title: l10n.formDescriptionSection,
+                  subtitle: l10n.formDescriptionSubtitle,
                 ),
                 const SizedBox(height: 14),
                 TextField(
                   controller: _descriptionController,
                   minLines: 3,
                   maxLines: 6,
-                  decoration: const InputDecoration(
-                    hintText: 'Masukkan deskripsi form',
+                  decoration: InputDecoration(
+                    hintText: l10n.formDescriptionInputHint,
                   ),
                 ),
               ],
@@ -2993,7 +2993,7 @@ class _SettingsTabState extends State<_SettingsTab>
           const SizedBox(height: 20),
 
           // ── TOKEN UJIAN ───────────────────────────────────────
-          _buildSectionLabel('TOKEN UJIAN'),
+          _buildSectionLabel(l10n.tokenUjian),
           const SizedBox(height: 8),
           _buildCard(
             child: Column(
@@ -3001,8 +3001,8 @@ class _SettingsTabState extends State<_SettingsTab>
               children: [
                 _buildCardHeader(
                   icon: Icons.key_rounded,
-                  title: 'Token Akses',
-                  subtitle: 'Masukkan atau ubah token kode akses untuk peserta ujian.',
+                  title: l10n.tokenAccess,
+                  subtitle: l10n.tokenAccessHint,
                 ),
                 const SizedBox(height: 14),
                 Row(
@@ -3014,7 +3014,7 @@ class _SettingsTabState extends State<_SettingsTab>
                         children: [
                           _buildTextField(
                             controller: _tokenController,
-                            hint: 'cth. UBI-2024',
+                            hint: l10n.tokenExample,
                             suffixIcon: _tokenController.text.isNotEmpty
                                 ? IconButton(
                                     icon: const Icon(Icons.copy_rounded,
@@ -3050,7 +3050,7 @@ class _SettingsTabState extends State<_SettingsTab>
                     ),
                     const SizedBox(width: 10),
                     _buildSaveButton(
-                      label: 'Ubah',
+                      label: l10n.ubah,
                       isSaving: _isSavingToken,
                       onTap: _saveToken,
                     ),
@@ -3111,8 +3111,8 @@ class _SettingsTabState extends State<_SettingsTab>
               children: [
                 _buildCardHeader(
                   icon: Icons.timer_outlined,
-                  title: 'Durasi Pengerjaan',
-                  subtitle: 'Isi 0 atau kosongkan untuk tanpa batasan waktu.',
+                  title: l10n.workDuration,
+                  subtitle: l10n.durationHelper,
                 ),
                 const SizedBox(height: 14),
                 Row(
@@ -3146,7 +3146,7 @@ class _SettingsTabState extends State<_SettingsTab>
                     ),
                     const SizedBox(width: 10),
                     _buildSaveButton(
-                      label: 'Simpan',
+                      label: l10n.save,
                       isSaving: _isSavingDuration,
                       onTap: _saveDuration,
                     ),
@@ -3197,8 +3197,8 @@ class _SettingsTabState extends State<_SettingsTab>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Acak Urutan Soal',
+Text(
+                         l10n.shuffleQuestions,
                         style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -3206,8 +3206,8 @@ class _SettingsTabState extends State<_SettingsTab>
                       ),
                       Text(
                         _isRandom
-                            ? 'Urutan soal akan diacak setiap kali form dibuka'
-                            : 'Urutan soal tetap sesuai yang dibuat',
+                            ? l10n.shuffleBody
+                            : l10n.fixedOrderBody,
                         style: const TextStyle(
                             fontSize: 12, color: AppColors.textSecondary),
                       ),
@@ -3244,8 +3244,8 @@ class _SettingsTabState extends State<_SettingsTab>
               children: [
                 _buildCardHeader(
                   icon: Icons.image_outlined,
-                  title: 'Banner Form',
-                  subtitle: 'Gambar header di atas form. JPG, PNG, atau WEBP maks 5MB.',
+                  title: l10n.bannerFormTitle,
+                  subtitle: l10n.bannerFormSubtitle,
                 ),
                 const SizedBox(height: 14),
                 if (_banner != null && _banner!.isNotEmpty)
@@ -3273,7 +3273,7 @@ class _SettingsTabState extends State<_SettingsTab>
                   children: [
                     Expanded(
                       child: _buildSaveButton(
-                        label: 'Upload',
+                        label: l10n.bannerUploadButton,
                         isSaving: _isSavingBanner,
                         onTap: _uploadBanner,
                       ),
@@ -3321,8 +3321,8 @@ child: Center(
               children: [
                 _buildCardHeader(
                   icon: Icons.palette_outlined,
-                  title: 'Warna Tema Form',
-                  subtitle: 'Pilih warna untuk tampilan form.',
+                  title: l10n.themeColorTitle,
+                  subtitle: l10n.themeColorHint,
                 ),
                 const SizedBox(height: 14),
                 _isSavingTheme
