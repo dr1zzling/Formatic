@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 import '../../home/screens/home_screen.dart';
@@ -27,6 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _handleLogin() async {
+    final l10n = FormaticLocalizations.of(context);
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
@@ -49,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['message'] ?? 'Login failed'),
+            content: Text(result['message'] ?? l10n.loginFailed),
             backgroundColor: AppColors.error,
           ),
         );
@@ -60,6 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final FormaticLocalizations l10n = FormaticLocalizations.of(context);
 
     return Scaffold(
       body: Container(
@@ -175,7 +178,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          'Create forms, collect responses,\nand gain insights with ease',
+                          l10n.tagline,
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.75),
@@ -219,12 +222,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                     fontFamily: 'Plus Jakarta Sans',
                                   ),
                                   children: [
-                                    const TextSpan(
-                                      text: 'Welcome ',
+                                    TextSpan(
+                                      text: l10n.welcomeBack,
                                       style: TextStyle(color: AppColors.navy),
                                     ),
                                     TextSpan(
-                                      text: 'Back',
+                                      text: l10n.back,
                                       style: TextStyle(color: AppColors.cyan),
                                     ),
                                   ],
@@ -232,7 +235,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Please enter your details',
+                                l10n.enterYourDetails,
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: AppColors.gray,
@@ -245,7 +248,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 28),
                         // Username
                         Text(
-                          'Username',
+                          l10n.username,
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -258,12 +261,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           controller: _usernameController,
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Please enter your username';
+                              return l10n.usernameRequired;
                             }
                             return null;
                           },
                           decoration: InputDecoration(
-                            hintText: 'Your name',
+                            hintText: l10n.usernameHint,
                             hintStyle: TextStyle(
                               color: AppColors.textHint,
                               fontSize: 13,
@@ -278,7 +281,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 20),
                         // Password
                         Text(
-                          'Password',
+                          l10n.password,
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -292,7 +295,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           obscureText: _obscurePassword,
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Please enter your password';
+                              return l10n.passwordRequired;
                             }
                             return null;
                           },
@@ -341,7 +344,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
                             child: Text(
-                              'Forgot password?',
+                              l10n.forgotPassword,
                               style: TextStyle(
                                 color: AppColors.cyan,
                                 fontSize: 13,
@@ -373,8 +376,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                     ),
                                   )
-                                : const Text(
-                                    'Sign In',
+                                : Text(
+                                    l10n.signIn,
                                     style: TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w600,
@@ -388,7 +391,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         Center(
                           child: Text.rich(
                             TextSpan(
-                              text: "Don't have an account? ",
+                              text: l10n.noAccountYet,
                               style: TextStyle(
                                 fontSize: 13,
                                 color: AppColors.gray,
@@ -405,7 +408,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       );
                                     },
                                     child: Text(
-                                      'Sign up',
+                                      l10n.signUp,
                                       style: TextStyle(
                                         color: AppColors.cyan,
                                         fontWeight: FontWeight.w600,

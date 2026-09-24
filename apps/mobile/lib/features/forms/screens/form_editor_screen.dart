@@ -14,6 +14,7 @@ import 'form_qr_screen.dart';
 import 'import_word_screen.dart';
 import 'monitoring_screen.dart';
 import '../../../core/utils/html_utils.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 
 class FormEditorScreen extends StatefulWidget {
   final String formId;
@@ -35,6 +36,7 @@ class FormEditorScreen extends StatefulWidget {
 
 class _FormEditorScreenState extends State<FormEditorScreen>
     with SingleTickerProviderStateMixin {
+  FormaticLocalizations get l10n => FormaticLocalizations.of(context);
   late TabController _tabController;
   List<Map<String, dynamic>> _questions = [];
   bool _isLoading = true;
@@ -47,6 +49,7 @@ class _FormEditorScreenState extends State<FormEditorScreen>
   int? _startAtMillis;      // loaded from backend via getFormBySlug
   String? _themeColor;      // loaded from backend via getFormBySlug
   String? _banner;          // loaded from backend via getFormBySlug
+  String? _description;
   bool _isSavingChanges = false;
   final GlobalKey<_SettingsTabState> _settingsKey = GlobalKey<_SettingsTabState>();
 
@@ -156,8 +159,10 @@ class _FormEditorScreenState extends State<FormEditorScreen>
               ? rawTheme.toString()
               : null;
 
-          // Parse banner (path relatif, mis. /uploads/banner/...)
-          final rawBanner = form['banner'];
+           _description = form['description']?.toString();
+
+           // Parse banner (path relatif, mis. /uploads/banner/...)
+           final rawBanner = form['banner'];
           _banner = rawBanner?.toString().isNotEmpty == true
               ? rawBanner.toString()
               : null;
@@ -305,19 +310,19 @@ class _FormEditorScreenState extends State<FormEditorScreen>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Form'),
+        title: Text(l10n.deleteFormTitle2),
         content: const Text(
           'Are you sure you want to delete this form? This action cannot be undone.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Delete'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -327,8 +332,8 @@ class _FormEditorScreenState extends State<FormEditorScreen>
       final result = await FormService.deleteForm(widget.formSlug);
       if (result['success'] && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Form deleted successfully'),
+SnackBar(
+             content: Text(l10n.deleted),
             backgroundColor: AppColors.success,
           ),
         );
@@ -410,7 +415,7 @@ class _FormEditorScreenState extends State<FormEditorScreen>
             )),
             icon: const Icon(Icons.visibility_outlined,
                 color: AppColors.textSecondary, size: 22),
-            tooltip: 'Preview form',
+            tooltip: l10n.previewForm,
           ),
         ],
         bottom: PreferredSize(
@@ -480,6 +485,7 @@ class _FormEditorScreenState extends State<FormEditorScreen>
                         initialStartAtMillis: _startAtMillis,
                         initialThemeColor: _themeColor,
                         initialBanner: _banner,
+                        initialDescription: _description,
                         onBannerChanged: (url) {
                           if (!mounted) return;
                           setState(() => _banner = url);
@@ -556,7 +562,7 @@ class _FormEditorScreenState extends State<FormEditorScreen>
               ),
             ),
             const SizedBox(height: 24),
-            ElevatedButton(onPressed: _loadForm, child: const Text('Retry')),
+            ElevatedButton(onPressed: _loadForm, child: Text(l10n.retry)),
           ],
         ),
       ),
@@ -584,6 +590,7 @@ class _QuestionsTab extends StatefulWidget {
 }
 
 class _QuestionsTabState extends State<_QuestionsTab> {
+  FormaticLocalizations get l10n => FormaticLocalizations.of(context);
   int _selectedPage = 1;
 
   /// Page numbers yang muncul di daftar soal. Halaman kosong (belum ada soal)
@@ -642,19 +649,19 @@ class _QuestionsTabState extends State<_QuestionsTab> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Question'),
+        title: Text(l10n.deleteQuestion),
         content: Text(
           'Are you sure you want to delete this question?\n\n${question['question']}',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Delete'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -686,8 +693,8 @@ class _QuestionsTabState extends State<_QuestionsTab> {
     final allQuestions = widget.questions;
     if (allQuestions.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tambahkan soal terlebih dahulu.'),
+        SnackBar(
+          content: Text(l10n.noQuestionsYet),
           backgroundColor: AppColors.warning,
         ),
       );
@@ -747,8 +754,8 @@ class _QuestionsTabState extends State<_QuestionsTab> {
                 onTap: () {
                   Clipboard.setData(ClipboardData(text: formSlug));
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Slug copied!'),
+                    SnackBar(
+                      content: Text(l10n.slugCopied),
                       backgroundColor: AppColors.success,
                     ),
                   );
@@ -908,7 +915,7 @@ class _QuestionsTabState extends State<_QuestionsTab> {
                             children: [
                               Icon(Icons.star_outline_rounded, size: 14, color: AppColors.warning),
                               const SizedBox(width: 4),
-                              Text('Skor',
+                              Text(l10n.score,
                                   style: TextStyle(
                                       fontSize: 12,
                                       color: AppColors.warning,
@@ -933,7 +940,7 @@ class _QuestionsTabState extends State<_QuestionsTab> {
                               Icon(Icons.upload_file_rounded,
                                   size: 14, color: AppColors.primary),
                               const SizedBox(width: 4),
-                              Text('Import Word',
+                              Text(l10n.importWord,
                                   style: TextStyle(
                                       fontSize: 12,
                                       color: AppColors.primary,
@@ -957,7 +964,7 @@ class _QuestionsTabState extends State<_QuestionsTab> {
                             children: [
                               Icon(Icons.add_rounded, size: 16, color: AppColors.primary),
                               const SizedBox(width: 2),
-                              Text('Add',
+                              Text(l10n.add,
                                   style: TextStyle(
                                       fontSize: 12,
                                       color: AppColors.primary,
@@ -986,10 +993,10 @@ class _QuestionsTabState extends State<_QuestionsTab> {
                           size: 56,
                           color: AppColors.textSecondary.withOpacity(0.4)),
                       const SizedBox(height: 14),
-                      const Text('Belum Ada Soal',
+                      Text(l10n.emptyQuestionsBoard,
                           style: TextStyle(fontSize: 15, color: AppColors.textSecondary)),
                       const SizedBox(height: 6),
-                      const Text('Tap "+ Add" untuk menambahkan soal ke halaman ini',
+                      Text(l10n.emptyQuestionsBoard,
                           style: TextStyle(fontSize: 13, color: AppColors.textHint)),
                     ],
                   ),
@@ -1217,7 +1224,7 @@ class _QuestionsTabState extends State<_QuestionsTab> {
                               color: const Color(0xFFDFF7EE),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Text('CORRECT',
+                            child: Text(l10n.correct,
                                 style: TextStyle(
                                   fontSize: 10,
                                   color: AppColors.primary,
@@ -1264,6 +1271,7 @@ class _ScoreSheet extends StatefulWidget {
 }
 
 class _ScoreSheetState extends State<_ScoreSheet> {
+  FormaticLocalizations get l10n => FormaticLocalizations.of(context);
   // 'manual' | 'auto'
   String _mode = 'auto';
   bool _isSaving = false;
@@ -1642,7 +1650,7 @@ class _ScoreSheetState extends State<_ScoreSheet> {
           controller: _totalController,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(
-            hintText: 'Contoh: 100 atau 200',
+            hintText: l10n.targetScoreHint,
             suffixText: 'pts',
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(color: AppColors.inputBorder)),
@@ -1924,6 +1932,7 @@ class _ResponsesTab extends StatefulWidget {
 }
 
 class _ResponsesTabState extends State<_ResponsesTab> {
+  FormaticLocalizations get l10n => FormaticLocalizations.of(context);
   List<dynamic> _summaryQuestions = [];
   List<dynamic> _detailQuestions = [];
   bool _isLoading = true;
@@ -2000,8 +2009,8 @@ class _ResponsesTabState extends State<_ResponsesTab> {
         if (kIsWeb) {
           triggerFileDownload(bytes, filename);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('File Excel berhasil diunduh.'),
+            SnackBar(
+              content: Text(l10n.excelDownloaded),
               backgroundColor: AppColors.success,
             ),
           );
@@ -2016,8 +2025,8 @@ class _ResponsesTabState extends State<_ResponsesTab> {
           if (savedUri == null) return;
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('File Excel berhasil disimpan.'),
+            SnackBar(
+              content: Text(l10n.excelSaved),
               backgroundColor: AppColors.success,
             ),
           );
@@ -2033,8 +2042,8 @@ class _ResponsesTabState extends State<_ResponsesTab> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Gagal mengunduh file Excel.'),
+          SnackBar(
+            content: Text(l10n.excelFailed),
             backgroundColor: AppColors.error,
           ),
         );
@@ -2247,11 +2256,12 @@ class _ResponsesTabState extends State<_ResponsesTab> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      q['question'] ?? '',
-                      style: const TextStyle(
+                    child: QuillRichText(
+                      content: q['question']?.toString() ?? '',
+                      baseStyle: const TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ),
@@ -2274,9 +2284,9 @@ class _ResponsesTabState extends State<_ResponsesTab> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Expanded(
-                              child: Text(
-                                '$value',
-                                style: const TextStyle(
+                              child: QuillRichText(
+                                content: value.toString(),
+                                baseStyle: const TextStyle(
                                   fontSize: 13,
                                   color: AppColors.textPrimary,
                                 ),
@@ -2375,11 +2385,12 @@ class _ResponsesTabState extends State<_ResponsesTab> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      q['question'] ?? '',
-                      style: const TextStyle(
+                    child: QuillRichText(
+                      content: q['question']?.toString() ?? '',
+                      baseStyle: const TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ),
@@ -2394,9 +2405,7 @@ class _ResponsesTabState extends State<_ResponsesTab> {
               else
                 ...responses.asMap().entries.map((entry) {
                   final resp = entry.value;
-                  final answerText = resp is Map
-                      ? (resp['answer'] ?? 'No answer')
-                      : resp;
+                  final answer = resp is Map ? resp['answer'] : resp;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
@@ -2409,12 +2418,20 @@ class _ResponsesTabState extends State<_ResponsesTab> {
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(
-                            '${entry.key + 1}. $answerText',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: AppColors.textSecondary,
-                            ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${entry.key + 1}. ',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              Expanded(
+                                child: _buildAnswerRichText(q, answer),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -2425,6 +2442,64 @@ class _ResponsesTabState extends State<_ResponsesTab> {
           ),
         );
       },
+    );
+  }
+
+  /// Render jawaban raw dari backend sebagai rich text:
+  /// - option (soal_option_id)  → value opsi (bisa Quill Delta JSON)
+  /// - checkbox multiple (IDs dipisah koma) → value opsi digabung
+  /// - teks                       → teks asli (plain text / Delta / HTML)
+  /// - null/malformed            → tampil aman tanpa crash
+  Widget _buildAnswerRichText(dynamic q, dynamic answer) {
+    final baseStyle = const TextStyle(
+      fontSize: 13,
+      color: AppColors.textSecondary,
+    );
+    if (answer == null) {
+      return Text(l10n.noAnswer, style: baseStyle);
+    }
+
+    final options = (q is Map ? (q['options'] as List?) : null) ?? [];
+    String? optionValueFor(String id) {
+      for (final o in options) {
+        if (o is! Map) continue;
+        final oid = (o['id'] ?? o['soal_option_id'])?.toString();
+        if (oid != null && oid == id) {
+          final v = o['value'] ?? o['option_value'];
+          return v?.toString();
+        }
+      }
+      return null;
+    }
+
+    List<String> values;
+    if (answer is num) {
+      final v = optionValueFor(answer.toString());
+      values = [v ?? answer.toString()];
+    } else if (answer is String && options.isNotEmpty) {
+      final raw = answer.toString();
+      final parts = raw.split(',').map((p) => p.trim()).toList();
+      if (parts.length > 1 && parts.every((p) => int.tryParse(p) != null)) {
+        values = parts.map((p) => optionValueFor(p) ?? p).toList();
+      } else {
+        values = [raw];
+      }
+    } else {
+      values = [answer.toString()];
+    }
+
+    if (values.length == 1) {
+      return QuillRichText(content: values.first, baseStyle: baseStyle);
+    }
+    final lastIndex = values.length - 1;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: values.asMap().entries.map((e) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: e.key < lastIndex ? 4 : 0),
+          child: QuillRichText(content: e.value, baseStyle: baseStyle),
+        );
+      }).toList(),
     );
   }
 
@@ -2471,6 +2546,7 @@ class _SettingsTab extends StatefulWidget {
   final int? initialStartAtMillis;
   final String? initialThemeColor;
   final String? initialBanner;
+  final String? initialDescription;
   final ValueChanged<String?> onBannerChanged;
 
   const _SettingsTab({
@@ -2485,6 +2561,7 @@ class _SettingsTab extends StatefulWidget {
     this.initialStartAtMillis,
     this.initialThemeColor,
     this.initialBanner,
+    this.initialDescription,
     required this.onBannerChanged,
   });
 
@@ -2493,9 +2570,12 @@ class _SettingsTab extends StatefulWidget {
 }
 
 class _SettingsTabState extends State<_SettingsTab>
+
     with AutomaticKeepAliveClientMixin {
+  FormaticLocalizations get l10n => FormaticLocalizations.of(context);
   late TextEditingController _durationController;
   late TextEditingController _tokenController;
+  late TextEditingController _descriptionController;
   bool _isSavingDuration = false;
   bool _isSavingToken = false;
   bool _isRandom = false;
@@ -2547,6 +2627,9 @@ class _SettingsTabState extends State<_SettingsTab>
     _tokenController = TextEditingController(
       text: widget.initialTokenRespon,
     );
+    _descriptionController = TextEditingController(
+      text: widget.initialDescription ?? '',
+    );
   }
 
   @override
@@ -2580,6 +2663,7 @@ class _SettingsTabState extends State<_SettingsTab>
   void dispose() {
     _durationController.dispose();
     _tokenController.dispose();
+    _descriptionController.dispose();
     super.dispose();
   }
 
@@ -2598,6 +2682,19 @@ class _SettingsTabState extends State<_SettingsTab>
     }
 
     final status = widget.isPublic ? 'public' : 'private';
+
+    final descriptionResult = await FormService.updateFormDescription(
+      slug: widget.formSlug,
+      description: _descriptionController.text.trim().isEmpty
+          ? null
+          : _descriptionController.text.trim(),
+    );
+    if (!descriptionResult['success']) {
+      return {
+        'success': false,
+        'message': descriptionResult['message'] ?? 'Gagal menyimpan deskripsi.',
+      };
+    }
 
     final statusResult = await FormService.updateFormStatus(
       slug: widget.formSlug,
@@ -2870,6 +2967,31 @@ class _SettingsTabState extends State<_SettingsTab>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
 
+          _buildSectionLabel('DESKRIPSI FORM'),
+          const SizedBox(height: 8),
+          _buildCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildCardHeader(
+                  icon: Icons.description_outlined,
+                  title: 'Deskripsi Form',
+                  subtitle: 'Tambahkan penjelasan yang akan dilihat peserta.',
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _descriptionController,
+                  minLines: 3,
+                  maxLines: 6,
+                  decoration: const InputDecoration(
+                    hintText: 'Masukkan deskripsi form',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
           // ── TOKEN UJIAN ───────────────────────────────────────
           _buildSectionLabel('TOKEN UJIAN'),
           const SizedBox(height: 8),
@@ -2901,8 +3023,8 @@ class _SettingsTabState extends State<_SettingsTab>
                                       Clipboard.setData(ClipboardData(
                                           text: _tokenController.text));
                                       ScaffoldMessenger.of(context)
-                                          .showSnackBar(const SnackBar(
-                                        content: Text('Token disalin!'),
+                                          .showSnackBar(SnackBar(
+                                        content: Text(l10n.tokenCopied),
                                         backgroundColor: AppColors.success,
                                         duration: Duration(seconds: 2),
                                       ));
@@ -3167,8 +3289,8 @@ class _SettingsTabState extends State<_SettingsTab>
                               color: AppColors.error.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Center(
-                              child: Text('Hapus',
+child: Center(
+                               child: Text(l10n.delete,
                                   style: TextStyle(
                                       color: AppColors.error,
                                       fontWeight: FontWeight.w700,
@@ -3361,8 +3483,8 @@ class _SettingsTabState extends State<_SettingsTab>
             onTap: () {
               Clipboard.setData(ClipboardData(text: widget.formSlug));
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Link form disalin!'),
+                SnackBar(
+                    content: Text(l10n.linkCopied),
                     backgroundColor: AppColors.success),
               );
             },
@@ -3379,16 +3501,16 @@ class _SettingsTabState extends State<_SettingsTab>
                       color: AppColors.primary, size: 20),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Bagikan Form',
+Expanded(
+                   child: Column(
+                     crossAxisAlignment: CrossAxisAlignment.start,
+                     children: [
+                       Text(l10n.shareForm,
                           style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                               color: AppColors.textPrimary)),
-                      Text('Salin slug form untuk dibagikan',
+                      Text(l10n.shareFormHint,
                           style: TextStyle(
                               fontSize: 12, color: AppColors.textSecondary)),
                     ],
@@ -3429,16 +3551,16 @@ class _SettingsTabState extends State<_SettingsTab>
                       color: AppColors.primary, size: 20),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Status Peserta',
+Expanded(
+                   child: Column(
+                     crossAxisAlignment: CrossAxisAlignment.start,
+                     children: [
+                       Text(l10n.participantStatusSection,
                           style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                               color: AppColors.textPrimary)),
-                      Text('Lihat dan kelola status pengerjaan peserta',
+                      Text(l10n.participantStatusBody,
                           style: TextStyle(
                               fontSize: 12, color: AppColors.textSecondary)),
                     ],
@@ -3468,16 +3590,16 @@ class _SettingsTabState extends State<_SettingsTab>
                       color: AppColors.error, size: 20),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Hapus Form',
+Expanded(
+                   child: Column(
+                     crossAxisAlignment: CrossAxisAlignment.start,
+                     children: [
+                       Text(l10n.deleteFormSection,
                           style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                               color: AppColors.error)),
-                      Text('Hapus form ini secara permanen',
+                      Text(l10n.deleteFormSectionBody,
                           style: TextStyle(
                               fontSize: 12, color: AppColors.textSecondary)),
                     ],

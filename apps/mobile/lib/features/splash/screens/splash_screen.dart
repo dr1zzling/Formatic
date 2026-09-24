@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../home/screens/home_screen.dart';
 
@@ -87,7 +88,7 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Create forms with ease',
+                FormaticLocalizations.of(context).tagline,
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.white.withOpacity(0.7),

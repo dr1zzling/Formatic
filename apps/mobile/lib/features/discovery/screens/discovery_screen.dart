@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/form_service.dart';
 import '../../../core/config/api_config.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 import '../../forms/screens/form_viewer_screen.dart';
 
 /// Discovery Screen — browse public forms, preview soal, copy ke form milik sendiri.
@@ -41,7 +42,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
               final kategori = f['kategori'];
               return {
                 'id': f['id'] ?? f['form_id'],
-                'title': f['title'] ?? f['form_title'] ?? 'Untitled',
+                'title': f['title'] ?? f['form_title'] ?? FormaticLocalizations.of(context).untitled,
                 'slug': f['slug'] ?? f['form_slug'] ?? '',
                 // Backend menaruh kategori di form.kategori.{primary_kategori,sub_kategori}
                 'category': kategori is Map
@@ -75,13 +76,14 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = FormaticLocalizations.of(context);
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          'Discovery',
+        title: Text(
+          l10n.discovery,
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -98,7 +100,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
               onChanged: (v) => setState(() => _search = v),
               style: const TextStyle(fontSize: 14),
               decoration: InputDecoration(
-                hintText: 'Cari form publik...',
+                hintText: l10n.searchPublicForms,
                 prefixIcon: const Icon(Icons.search,
                     size: 18, color: AppColors.textHint),
                 filled: true,
@@ -433,6 +435,7 @@ class _FormPreviewSheetState extends State<_FormPreviewSheet> {
   }
 
   Future<void> _copySoal(String targetSlug) async {
+    final l10n = FormaticLocalizations.of(context);
     if (_isCopying) return;
     if (_soal.isEmpty || targetSlug.isEmpty) return;
     setState(() => _isCopying = true);
@@ -468,8 +471,8 @@ class _FormPreviewSheetState extends State<_FormPreviewSheet> {
     setState(() => _isCopying = false);
     if (result['success'] == true) {
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Soal berhasil disalin ke form Anda.'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(l10n.copiedToClipboard),
         backgroundColor: AppColors.success,
       ));
     } else {
@@ -481,6 +484,7 @@ class _FormPreviewSheetState extends State<_FormPreviewSheet> {
   }
 
   void _showCopyDialog() async {
+    final l10n = FormaticLocalizations.of(context);
     await _loadMyForms();
     if (!mounted) return;
     if (_myForms.isEmpty) {
@@ -548,6 +552,7 @@ class _FormPreviewSheetState extends State<_FormPreviewSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = FormaticLocalizations.of(context);
     final title = widget.form['title'] as String? ?? '';
     final category = widget.form['category'] as String? ?? '';
     final slug = widget.form['slug'] as String? ?? '';
@@ -588,7 +593,7 @@ class _FormPreviewSheetState extends State<_FormPreviewSheet> {
                 MaterialPageRoute(
                     builder: (_) => FormViewerScreen(slug: slug)),
               ),
-              child: const Text('Isi Form',
+              child: Text(l10n.fillForm,
                   style: TextStyle(
                       color: AppColors.primary, fontWeight: FontWeight.w600)),
             ),
@@ -755,14 +760,15 @@ class _FormPreviewSheetState extends State<_FormPreviewSheet> {
   }
 
   Widget _buildEmpty() {
-    return const Center(
+    final l10n = FormaticLocalizations.of(context);
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.quiz_outlined,
               size: 56, color: AppColors.textSecondary),
           SizedBox(height: 12),
-          Text('Tidak ada soal',
+          Text(l10n.noQuestions,
               style: TextStyle(
                   fontSize: 15, color: AppColors.textSecondary)),
         ],

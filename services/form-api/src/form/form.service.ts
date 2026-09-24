@@ -121,10 +121,11 @@ export class FormService {
         access_type: 'user_form.access_type',
         id: 'forms.id',
         slug: 'forms.slug',
-        title: 'forms.title',
-        banner: 'forms.banner',
+         title: 'forms.title',
+         banner: 'forms.banner',
+         description: 'forms.description',
 
-        token_respon: 'forms.token_respon',
+         token_respon: 'forms.token_respon',
         token_collab: 'forms.token_collab',
 
         primary_kategori: 'primary_kategori.name',
@@ -151,7 +152,7 @@ export class FormService {
   // Create Form
   async create(
     user: { id: number, username: string },
-    body: { title: string, sub_kategori: number, token_respon: string, theme_color: string },
+    body: { title: string, description?: string, sub_kategori: number, token_respon: string, theme_color: string },
     banner?: Express.Multer.File
   ) {
     const slug = slugify(body.title, { lower: true, strict: true })
@@ -169,6 +170,7 @@ export class FormService {
           status: 'private',
           kategori_id: body.sub_kategori,
           banner: bannerPath,
+          description: body.description?.trim() || null,
           token_respon: body.token_respon,
           token_collab: tokenCollab
         })
@@ -258,10 +260,11 @@ export class FormService {
       .select({
         id: 'forms.id',
         slug: 'forms.slug',
-        title: 'forms.title',
-        banner: 'forms.banner',
+         title: 'forms.title',
+         banner: 'forms.banner',
+         description: 'forms.description',
 
-        token_respon: 'forms.token_respon',
+         token_respon: 'forms.token_respon',
         token_collab: 'forms.token_collab',
 
         primary_kategori: 'primary_kategori.name',
@@ -299,7 +302,10 @@ export class FormService {
   }
 
   // Update Description
-  async updateDescription(req: { id: number }, form: any, description: string){
+  async updateDescription(req: { id: number }, form: any, description?: string){
+    const isCreator = await this.isCreator.isCreator(req.id, form.id)
+    if (isCreator !== 'Creator') throw new UnauthorizedException("Anda Tidak Berhak Update Form Ini")
+
     await this.knexService.connection("forms")
     .update({ description: description })
     .where("id", form.id)

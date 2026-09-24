@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 import '../../home/screens/home_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -28,6 +29,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   void _handleRegister() async {
+    final l10n = FormaticLocalizations.of(context);
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
@@ -50,7 +52,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['message'] ?? 'Registration failed'),
+            content: Text(result['message'] ?? l10n.signUpFailed),
             backgroundColor: AppColors.error,
           ),
         );
@@ -61,6 +63,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final FormaticLocalizations l10n = FormaticLocalizations.of(context);
 
     return Scaffold(
       body: Container(
@@ -159,7 +162,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          'Create forms, collect responses,\nand gain insights with ease',
+                          l10n.tagline,
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.75),
@@ -203,12 +206,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     fontFamily: 'Plus Jakarta Sans',
                                   ),
                                   children: [
-                                    const TextSpan(
-                                      text: 'Create ',
+                                    TextSpan(
+                                      text: l10n.createAccount,
                                       style: TextStyle(color: AppColors.navy),
                                     ),
                                     TextSpan(
-                                      text: 'Account',
+                                      text: l10n.account,
                                       style: TextStyle(color: AppColors.cyan),
                                     ),
                                   ],
@@ -216,7 +219,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Please enter your details',
+                                l10n.enterYourDetails,
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: AppColors.gray,
@@ -229,7 +232,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         const SizedBox(height: 28),
                         // Username
                         Text(
-                          'Username',
+                          l10n.username,
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -242,12 +245,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           controller: _usernameController,
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Please enter your username';
+                              return l10n.usernameRequired;
                             }
                             return null;
                           },
                           decoration: InputDecoration(
-                            hintText: 'Your name',
+                            hintText: l10n.usernameHint,
                             hintStyle: TextStyle(
                               color: AppColors.textHint,
                               fontSize: 13,
@@ -262,7 +265,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         const SizedBox(height: 20),
                         // Password
                         Text(
-                          'Password',
+                          l10n.password,
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -276,19 +279,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           obscureText: _obscurePassword,
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Please enter a password';
+                              return l10n.enterYourPassword;
                             }
                             if (value.length < 8) {
-                              return 'Password minimal 8 karakter';
+                              return l10n.pwMin8;
                             }
                             if (!value.contains(RegExp(r'[A-Z]'))) {
-                              return 'Password harus mengandung 1 huruf kapital';
+                              return l10n.pwUpper;
                             }
                             if (!value.contains(RegExp(r'[a-z]'))) {
-                              return 'Password harus mengandung 1 huruf kecil';
+                              return l10n.pwLower;
                             }
                             if (!value.contains(RegExp(r'[0-9]'))) {
-                              return 'Password harus mengandung 1 angka';
+                              return l10n.pwNumber;
                             }
                             return null;
                           },
@@ -322,7 +325,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         const SizedBox(height: 20),
                         // Confirm Password
                         Text(
-                          'Enter your password',
+                          l10n.confirmPassword,
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -336,10 +339,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           obscureText: _obscureConfirmPassword,
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Please confirm your password';
+                              return l10n.confirmPasswordRequired;
                             }
                             if (value != _passwordController.text) {
-                              return 'Passwords do not match';
+                              return l10n.passwordsDoNotMatch;
                             }
                             return null;
                           },
@@ -393,8 +396,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                     ),
                                   )
-                                : const Text(
-                                    'Sign Up',
+                                : Text(
+                                    l10n.signUp,
                                     style: TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w600,
@@ -408,7 +411,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         Center(
                           child: Text.rich(
                             TextSpan(
-                              text: 'Already have an account? ',
+                              text: l10n.haveAccount,
                               style: TextStyle(
                                 fontSize: 13,
                                 color: AppColors.gray,
@@ -421,7 +424,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       Navigator.of(context).pop();
                                     },
                                     child: Text(
-                                      'Sign in',
+                                      l10n.signIn,
                                       style: TextStyle(
                                         color: AppColors.cyan,
                                         fontWeight: FontWeight.w600,

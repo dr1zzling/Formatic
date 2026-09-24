@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 import '../../forms/screens/form_viewer_screen.dart';
 
 /// History Screen — stores and displays form submission history locally
@@ -98,19 +99,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   String _relativeTime(String? iso) {
+    final l10n = FormaticLocalizations.of(context);
     if (iso == null) return '';
     final dt = DateTime.tryParse(iso);
     if (dt == null) return '';
     final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 1) return 'Baru saja';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} menit lalu';
-    if (diff.inHours < 24) return '${diff.inHours} jam lalu';
-    if (diff.inDays < 30) return '${diff.inDays} hari lalu';
-    return '${(diff.inDays / 30).floor()} bulan lalu';
+    if (diff.inMinutes < 1) return l10n.unknown;
+    if (diff.inMinutes < 60) return l10n.relativeMinutes(diff.inMinutes);
+    if (diff.inHours < 24) return l10n.relativeHours(diff.inHours);
+    if (diff.inDays < 30) return l10n.relativeDays(diff.inDays);
+    return l10n.relativeMonths((diff.inDays / 30).floor());
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = FormaticLocalizations.of(context);
     final filtered = _filtered;
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -122,8 +125,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
               child: Row(
                 children: [
-                  const Text(
-                    'Riwayat',
+                  Text(
+                    l10n.historyTitle,
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -139,19 +142,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           builder: (ctx) => AlertDialog(
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16)),
-                            title: const Text('Hapus Semua Riwayat'),
-                            content: const Text(
-                                'Seluruh riwayat pengisian form akan dihapus. Lanjutkan?'),
+                            title: Text(l10n.clearHistory),
+content: Text(l10n.clearHistoryBody),
                             actions: [
                               TextButton(
                                   onPressed: () =>
                                       Navigator.of(ctx).pop(false),
-                                  child: const Text('Batal')),
+                                  child: Text(l10n.cancel)),
                               TextButton(
                                 onPressed: () => Navigator.of(ctx).pop(true),
                                 style: TextButton.styleFrom(
                                     foregroundColor: AppColors.error),
-                                child: const Text('Hapus'),
+                                child: Text(l10n.delete),
                               ),
                             ],
                           ),
@@ -163,8 +165,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           await prefs.remove(_storageKey);
                         }
                       },
-                      child: const Text(
-                        'Hapus semua',
+child: Text(
+                         l10n.delete,
                         style: TextStyle(
                             color: AppColors.error, fontSize: 13),
                       ),
@@ -182,7 +184,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   onChanged: (v) => setState(() => _search = v),
                   style: const TextStyle(fontSize: 14),
                   decoration: InputDecoration(
-                    hintText: 'Cari riwayat...',
+                    hintText: l10n.historySearchHint,
                     prefixIcon: const Icon(Icons.search,
                         size: 18, color: AppColors.textHint),
                     filled: true,

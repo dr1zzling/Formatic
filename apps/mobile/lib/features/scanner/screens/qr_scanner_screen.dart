@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 import '../../forms/screens/form_viewer_screen.dart';
 
 class QrScannerScreen extends StatefulWidget {
@@ -79,6 +80,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
   }
 
   void _showEnterCodeDialog() {
+    final l10n = FormaticLocalizations.of(context);
     final controller = TextEditingController();
     var controllerDisposed = false;
     void disposeController() {
@@ -118,8 +120,8 @@ class _QrScannerScreenState extends State<QrScannerScreen>
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
-              'Masukkan Kode Form',
+Text(
+               l10n.scanFormCode,
               style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.bold,
@@ -128,7 +130,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
             ),
             const SizedBox(height: 6),
             Text(
-              'Masukkan slug form Formatic secara manual',
+              l10n.scanFormInstruction,
               style: TextStyle(
                 fontSize: 13,
                 color: Colors.white.withOpacity(0.6),
@@ -184,8 +186,8 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                   ),
                   elevation: 0,
                 ),
-                child: const Text(
-                  'Buka Form',
+child: Text(
+                   l10n.fillForm,
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                 ),
               ),
@@ -198,6 +200,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = FormaticLocalizations.of(context);
     return Scaffold(
       backgroundColor: const Color(0xFF0D1821),
       body: Stack(
@@ -246,8 +249,8 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                           ),
                         ),
                         const SizedBox(width: 7),
-                        const Text(
-                          'SCAN QR CODE',
+Text(
+                           l10n.qrCodeTitle,
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 12,
@@ -279,8 +282,8 @@ class _QrScannerScreenState extends State<QrScannerScreen>
             top: MediaQuery.of(context).size.height * 0.18,
             child: Column(
               children: [
-                const Text(
-                  'Scan form QR to open',
+Text(
+                   l10n.qrScanToFill,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white,
@@ -290,7 +293,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Align the QR code inside the frame to\nautomatically view or participate',
+                  l10n.scanQrInstruction,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.65),
@@ -335,7 +338,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                             ),
                             const SizedBox(width: 10),
                             Text(
-                              'Enter Code',
+                              l10n.enterCode,
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.9),
                                 fontSize: 15,
@@ -358,7 +361,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          'Point at any Formatic QR code to instantly start',
+                          l10n.scanQrStart,
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.4),
                             fontSize: 12,

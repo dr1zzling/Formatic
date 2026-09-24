@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/form_service.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 import 'form_viewer_screen.dart';
 
 class QrCodeScreen extends StatefulWidget {
@@ -87,7 +88,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
     Clipboard.setData(ClipboardData(text: widget.formSlug));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Form link copied to clipboard!'),
+        content: Text(l10n.qrCopied),
         backgroundColor: AppColors.success,
       ),
     );
@@ -97,7 +98,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
     // TODO: Implement share functionality using share_plus package
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Share feature coming soon!'),
+        content: Text(l10n.qrShareSoon),
         backgroundColor: AppColors.primary,
       ),
     );
@@ -105,6 +106,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = FormaticLocalizations.of(context);
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -162,7 +164,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
               ),
-              child: const Text('Retry'),
+              child: Text(l10n.qrRetry),
             ),
           ],
         ),
@@ -290,7 +292,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
               );
             },
             icon: const Icon(Icons.visibility),
-            label: const Text('Preview Form'),
+            label: Text(l10n.qrPreviewForm),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
@@ -307,7 +309,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
           OutlinedButton.icon(
             onPressed: _shareQrCode,
             icon: const Icon(Icons.share),
-            label: const Text('Share QR Code'),
+            label: Text(l10n.qrShareCode),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.primary,
               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -325,13 +327,13 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
               // TODO: Implement download functionality
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Download feature coming soon!'),
+                  content: Text(l10n.qrDownloadSoon),
                   backgroundColor: AppColors.primary,
                 ),
               );
             },
             icon: const Icon(Icons.download),
-            label: const Text('Download QR Code'),
+            label: Text(l10n.qrDownloadCode),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.primary,
               padding: const EdgeInsets.symmetric(vertical: 16),

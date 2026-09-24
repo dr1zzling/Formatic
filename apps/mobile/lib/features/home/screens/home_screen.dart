@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/services/form_service.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 import '../widgets/category_chip.dart';
 import '../../forms/screens/create_form_screen.dart';
 import '../../forms/screens/my_forms_screen.dart';
@@ -30,12 +31,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _handleCreateResult(Object? result) {
+    final l10n = FormaticLocalizations.of(context);
     if (result is Map && result['success'] == true && mounted) {
       // Muat ulang daftar My Forms agar form yang baru dibuat langsung muncul.
       _myFormsKey.currentState?.reload();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result['message'] ?? 'Form berhasil dibuat'),
+          content: Text(result['message'] ?? l10n.formCreated),
           backgroundColor: AppColors.success,
         ),
       );
@@ -55,6 +57,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final FormaticLocalizations l10n = FormaticLocalizations.of(context);
     // Map nav index → stack index
     // Nav:   0=Home, 1=MyForms, 2=QR(center), 3=Discovery, 4=Profile
     // Stack: 0=Home, 1=MyForms, 2=Discovery, 3=Profile
@@ -87,17 +90,17 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: _navigateToCreateForm,
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
-              tooltip: 'Buat Form',
+              tooltip: l10n.createFormTooltip,
               child: const Icon(Icons.add, size: 26),
             )
           : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      bottomNavigationBar: _buildBottomNav(),
+      bottomNavigationBar: _buildBottomNav(l10n),
     );
   }
 
   // ── Floating Bottom Nav ──────────────────────────────────────
-  Widget _buildBottomNav() {
+  Widget _buildBottomNav(FormaticLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       child: Container(
@@ -115,13 +118,13 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: Row(
           children: [
-            _buildNavItem(0, Icons.home_outlined, Icons.home_rounded, 'Home'),
+            _buildNavItem(0, Icons.home_outlined, Icons.home_rounded, l10n.tabHome),
             _buildNavItem(1, Icons.description_outlined,
-                Icons.description_rounded, 'My Forms'),
+                Icons.description_rounded, l10n.tabMyForms),
             _buildNavCenter(),
-            _buildNavItem(3, Icons.explore_outlined, Icons.explore_rounded, 'Discovery'),
+            _buildNavItem(3, Icons.explore_outlined, Icons.explore_rounded, l10n.tabDiscovery),
             _buildNavItem(
-                4, Icons.person_outline_rounded, Icons.person_rounded, 'Profile'),
+                4, Icons.person_outline_rounded, Icons.person_rounded, l10n.tabProfile),
           ],
         ),
       ),
@@ -217,7 +220,7 @@ class _HomeContentState extends State<_HomeContent>
   @override
   bool get wantKeepAlive => true;
   String _selectedCategory = 'All';
-  String _username = 'User';
+  String _username = '';
   bool _isLoading = true;
   List<Map<String, dynamic>> _allForms = [];
   List<Map<String, dynamic>> _filteredForms = [];
@@ -330,40 +333,43 @@ class _HomeContentState extends State<_HomeContent>
   @override
   Widget build(BuildContext context) {
     super.build(context); // required by AutomaticKeepAliveClientMixin
+    final FormaticLocalizations l10n = FormaticLocalizations.of(context);
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4FA),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHeader(),
-            _buildSearchBar(),
+            _buildHeader(l10n),
+            _buildSearchBar(l10n),
             const SizedBox(height: 14),
-            _buildCategoryChips(),
+            _buildCategoryChips(l10n),
             const SizedBox(height: 18),
-            Expanded(child: _buildBody()),
+            Expanded(child: _buildBody(l10n)),
           ],
         ),
       ),
     );  }
 
+  String _localizedCategoryName(String raw, FormaticLocalizations l10n) {
+    final lower = raw.toLowerCase().trim();
+    if (lower == 'ujian') return l10n.catUjian;
+    if (lower == 'survei') return l10n.catSurvei;
+    if (lower == 'pengumpulan data') return l10n.catPengumpulanData;
+    if (lower == 'all' || lower == 'semua') return l10n.catAll;
+    return raw;
+  }
+
   // ── Header ────────────────────────────────────────────────────
-  Widget _buildHeader() {
+  Widget _buildHeader(FormaticLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
       child: Row(
         children: [
-          // Hamburger
-          GestureDetector(
-            onTap: () {},
-            child: const Icon(Icons.menu_rounded,
-                size: 26, color: AppColors.textPrimary),
-          ),
-          const SizedBox(width: 14),
           // Greeting
           Expanded(
             child: Text(
-              'Hi, $_username',
+              l10n.homeGreetingPrefix(_username),
               style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
@@ -411,7 +417,7 @@ class _HomeContentState extends State<_HomeContent>
   }
 
   // ── Search Bar ────────────────────────────────────────────────
-  Widget _buildSearchBar() {
+  Widget _buildSearchBar(FormaticLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
@@ -434,7 +440,7 @@ class _HomeContentState extends State<_HomeContent>
           },
           style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
           decoration: InputDecoration(
-            hintText: 'Search templates...',
+            hintText: l10n.searchTemplates,
             hintStyle:
                 const TextStyle(color: AppColors.textHint, fontSize: 13),
             prefixIcon:
@@ -448,7 +454,7 @@ class _HomeContentState extends State<_HomeContent>
   }
 
   // ── Category Chips ────────────────────────────────────────────
-  Widget _buildCategoryChips() {
+  Widget _buildCategoryChips(FormaticLocalizations l10n) {
     return SizedBox(
       height: 36,
       child: ListView.builder(
@@ -457,10 +463,11 @@ class _HomeContentState extends State<_HomeContent>
         itemCount: _categories.length,
         itemBuilder: (context, index) {
           final label = _categories[index];
+          final displayLabel = _localizedCategoryName(label, l10n);
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: CategoryChip(
-              label: label,
+              label: displayLabel,
               isSelected: _selectedCategory == label,
               onTap: () {
                 setState(() {
@@ -476,13 +483,13 @@ class _HomeContentState extends State<_HomeContent>
   }
 
   // ── Body ──────────────────────────────────────────────────────
-  Widget _buildBody() {
+  Widget _buildBody(FormaticLocalizations l10n) {
     if (_isLoading) {
       return const Center(
           child: CircularProgressIndicator(color: AppColors.primary));
     }
     if (_allForms.isEmpty) {
-      return _buildEmptyState();
+      return _buildEmptyState(l10n);
     }
     return RefreshIndicator(
       onRefresh: _loadForms,
@@ -494,9 +501,9 @@ class _HomeContentState extends State<_HomeContent>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Trending Forms',
-                style: TextStyle(
+              Text(
+                l10n.trendingForms,
+                style: const TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
@@ -510,9 +517,9 @@ class _HomeContentState extends State<_HomeContent>
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                child: const Text(
-                  'View all',
-                  style: TextStyle(
+                child: Text(
+                  l10n.viewAll,
+                  style: const TextStyle(
                     color: AppColors.primary,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -532,7 +539,7 @@ class _HomeContentState extends State<_HomeContent>
                         size: 56,
                         color: AppColors.textSecondary.withOpacity(0.4)),
                     const SizedBox(height: 12),
-                    Text('Tidak ada form "$_selectedCategory"',
+                    Text(l10n.noFormsForCategory(_localizedCategoryName(_selectedCategory, l10n)),
                         style: const TextStyle(
                             fontSize: 14, color: AppColors.textSecondary)),
                   ],
@@ -542,7 +549,7 @@ class _HomeContentState extends State<_HomeContent>
           else
             ..._filteredForms.map((form) => Padding(
                   padding: const EdgeInsets.only(bottom: 14),
-                  child: _buildFormCard(form),
+                  child: _buildFormCard(form, l10n),
                 )),
         ],
       ),
@@ -550,7 +557,7 @@ class _HomeContentState extends State<_HomeContent>
   }
 
   // ── Form Card (seperti referensi gambar) ──────────────────────
-  Widget _buildFormCard(Map<String, dynamic> form) {
+  Widget _buildFormCard(Map<String, dynamic> form, FormaticLocalizations l10n) {
     final status = (form['status'] as String? ?? 'private').toLowerCase();
     final isPublic = status == 'public';
     final category = (form['category'] as String? ?? '').toLowerCase();
@@ -597,7 +604,7 @@ class _HomeContentState extends State<_HomeContent>
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            isPublic ? 'Public' : 'Private',
+                            isPublic ? l10n.formPublic : l10n.formPrivate,
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
@@ -610,7 +617,7 @@ class _HomeContentState extends State<_HomeContent>
                         const SizedBox(height: 8),
                         // Title
                         Text(
-                          form['title'] ?? 'Untitled Form',
+                          form['title'] ?? l10n.untitledForm,
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
@@ -628,7 +635,7 @@ class _HomeContentState extends State<_HomeContent>
                                 size: 13, color: AppColors.textSecondary),
                             const SizedBox(width: 4),
                             Text(
-                              '${form['questions'] ?? 0} Questions  ·  ${form['responses'] ?? '0'} Responses',
+                              l10n.formMeta(form['questions'] ?? 0, form['responses'] ?? '0'),
                               style: const TextStyle(
                                 fontSize: 11,
                                 color: AppColors.textSecondary,
@@ -641,7 +648,7 @@ class _HomeContentState extends State<_HomeContent>
                   ),
                   // Kebab menu
                   GestureDetector(
-                    onTap: () => _showFormMenu(context, form),
+                    onTap: () => _showFormMenu(context, form, l10n),
                     child: const Padding(
                       padding: EdgeInsets.only(left: 8, top: 2),
                       child: Icon(Icons.more_vert,
@@ -699,7 +706,9 @@ class _HomeContentState extends State<_HomeContent>
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
-                          category.isEmpty ? 'Form' : _capitalise(category),
+                          category.isEmpty
+                              ? l10n.categoryFallback
+                              : _localizedCategoryName(category, l10n),
                           style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -721,7 +730,7 @@ class _HomeContentState extends State<_HomeContent>
   String _capitalise(String s) =>
       s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 
-  void _showFormMenu(BuildContext context, Map<String, dynamic> form) {
+  void _showFormMenu(BuildContext context, Map<String, dynamic> form, FormaticLocalizations l10n) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -741,7 +750,7 @@ class _HomeContentState extends State<_HomeContent>
             ListTile(
               leading: const Icon(Icons.visibility_outlined,
                   color: AppColors.primary),
-              title: const Text('Isi Form'),
+              title: Text(l10n.fillForm),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.of(context).push(MaterialPageRoute(
@@ -757,7 +766,7 @@ class _HomeContentState extends State<_HomeContent>
   }
 
   // ── Empty state ───────────────────────────────────────────────
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(FormaticLocalizations l10n) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(40),
@@ -774,23 +783,23 @@ class _HomeContentState extends State<_HomeContent>
                   size: 50, color: AppColors.primary),
             ),
             const SizedBox(height: 24),
-            const Text('Belum Ada Form',
-                style: TextStyle(
+            Text(l10n.homeEmptyTitle,
+                style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary)),
             const SizedBox(height: 10),
-            const Text(
-              'Buat form pertama kamu dengan\nmenekan tombol + di bawah.',
+            Text(
+              l10n.homeEmptySubtitle,
               textAlign: TextAlign.center,
               style:
-                  TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                  const TextStyle(fontSize: 14, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 28),
             ElevatedButton.icon(
               onPressed: _navigateToCreateForm,
               icon: const Icon(Icons.add),
-              label: const Text('Buat Form'),
+              label: Text(l10n.createFormButton),
               style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,

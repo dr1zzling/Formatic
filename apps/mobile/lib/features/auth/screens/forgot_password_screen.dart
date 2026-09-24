@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 import 'login_screen.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -30,11 +31,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Future<void> _handleReset() async {
+    final l10n = FormaticLocalizations.of(context);
     if (!_formKey.currentState!.validate()) return;
 
     if (_passwordController.text != _confirmPasswordController.text) {
       setState(() {
-        _error = 'Password baru tidak cocok.';
+        _error = l10n.passwordsDoNotMatch;
       });
       return;
     }
@@ -61,7 +63,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       });
     } else {
       setState(() {
-        _error = result['message'] ?? 'Gagal mengubah password.';
+        _error = result['message'] ?? l10n.resetFailed;
       });
     }
   }
@@ -102,6 +104,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Widget _buildSuccess() {
+    final l10n = FormaticLocalizations.of(context);
     return Column(
       children: [
         const SizedBox(height: 8),
@@ -115,20 +118,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           child: const Icon(Icons.check_circle, color: AppColors.success, size: 32),
         ),
         const SizedBox(height: 16),
-        const Text(
-          'Password berhasil diubah!',
+        Text(
+          l10n.resetSuccess,
           textAlign: TextAlign.center,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
             color: AppColors.navy,
           ),
         ),
         const SizedBox(height: 8),
-        const Text(
-          'Silakan login dengan password baru Anda.',
+        Text(
+          l10n.resetSuccessSubtitle,
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, color: AppColors.gray),
+          style: const TextStyle(fontSize: 13, color: AppColors.gray),
         ),
         const SizedBox(height: 24),
         GestureDetector(
@@ -151,10 +154,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 ),
               ],
             ),
-            child: const Center(
+            child: Center(
               child: Text(
-                'Ke Halaman Login',
-                style: TextStyle(
+                l10n.goToLogin,
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
@@ -168,24 +171,25 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Widget _buildForm() {
+    final l10n = FormaticLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 8),
-        const Text(
-          'Reset Password',
+        Text(
+          l10n.resetPasswordTitle,
           textAlign: TextAlign.center,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
             color: AppColors.navy,
           ),
         ),
         const SizedBox(height: 4),
-        const Text(
-          'Masukkan username dan password baru Anda',
+        Text(
+          l10n.resetPasswordSubtitle,
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14, color: AppColors.gray),
+          style: const TextStyle(fontSize: 14, color: AppColors.gray),
         ),
         const SizedBox(height: 24),
 
@@ -204,17 +208,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
           ),
 
-        _label('Username'),
+        _label(l10n.username),
         const SizedBox(height: 8),
         _buildField(
           controller: _usernameController,
-          hint: 'Masukkan username Anda',
+          hint: l10n.usernameHint,
           onChanged: (_) => setState(() => _error = ''),
-          validator: (v) => (v == null || v.isEmpty) ? 'Masukkan username' : null,
+          validator: (v) => (v == null || v.isEmpty) ? l10n.usernameRequired : null,
         ),
         const SizedBox(height: 20),
 
-        _label('Password Baru'),
+        _label(l10n.newPassword),
         const SizedBox(height: 8),
         _buildField(
           controller: _passwordController,
@@ -230,14 +234,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
           onChanged: (_) => setState(() => _error = ''),
           validator: (v) {
-            if (v == null || v.isEmpty) return 'Masukkan password baru';
-            if (v.length < 6) return 'Password minimal 6 karakter';
+            if (v == null || v.isEmpty) return l10n.enterYourPassword;
+            if (v.length < 6) return l10n.pwMin8;
             return null;
           },
         ),
         const SizedBox(height: 20),
 
-        _label('Konfirmasi Password Baru'),
+        _label(l10n.confirmNewPassword),
         const SizedBox(height: 8),
         _buildField(
           controller: _confirmPasswordController,
@@ -253,7 +257,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
           ),
           onChanged: (_) => setState(() => _error = ''),
-          validator: (v) => (v == null || v.isEmpty) ? 'Konfirmasi password' : null,
+          validator: (v) => (v == null || v.isEmpty) ? l10n.confirmPasswordRequired : null,
         ),
         const SizedBox(height: 24),
 
@@ -285,9 +289,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
-                  : const Text(
-                      'Reset Password',
-                      style: TextStyle(
+                  : Text(
+                      l10n.resetPasswordButton,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -301,15 +305,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text(
-              'Ingat password? ',
-              style: TextStyle(fontSize: 13, color: AppColors.gray),
+            Text(
+              l10n.rememberPassword,
+              style: const TextStyle(fontSize: 13, color: AppColors.gray),
             ),
             GestureDetector(
               onTap: () => Navigator.of(context).pop(),
-              child: const Text(
-                'Kembali Login',
-                style: TextStyle(
+              child: Text(
+                l10n.backToLogin,
+                style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppColors.cyan,

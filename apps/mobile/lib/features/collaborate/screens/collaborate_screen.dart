@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/form_service.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 import '../../forms/screens/form_editor_screen.dart';
 
 /// Collaborate Screen — join form sebagai Collaborator via token_collab.
@@ -26,6 +27,7 @@ class _CollaborateScreenState extends State<CollaborateScreen> {
   String _error = '';
 
   Future<void> _join() async {
+    final l10n = FormaticLocalizations.of(context);
     setState(() {
       _isJoining = true;
       _error = '';
@@ -40,12 +42,13 @@ class _CollaborateScreenState extends State<CollaborateScreen> {
       setState(() => _joined = true);
     } else {
       setState(() => _error =
-          result['message'] ?? 'Gagal bergabung. Periksa link undangan.');
+          result['message'] ?? l10n.collaborateJoinFailed);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = FormaticLocalizations.of(context);
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -55,8 +58,8 @@ class _CollaborateScreenState extends State<CollaborateScreen> {
           onPressed: () => Navigator.of(context).pop(),
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
         ),
-        title: const Text(
-          'Undangan Kolaborasi',
+        title: Text(
+          l10n.collaborateTitle,
           style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.bold,
@@ -67,13 +70,13 @@ class _CollaborateScreenState extends State<CollaborateScreen> {
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
-          child: _joined ? _buildSuccess() : _buildJoin(),
+          child: _joined ? _buildSuccess(l10n) : _buildJoin(l10n),
         ),
       ),
     );
   }
 
-  Widget _buildJoin() {
+  Widget _buildJoin(FormaticLocalizations l10n) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -88,8 +91,8 @@ class _CollaborateScreenState extends State<CollaborateScreen> {
               size: 36, color: AppColors.primary),
         ),
         const SizedBox(height: 24),
-        const Text(
-          'Bergabung sebagai Collaborator',
+        Text(
+          l10n.collaborateJoinAs,
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -107,8 +110,8 @@ class _CollaborateScreenState extends State<CollaborateScreen> {
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
-        const Text(
-          'Sebagai Collaborator kamu dapat melihat dan mengedit pertanyaan form ini.',
+        Text(
+          l10n.collaborateBody,
           style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
           textAlign: TextAlign.center,
         ),
@@ -151,7 +154,7 @@ class _CollaborateScreenState extends State<CollaborateScreen> {
                         strokeWidth: 2, color: Colors.white))
                 : const Icon(Icons.check, size: 18),
             label:
-                Text(_isJoining ? 'Bergabung...' : 'Bergabung'),
+                Text(_isJoining ? l10n.collaborateJoining : l10n.collaborateJoin),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
@@ -174,14 +177,14 @@ class _CollaborateScreenState extends State<CollaborateScreen> {
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('Batal'),
+            child: Text(l10n.cancel),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildSuccess() {
+  Widget _buildSuccess(FormaticLocalizations l10n) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -196,16 +199,16 @@ class _CollaborateScreenState extends State<CollaborateScreen> {
               size: 40, color: AppColors.success),
         ),
         const SizedBox(height: 24),
-        const Text(
-          'Berhasil Bergabung!',
+        Text(
+          l10n.collaborateSuccess,
           style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
               color: AppColors.textPrimary),
         ),
         const SizedBox(height: 10),
-        const Text(
-          'Kamu sekarang menjadi Collaborator. Kamu bisa melihat dan mengedit pertanyaan form ini.',
+        Text(
+          l10n.collaborateSuccessBody,
           style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
           textAlign: TextAlign.center,
         ),
@@ -230,14 +233,14 @@ class _CollaborateScreenState extends State<CollaborateScreen> {
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('Buka Form'),
+            child: Text(l10n.collaborateOpenForm),
           ),
         ),
         const SizedBox(height: 12),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text(
-            'Kembali',
+          child: Text(
+            l10n.collaborateBack,
             style: TextStyle(color: AppColors.textSecondary),
           ),
         ),

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/form_service.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 import '../../../core/config/api_config.dart';
 import '../widgets/form_audio_player.dart';
 import '../widgets/math_keyboard.dart';
@@ -310,6 +311,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
   bool _needsOptions() => ['radio', 'checkbox', 'rating'].contains(_selectedType);
 
   Future<void> _pickImage() async {
+    final l10n = FormaticLocalizations.of(context);
     try {
       final result = await FilePickerPlatform.instance.pickFiles(
         type: FileType.custom,
@@ -321,8 +323,8 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
       if (!['jpg', 'jpeg', 'png', 'webp'].contains(ext)) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Format tidak valid. Pilih JPG, PNG, atau WEBP.'),
+SnackBar(
+               content: Text(l10n.invalidImageFormat),
               backgroundColor: AppColors.error,
             ),
           );
@@ -334,8 +336,8 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
       if (bytes.lengthInBytes > 5 * 1024 * 1024) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Gambar terlalu besar. Maksimal 5MB.'),
+SnackBar(
+               content: Text(l10n.imageTooLarge),
               backgroundColor: AppColors.error,
             ),
           );
@@ -351,8 +353,8 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Gagal memilih gambar. Coba lagi.'),
+SnackBar(
+             content: Text(l10n.fileSelectError),
             backgroundColor: AppColors.error,
           ),
         );
@@ -371,6 +373,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
   static const List<String> _audioExtensions = ['mp3', 'wav', 'ogg', 'm4a', 'aac'];
 
   Future<void> _pickAudio() async {
+    final l10n = FormaticLocalizations.of(context);
     try {
       final result = await FilePickerPlatform.instance.pickFiles(
         type: FileType.custom,
@@ -382,8 +385,8 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
       if (!_audioExtensions.contains(ext)) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Format audio tidak didukung. Gunakan MP3, WAV, OGG, M4A, atau AAC.'),
+SnackBar(
+               content: Text(l10n.unsupportedAudioFormat),
               backgroundColor: AppColors.error,
             ),
           );
@@ -405,8 +408,8 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Gagal memilih audio. Coba lagi.'),
+SnackBar(
+             content: Text(l10n.audioPickFailed),
             backgroundColor: AppColors.error,
           ),
         );
@@ -424,6 +427,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
   }
 
   Future<void> _saveQuestion() async {
+    final l10n = FormaticLocalizations.of(context);
     if (_isQuestionEmpty()) {
       setState(() => _questionEmpty = true);
       return;
@@ -433,8 +437,8 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
 
     if (widget.formSlug == null || widget.formSlug!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Form slug tidak tersedia'),
+        SnackBar(
+          content: Text(l10n.missingSlug),
           backgroundColor: AppColors.error,
         ),
       );
@@ -446,8 +450,8 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
           _optionQuillControllers.any((c) => _isOptionEmpty(c));
       if (hasEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Isi semua opsi terlebih dahulu'),
+SnackBar(
+          content: Text(l10n.fillAllOptions),
             backgroundColor: AppColors.error,
           ),
         );
@@ -557,8 +561,8 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
       if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Gagal menyimpan soal. Coba lagi.'),
+        SnackBar(
+          content: Text(l10n.saveFailed),
           backgroundColor: AppColors.error,
         ),
       );
@@ -567,6 +571,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = FormaticLocalizations.of(context);
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -756,7 +761,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                         : null,
                     icon: const Icon(Icons.remove_circle_outline,
                         color: AppColors.primary),
-                    tooltip: 'Halaman sebelumnya',
+                    tooltip: FormaticLocalizations.of(context).back,
                   ),
                   SizedBox(
                     width: 40,
@@ -781,7 +786,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                     onPressed: () => setState(() => _selectedPage++),
                     icon: const Icon(Icons.add_circle_outline,
                         color: AppColors.primary),
-                    tooltip: 'Halaman berikutnya',
+                    tooltip: FormaticLocalizations.of(context).next,
                   ),
                 ],
               ),
@@ -1126,7 +1131,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                     TextButton.icon(
                       onPressed: _addOption,
                       icon: const Icon(Icons.add_rounded, size: 18),
-                      label: const Text('Tambah'),
+                      label: Text(FormaticLocalizations.of(context).add),
                       style: TextButton.styleFrom(
                         foregroundColor: AppColors.primary,
                         padding: EdgeInsets.zero,

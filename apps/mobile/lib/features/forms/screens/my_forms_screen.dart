@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/services/form_service.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 import '../widgets/my_form_card.dart';
 import 'form_editor_screen.dart';
 import '../../trash/screens/trash_screen.dart';
@@ -16,6 +17,7 @@ class MyFormsScreen extends StatefulWidget {
 
 class MyFormsScreenState extends State<MyFormsScreen>
     with AutomaticKeepAliveClientMixin {
+  FormaticLocalizations get l10n => FormaticLocalizations.of(context);
   @override
   bool get wantKeepAlive => true;
   int _selectedTab = 0;
@@ -265,7 +267,7 @@ class MyFormsScreenState extends State<MyFormsScreen>
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('Bergabung'),
+                child: Text(l10n.join),
               ),
             ),
           ],
@@ -321,11 +323,11 @@ class MyFormsScreenState extends State<MyFormsScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        title: Row(
           children: [
             Icon(Icons.delete_outline, color: AppColors.error),
             SizedBox(width: 8),
-            Text('Hapus Form'),
+            Text(l10n.deleteFormTitle),
           ],
         ),
         content: Text(
@@ -335,7 +337,7 @@ class MyFormsScreenState extends State<MyFormsScreen>
         actions: [
           TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Batal')),
+              child: Text(l10n.cancel)),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: ElevatedButton.styleFrom(
@@ -344,7 +346,7 @@ class MyFormsScreenState extends State<MyFormsScreen>
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8)),
             ),
-            child: const Text('Hapus'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -362,8 +364,8 @@ class MyFormsScreenState extends State<MyFormsScreen>
       _applyFilters();
     });
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Form dipindahkan ke Trash.'),
+ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+         content: Text(l10n.movedToTrash),
         backgroundColor: AppColors.success,
         duration: Duration(seconds: 2),
       ));
@@ -387,7 +389,8 @@ class MyFormsScreenState extends State<MyFormsScreen>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // required by AutomaticKeepAliveClientMixin
+    super.build(context);
+    final l10n = FormaticLocalizations.of(context); // required by AutomaticKeepAliveClientMixin
     final forms = _selectedTab == 0
         ? _filteredForms
         : _filteredForms.where((f) => f['role'] == 'COLLABORATOR').toList();
@@ -403,7 +406,7 @@ class MyFormsScreenState extends State<MyFormsScreen>
               child: Row(
                 children: [
                   Text(
-                    'My Forms',
+                    l10n.myForms,
                     style: Theme.of(context).textTheme.displayMedium?.copyWith(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -499,8 +502,8 @@ class MyFormsScreenState extends State<MyFormsScreen>
                       _applyFilters();
                     });
                   },
-                  decoration: const InputDecoration(
-                    hintText: 'Cari form...',
+decoration: InputDecoration(
+                     hintText: l10n.searchForms,
                     hintStyle: TextStyle(
                       color: AppColors.textHint,
                       fontSize: 13,

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/form_service.dart';
-import '../widgets/app_logo.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 
 class CreateFormScreen extends StatefulWidget {
   const CreateFormScreen({super.key});
@@ -13,8 +13,10 @@ class CreateFormScreen extends StatefulWidget {
 }
 
 class _CreateFormScreenState extends State<CreateFormScreen> {
+  FormaticLocalizations get l10n => FormaticLocalizations.of(context);
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
   final _tokenController = TextEditingController();
   final _durationController = TextEditingController();
 
@@ -53,6 +55,7 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
   @override
   void dispose() {
     _titleController.dispose();
+    _descriptionController.dispose();
     _tokenController.dispose();
     _durationController.dispose();
     super.dispose();
@@ -134,17 +137,9 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
   Future<void> _handleCreateForm() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_bannerBytes == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Banner image wajib diunggah'),
-        backgroundColor: AppColors.error,
-      ));
-      return;
-    }
-
     if (_selectedSubId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Pilih kategori terlebih dahulu'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(l10n.missingData),
         backgroundColor: AppColors.error,
       ));
       return;
@@ -160,7 +155,10 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
 
     final result = await FormService.createForm(
       title: titleText,
-      bannerBytes: _bannerBytes!,
+      description: _descriptionController.text.trim().isEmpty
+          ? null
+          : _descriptionController.text.trim(),
+      bannerBytes: _bannerBytes,
       subKategoriId: _selectedSubId,
       tokenRespon: tokenText,
       duration: durationVal,
@@ -203,7 +201,7 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
     setState(() => _isLoading = false);
 
     if (!themeColorSaved) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(
           'Form berhasil dibuat. Warna tema tidak tersimpan — atur kembali di Form Settings.',
         ),
@@ -233,8 +231,6 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const AppLogo(),
-                const SizedBox(height: 40),
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
@@ -266,12 +262,12 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
                         const SizedBox(height: 32),
 
                         // ── Judul ───────────────────────────────────────────
-                        Text('JUDUL FORM', style: Theme.of(context).textTheme.labelLarge),
+                        Text(l10n.formTitleLabel, style: Theme.of(context).textTheme.labelLarge),
                         const SizedBox(height: 8),
                         TextFormField(
                           controller: _titleController,
                           decoration: InputDecoration(
-                            hintText: 'Contoh: Kuesioner Kepuasan Siswa',
+                            hintText: l10n.formTitleHint,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: const BorderSide(color: AppColors.inputBorder),
@@ -282,8 +278,24 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
                         ),
                         const SizedBox(height: 24),
 
-                        // ── Kategori dari API ───────────────────────────────
-                        Text('KATEGORI', style: Theme.of(context).textTheme.labelLarge),
+                         Text('Deskripsi (Opsional)', style: Theme.of(context).textTheme.labelLarge),
+                         const SizedBox(height: 8),
+                         TextFormField(
+                           controller: _descriptionController,
+                           minLines: 3,
+                           maxLines: 5,
+                           decoration: InputDecoration(
+                             hintText: 'Tambahkan deskripsi form',
+                             border: OutlineInputBorder(
+                               borderRadius: BorderRadius.circular(12),
+                               borderSide: const BorderSide(color: AppColors.inputBorder),
+                             ),
+                           ),
+                         ),
+                         const SizedBox(height: 24),
+
+                         // ── Kategori dari API ───────────────────────────────
+                        Text(l10n.category, style: Theme.of(context).textTheme.labelLarge),
                         const SizedBox(height: 8),
                         if (_isLoadingCategories)
                           const SizedBox(
@@ -430,7 +442,7 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
                           controller: _durationController,
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
-                            hintText: 'Contoh: 60',
+                            hintText: l10n.durationHint,
                             suffixText: 'menit',
                             helperText: 'Kosongkan jika tidak ada batas waktu',
                             helperStyle: const TextStyle(
@@ -474,7 +486,7 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
                         TextFormField(
                           controller: _tokenController,
                           decoration: InputDecoration(
-                            hintText: 'Contoh: TOKEN123',
+                            hintText: l10n.tokenResponHint,
                             helperText: 'Kosongkan jika form terbuka untuk umum',
                             helperStyle: const TextStyle(
                               fontSize: 12,
@@ -540,9 +552,9 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
                         ),
                         const SizedBox(height: 24),
 
-                        // ── Banner ─────────────────────────────────────────
+                        // ── Banner (opsional) ─────────────────────────────
                         Text(
-                          'BANNER FORM',
+                          'BANNER FORM (OPSIONAL)',
                           style: Theme.of(context).textTheme.labelLarge,
                         ),
                         const SizedBox(height: 8),
@@ -573,7 +585,7 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
                                       ),
                                       const SizedBox(height: 8),
                                       const Text(
-                                        'Tap untuk upload banner',
+                                        'Tap untuk upload banner (opsional)',
                                         style: TextStyle(
                                           color: AppColors.textSecondary,
                                           fontSize: 14,
@@ -631,7 +643,7 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
                                       ),
                                     ),
                                   )
-                                : const Text('Buat Form'),
+                                : Text(l10n.createFormButton),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -639,8 +651,8 @@ class _CreateFormScreenState extends State<CreateFormScreen> {
                           width: double.infinity,
                           child: TextButton(
                             onPressed: () => Navigator.of(context).pop(),
-                            child: const Text(
-                              'Batal',
+                            child: Text(
+                              l10n.cancel,
                               style: TextStyle(
                                 color: AppColors.textPrimary,
                                 fontWeight: FontWeight.w600,

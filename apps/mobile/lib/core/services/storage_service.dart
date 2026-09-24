@@ -3,6 +3,27 @@ import 'package:shared_preferences/shared_preferences.dart';
 class StorageService {
   static const String _tokenKey = 'auth_token';
   static const String _usernameKey = 'username';
+  static const String _languageKey = 'app_language';
+
+  // Save language ('id' | 'en')
+  static Future<bool> saveLanguage(String languageCode) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return await prefs.setString(_languageKey, languageCode);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Get language
+  static Future<String?> getLanguage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_languageKey);
+    } catch (e) {
+      return null;
+    }
+  }
 
   // Save token
   static Future<bool> saveToken(String token) async {

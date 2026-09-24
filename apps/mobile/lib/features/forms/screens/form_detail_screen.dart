@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/form_service.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 import 'add_question_screen.dart';
 import 'qr_code_screen.dart';
 import 'form_viewer_screen.dart';
@@ -32,6 +33,7 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
 
   int _submissions = 0;
   bool _isActive = false;
+  String _description = '';
 
   @override
   void initState() {
@@ -71,7 +73,9 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
         final data = result['data']['data'];
         // Backend returns soal grouped by page: [{page:1, soal:[...]}, ...]
         // Flatten all page groups into a single list of soal items.
-        final rawSoal = data['soal'] is List ? data['soal'] as List : [];
+         final form = data['form'] is Map ? data['form'] as Map : <String, dynamic>{};
+         _description = form['description']?.toString() ?? '';
+         final rawSoal = data['soal'] is List ? data['soal'] as List : [];
         final List<dynamic> listSoal = rawSoal.expand<dynamic>((pageGroup) {
           if (pageGroup is Map && pageGroup['soal'] is List) {
             return pageGroup['soal'] as List;
@@ -129,6 +133,7 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = FormaticLocalizations.of(context);
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -161,7 +166,7 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
                 );
               },
               icon: const Icon(Icons.qr_code, color: AppColors.textPrimary),
-              tooltip: 'Show QR Code',
+              tooltip: l10n.showQrCode,
             ),
           IconButton(
             onPressed: _loadQuestions,
@@ -211,7 +216,7 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
                   vertical: 12,
                 ),
               ),
-              child: const Text('Retry'),
+              child: Text(l10n.retry),
             ),
           ],
         ),
@@ -317,8 +322,23 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
 
         const SizedBox(height: 16),
 
-        // Questions Header
-        Padding(
+         if (_description.trim().isNotEmpty)
+           Container(
+             width: double.infinity,
+             margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+             padding: const EdgeInsets.all(16),
+             decoration: BoxDecoration(
+               color: Colors.white,
+               borderRadius: BorderRadius.circular(12),
+             ),
+             child: Text(
+               _description,
+               style: const TextStyle(fontSize: 15, height: 1.5, color: AppColors.textSecondary),
+             ),
+           ),
+
+         // Questions Header
+         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
             children: [
@@ -346,7 +366,7 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
                 },
                 icon: const Icon(Icons.add, color: AppColors.primary),
                 label: const Text(
-                  'Add',
+                  l10n.add,
                   style: TextStyle(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w600,
@@ -424,7 +444,7 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
                     .then((_) => _loadQuestions());
               },
               icon: const Icon(Icons.add),
-              label: const Text('Add Question'),
+              label: Text(l10n.addQuestion),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -510,21 +530,21 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
                   final confirm = await showDialog<bool>(
                     context: context,
                     builder: (context) => AlertDialog(
-                      title: const Text('Hapus Soal'),
+                      title: Text(l10n.deleteQuestion),
                       content: Text(
                         'Yakin ingin menghapus soal ini?\n\n${question['question']}',
                       ),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.of(context).pop(false),
-                          child: const Text('Batal'),
+                          child: Text(l10n.cancel),
                         ),
                         TextButton(
                           onPressed: () => Navigator.of(context).pop(true),
                           style: TextButton.styleFrom(
                             foregroundColor: AppColors.error,
                           ),
-                          child: const Text('Hapus'),
+                          child: Text(l10n.delete),
                         ),
                       ],
                     ),

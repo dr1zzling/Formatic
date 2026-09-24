@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/form_service.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 
 class MonitoringScreen extends StatefulWidget {
   final String formSlug;
@@ -18,6 +19,7 @@ class MonitoringScreen extends StatefulWidget {
 }
 
 class _MonitoringScreenState extends State<MonitoringScreen> {
+  FormaticLocalizations get l10n => FormaticLocalizations.of(context);
   bool _isLoading = true;
   String _errorMessage = '';
   List<Map<String, dynamic>> _statusList = [];
@@ -30,6 +32,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
   }
 
   Future<void> _loadMonitoring() async {
+    final l10n = FormaticLocalizations.of(context);
     setState(() { _isLoading = true; _errorMessage = ''; });
     final result = await FormService.getMonitoringStatus(widget.formSlug);
     if (!mounted) return;
@@ -40,24 +43,25 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
       } else {
-        _errorMessage = result['message'] ?? 'Gagal memuat data monitoring.';
+        _errorMessage = result['message'] ?? l10n.loadFailed;
       }
     });
   }
 
   Future<void> _resetUser(int userId, String username) async {
+    final l10n = FormaticLocalizations.of(context);
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Reset Peserta', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Text('Yakin ingin mereset pengerjaan "$username"?\n\nPeserta akan dapat mengerjakan form ini kembali dari awal.'),
+        title: Text(l10n.resetParticipantTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
+        content: Text(l10n.resetParticipantBody(username)),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Batal')),
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(l10n.cancel)),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-            child: const Text('Reset'),
+            child: Text(l10n.resetParticipantTitle),
           ),
         ],
       ),
@@ -68,7 +72,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
     if (!mounted) return;
     setState(() => _resettingIds.remove(userId));
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(result['message'] ?? (result['success'] ? 'Berhasil Reset' : 'Gagal melakukan reset')),
+      content: Text(result['message'] ?? (result['success'] ? l10n.resetSuccess : l10n.resetFailed)),
       backgroundColor: result['success'] ? AppColors.success : AppColors.error,
     ));
     if (result['success']) _loadMonitoring();
@@ -76,6 +80,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = FormaticLocalizations.of(context);
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -85,11 +90,11 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Monitoring', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+            Text(l10n.monitoring, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
             Text(widget.formTitle, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.normal), overflow: TextOverflow.ellipsis),
           ],
         ),
-        actions: [IconButton(onPressed: _loadMonitoring, icon: const Icon(Icons.refresh, color: AppColors.primary), tooltip: 'Refresh')],
+        actions: [IconButton(onPressed: _loadMonitoring, icon: const Icon(Icons.refresh, color: AppColors.primary), tooltip: l10n.refresh)],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
@@ -109,7 +114,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
             Text(_errorMessage, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, color: AppColors.textSecondary)),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: _loadMonitoring, icon: const Icon(Icons.refresh), label: const Text('Coba Lagi'),
+              onPressed: _loadMonitoring, icon: const Icon(Icons.refresh), label: Text(l10n.tryAgain),
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
             ),
           ],
@@ -127,11 +132,11 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
           children: [
             Icon(Icons.people_outline, size: 80, color: AppColors.textSecondary.withOpacity(0.4)),
             const SizedBox(height: 16),
-            const Text('Belum Ada Peserta', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+            Text(l10n.noParticipantsTitle, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
             const SizedBox(height: 8),
-            const Text('Belum ada peserta yang mengerjakan form ini.', textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: AppColors.textHint)),
+            Text(l10n.noParticipantsBody, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: AppColors.textHint)),
             const SizedBox(height: 24),
-            OutlinedButton.icon(onPressed: _loadMonitoring, icon: const Icon(Icons.refresh), label: const Text('Refresh')),
+            OutlinedButton.icon(onPressed: _loadMonitoring, icon: const Icon(Icons.refresh), label: Text(l10n.refresh)),
           ],
         ),
       ),
@@ -157,7 +162,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
               const SizedBox(width: 10),
               _summaryChip('Selesai', completed, AppColors.success),
               const SizedBox(width: 10),
-              _summaryChip('Reset', reset, AppColors.textSecondary),
+              _summaryChip(l10n.statusReset, reset, AppColors.textSecondary),
             ],
           ),
         ),
@@ -265,7 +270,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                     : IconButton(
                         onPressed: () => _resetUser(userIdInt, username),
                         icon: const Icon(Icons.restart_alt, color: AppColors.error, size: 22),
-                        tooltip: 'Reset peserta ini',
+                        tooltip: l10n.resetParticipantTooltip,
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                       ),
@@ -301,7 +306,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                     children: [
                       const Icon(Icons.play_circle_outline, size: 13, color: AppColors.textHint),
                       const SizedBox(width: 4),
-                      Text('Mulai: $startAt', style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
+                      Text(l10n.startedAt(startAt), style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
                     ],
                   ),
                 if (submittedAt.isNotEmpty)
@@ -310,7 +315,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                     children: [
                       const Icon(Icons.check_circle_outline, size: 13, color: AppColors.textHint),
                       const SizedBox(width: 4),
-                      Text('Selesai: $submittedAt', style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
+                      Text(l10n.completedAt(submittedAt), style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
                     ],
                   ),
               ],

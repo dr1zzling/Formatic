@@ -38,7 +38,7 @@ class AuthService {
         if (token == null || token.isEmpty) {
           return {
             'success': false,
-            'message': data['message'] ?? 'Login failed: invalid server response',
+            'message': data['message'],
           };
         }
         await StorageService.saveToken(token);
@@ -52,7 +52,7 @@ class AuthService {
       } else {
         return {
           'success': false,
-          'message': data['message'] ?? 'Login failed',
+          'message': data['message'],
         };
       }
     } catch (e) {
@@ -87,7 +87,7 @@ class AuthService {
         if (token == null || token.isEmpty) {
           return {
             'success': false,
-            'message': data['message'] ?? 'Registration failed: invalid server response',
+            'message': data['message'],
           };
         }
         await StorageService.saveToken(token);
@@ -101,7 +101,7 @@ class AuthService {
       } else {
         return {
           'success': false,
-          'message': data['message'] ?? 'Registration failed',
+          'message': data['message'],
         };
       }
     } catch (e) {
@@ -112,10 +112,14 @@ class AuthService {
     }
   }
 
-  // Forgot password / Reset password
+  // Forgot password / Reset password / Change password
+  // Wanneer `currentPassword` word meegegeven (change-password flow), stuurt
+  // de backend dit naar bcrypt.compare en weigert het de update als het niet
+  // matcht met de huidige password.
   static Future<Map<String, dynamic>> resetPassword({
     required String username,
     required String newPassword,
+    String? currentPassword,
   }) async {
     try {
       final url = Uri.parse('${ApiConfig.userApiBaseUrl}${ApiConfig.forgotPasswordEndpoint}');
@@ -126,6 +130,8 @@ class AuthService {
         body: jsonEncode({
           'username': username,
           'password': newPassword,
+          if (currentPassword != null && currentPassword.isNotEmpty)
+            'current_password': currentPassword,
         }),
       ).timeout(ApiConfig.timeout);
 

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/services/locale_service.dart';
 import '../../../core/services/storage_service.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 import '../../auth/screens/login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -15,7 +17,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
-  String _username = 'User';
+  String _username = '';
   bool _isLoading = true;
 
   @override
@@ -36,24 +38,25 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Future<void> _handleLogout() async {
+    final l10n = FormaticLocalizations.of(context);
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
+        title: Text(l10n.logout),
+        content: Text(l10n.logoutConfirmBody),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
             child: Text(
-              'Cancel',
+              l10n.cancel,
               style: TextStyle(color: AppColors.textSecondary),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Logout'),
+            child: Text(l10n.logout),
           ),
         ],
       ),
@@ -72,23 +75,16 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   void _showChangePasswordDialog() {
+    final FormaticLocalizations l10n = FormaticLocalizations.of(context);
     final currentPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
     final confirmController = TextEditingController();
-    var controllersDisposed = false;
-    void disposeControllers() {
-      if (!controllersDisposed) {
-        controllersDisposed = true;
-        currentPasswordController.dispose();
-        newPasswordController.dispose();
-        confirmController.dispose();
-      }
-    }
 
     bool lifting = false;
     bool obscureCurrentPassword = true;
     bool obscureNewPassword = true;
     bool obscureConfirmPassword = true;
+    bool dialogClosed = false;
 
     showDialog(
       context: context,
@@ -120,9 +116,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 vertical: 15,
               ),
               suffixIcon: IconButton(
-                tooltip: obscureText
-                    ? 'Tampilkan password'
-                    : 'Sembunyikan password',
+                tooltip: obscureText ? l10n.showPassword : l10n.hidePassword,
                 onPressed: lifting ? null : onToggleVisibility,
                 icon: Icon(
                   obscureText
@@ -192,8 +186,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'Change Password',
+                              Text(
+                                l10n.cpTitle,
                                 style: TextStyle(
                                   color: AppColors.textPrimary,
                                   fontSize: 19,
@@ -202,7 +196,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Akun: $_username',
+                                l10n.cpAccount(_username),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -222,8 +216,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                       obscureText: obscureCurrentPassword,
                       textInputAction: TextInputAction.next,
                       decoration: passwordDecoration(
-                        label: 'Password Saat Ini',
-                        hint: 'Masukkan password saat ini',
+                        label: l10n.cpCurrentLabel,
+                        hint: l10n.cpCurrentHint,
                         obscureText: obscureCurrentPassword,
                         onToggleVisibility: () {
                           setDialogState(
@@ -239,8 +233,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                       obscureText: obscureNewPassword,
                       textInputAction: TextInputAction.next,
                       decoration: passwordDecoration(
-                        label: 'Password Baru',
-                        hint: 'Masukkan password baru',
+                        label: l10n.cpNewLabel,
+                        hint: l10n.cpNewHint,
                         obscureText: obscureNewPassword,
                         onToggleVisibility: () {
                           setDialogState(
@@ -255,8 +249,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                       obscureText: obscureConfirmPassword,
                       textInputAction: TextInputAction.done,
                       decoration: passwordDecoration(
-                        label: 'Konfirmasi Password Baru',
-                        hint: 'Ulangi password baru',
+                        label: l10n.cpConfirmLabel,
+                        hint: l10n.cpConfirmHint,
                         obscureText: obscureConfirmPassword,
                         onToggleVisibility: () {
                           setDialogState(
@@ -274,7 +268,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                             onPressed: lifting
                                 ? null
                                 : () {
-                                    disposeControllers();
                                     Navigator.of(dialogContext).pop();
                                   },
                             style: TextButton.styleFrom(
@@ -284,8 +277,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 borderRadius: BorderRadius.circular(14),
                               ),
                             ),
-                            child: const Text(
-                              'Batal',
+                            child: Text(
+                              l10n.cancel,
                               style: TextStyle(fontWeight: FontWeight.w600),
                             ),
                           ),
@@ -308,10 +301,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                                       ScaffoldMessenger.of(
                                         context,
                                       ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Isi semua field terlebih dahulu',
-                                          ),
+                                        SnackBar(
+                                          content: Text(l10n.cpFillAll),
                                           backgroundColor: AppColors.error,
                                         ),
                                       );
@@ -321,10 +312,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                                       ScaffoldMessenger.of(
                                         context,
                                       ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Konfirmasi password tidak cocok',
-                                          ),
+                                        SnackBar(
+                                          content: Text(l10n.cpMismatch),
                                           backgroundColor: AppColors.error,
                                         ),
                                       );
@@ -336,16 +325,19 @@ class _ProfileScreenState extends State<ProfileScreen>
                                         await AuthService.resetPassword(
                                           username: _username,
                                           newPassword: newPassword,
+                                          currentPassword: currentPassword,
                                         );
-                                    if (!context.mounted) return;
+                                    if (!context.mounted || dialogClosed) {
+                                      return;
+                                    }
 
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
                                           result['message'] ??
                                               (result['success']
-                                                  ? 'Password berhasil diubah'
-                                                  : 'Gagal mengubah password'),
+                                                  ? l10n.cpSuccess
+                                                  : l10n.cpFailed),
                                         ),
                                         backgroundColor: result['success']
                                             ? AppColors.success
@@ -353,7 +345,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                                       ),
                                     );
                                     if (result['success']) {
-                                      disposeControllers();
                                       Navigator.of(dialogContext).pop();
                                     } else {
                                       setDialogState(() => lifting = false);
@@ -382,8 +373,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                                       ),
                                     ),
                                   )
-                                : const Text(
-                                    'Simpan',
+                                : Text(
+                                    l10n.cpSubmit,
                                     style: TextStyle(
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -399,12 +390,103 @@ class _ProfileScreenState extends State<ProfileScreen>
           );
         },
       ),
-    ).whenComplete(disposeControllers);
+    ).whenComplete(() => dialogClosed = true);
+  }
+
+  void _showLanguageDialog() {
+    final FormaticLocalizations l10n = FormaticLocalizations.of(context);
+    Widget languageRow(String flag, String label, String languageCode) {
+      final selected = LocaleService.languageCode == languageCode;
+      return ListTile(
+        minTileHeight: 56,
+        leading: CircleAvatar(radius: 14, child: Text(flag)),
+        title: Text(
+          label,
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        trailing: selected
+            ? const Icon(
+                Icons.radio_button_checked,
+                color: AppColors.primary,
+                size: 22,
+              )
+            : const SizedBox(
+                width: 22,
+                height: 22,
+              ),
+        onTap: () async {
+          await LocaleService.select(languageCode);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.languageChanged),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          Navigator.of(context).pop();
+        },
+      );
+    }
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          l10n.languageMenu,
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              l10n.languageSubtitle,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.inputFill,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.inputBorder),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  languageRow('🇮🇩', l10n.bahasaIndonesia, 'id'),
+                  Divider(height: 1, color: AppColors.inputBorder),
+                  languageRow('🇬🇧', l10n.english, 'en'),
+                ],
+              ),
+            ),
+          ],
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(
+              l10n.cancel,
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context); // required by AutomaticKeepAliveClientMixin
+    final FormaticLocalizations l10n = FormaticLocalizations.of(context);
     return Scaffold(
       backgroundColor: AppColors.background,
       body: _isLoading
@@ -421,7 +503,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       child: Row(
                         children: [
                           Text(
-                            'Profile',
+                            l10n.profile,
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
@@ -487,7 +569,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        'Form Creator',
+                        l10n.formCreatorRole,
                         style: TextStyle(
                           fontSize: 12,
                           color: AppColors.primary,
@@ -503,19 +585,26 @@ class _ProfileScreenState extends State<ProfileScreen>
                         children: [
                           _buildMenuItem(
                             icon: Icons.lock_outline,
-                            title: 'Change Password',
-                            subtitle: 'Update your password',
+                            title: l10n.changePassword,
+                            subtitle: l10n.updateYourPassword,
                             onTap: _showChangePasswordDialog,
                           ),
                           const SizedBox(height: 12),
                           _buildMenuItem(
+                            icon: Icons.translate,
+                            title: l10n.languageMenu,
+                            subtitle: l10n.languageSubtitle,
+                            onTap: _showLanguageDialog,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildMenuItem(
                             icon: Icons.info_outline,
-                            title: 'About',
-                            subtitle: 'App version and information',
+                            title: l10n.about,
+                            subtitle: l10n.aboutSubtitle,
                             onTap: () {
                               showAboutDialog(
                                 context: context,
-                                applicationName: 'Formatic',
+                                applicationName: l10n.aboutTitle,
                                 applicationVersion: '1.0.0',
                                 applicationIcon: Container(
                                   width: 60,
@@ -531,9 +620,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                   ),
                                 ),
                                 children: [
-                                  const Text(
-                                    'A modern form builder application',
-                                  ),
+                                  Text(l10n.aboutDescription),
                                 ],
                               );
                             },
@@ -581,9 +668,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                                         ),
                                       ),
                                       const SizedBox(width: 16),
-                                      const Expanded(
+                                      Expanded(
                                         child: Text(
-                                          'Logout',
+                                          l10n.logout,
                                           style: TextStyle(
                                             fontSize: 16,
                                             fontWeight: FontWeight.w600,

@@ -7,6 +7,7 @@ import 'package:flutter_quill/flutter_quill.dart' as quill;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/form_service.dart';
 import '../../../core/config/api_config.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 import '../../../core/utils/html_utils.dart';
 import '../widgets/form_audio_player.dart';
 import '../../history/screens/history_screen.dart';
@@ -21,12 +22,14 @@ class FormViewerScreen extends StatefulWidget {
 }
 
 class _FormViewerScreenState extends State<FormViewerScreen> {
+  FormaticLocalizations get l10n => FormaticLocalizations.of(context);
   bool _isLoading = true;
   String _errorMessage = '';
   bool _isSubmitting = false;
   bool _isSubmitted = false;
 
   String _formTitle = '';
+  String _formDescription = '';
   String _category = '';
   String _tokenRespon = '';
 
@@ -142,9 +145,10 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
                   ? Map<String, dynamic>.from(form['kategori'] as Map)
                   : <String, dynamic>{};
 
-          _formTitle = form['title']?.toString() ??
-              data['title']?.toString() ??
-              'Untitled Form';
+           _formTitle = form['title']?.toString() ??
+               data['title']?.toString() ??
+               'Untitled Form';
+           _formDescription = form['description']?.toString() ?? '';
           _category = (kategori['primary_kategori'] ??
               data['category'] ??
               '')
@@ -682,24 +686,24 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
   }
 
   void _showTimeWarning() {
+    final l10n = FormaticLocalizations.of(context);
     if (!_hasShownWarning && mounted) {
       _hasShownWarning = true;
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (context) => AlertDialog(
-          title: Row(children: const [
+          title: Row(children: [
             Icon(Icons.warning_amber, color: AppColors.error, size: 28),
             SizedBox(width: 8),
-            Text('Time Warning'),
+            Text(l10n.timeWarningTitle),
           ]),
-          content: const Text(
-              'You have less than 1 minute remaining! Please submit your answers soon.'),
+          content: Text(l10n.timeWarningBody),
           actions: [
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(),
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-              child: const Text('Continue'),
+              child: Text(l10n.continueButton),
             ),
           ],
         ),
@@ -708,6 +712,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
   }
 
   Future<void> _handleAutoSubmit() async {
+    final l10n = FormaticLocalizations.of(context);
     _countdownTimer?.cancel();
     if (!mounted) return;
     Navigator.of(context, rootNavigator: true).popUntil(
@@ -716,7 +721,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
 
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      SnackBar(
         content: Row(children: [
           Icon(Icons.timer_off, color: Colors.white, size: 18),
           SizedBox(width: 10),
@@ -738,6 +743,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
   }
 
   Future<void> _forceSubmit() async {
+    final l10n = FormaticLocalizations.of(context);
     if (_isSubmitting || _isSubmitted) return;
     setState(() => _isSubmitting = true);
 
@@ -924,7 +930,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
       // Show generic error but don't crash
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Terjadi kesalahan. Silakan coba lagi.'),
+          content: Text(l10n.genericError),
           backgroundColor: AppColors.error,
           duration: const Duration(seconds: 4),
         ),
@@ -933,26 +939,27 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
   }
 
   Future<void> _promptToken() async {
+    final l10n = FormaticLocalizations.of(context);
     final controller = TextEditingController();
     final result = await showDialog<String>(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('Token Responden'),
+        title: Text(l10n.tokenDialogTitle),
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(hintText: 'Masukkan token yang diberikan'),
+          decoration: InputDecoration(hintText: l10n.tokenDialogEmpty),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(null),
-            child: const Text('Batal'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(controller.text),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-            child: const Text('Lanjutkan'),
+            child: Text(l10n.next),
           ),
         ],
       ),
@@ -961,8 +968,8 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
     if (!mounted) return;
 
     if (result == null || result.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Token wajib diisi untuk mengirim jawaban'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(l10n.tokenEmptySubmit),
         backgroundColor: AppColors.error,
       ));
       return;
@@ -1015,8 +1022,8 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Gagal memilih file. Coba lagi.'),
+      SnackBar(
+          content: Text(l10n.fileSelectError),
           backgroundColor: AppColors.error,
         ),
       );
@@ -1147,8 +1154,8 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
           category: _category,
         );
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Form submitted successfully!'),
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(l10n.submitSuccess),
           backgroundColor: AppColors.success,
         ));
       } else {
@@ -1164,8 +1171,8 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
             category: _category,
           );
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Anda sudah mengisi form ini sebelumnya.'),
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(l10n.alreadySubmitted),
             backgroundColor: AppColors.success,
           ));
           return;
@@ -1177,8 +1184,8 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Failed to submit form. Please check your connection and try again.'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(l10n.submitFailedGeneric),
           backgroundColor: AppColors.error,
         ));
     }
@@ -1186,6 +1193,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = FormaticLocalizations.of(context);
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: (_preStartCompleted && !_isLoading && _errorMessage.isEmpty && !_isSubmitted)
@@ -1198,7 +1206,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
                 icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
               ),
               title: Text(
-                _isLoading ? 'Memuat...' : (_isSubmitted ? 'Selesai' : 'Fill Form'),
+                _isLoading ? l10n.loading : (_isSubmitted ? l10n.fillFinished : l10n.fillFormTitle),
                 style: const TextStyle(
                     fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
               ),
@@ -1230,11 +1238,11 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
               child: const Icon(Icons.check_circle_outline, size: 60, color: AppColors.success),
             ),
             const SizedBox(height: 24),
-            const Text('Thank You!',
+            Text(l10n.thankYou,
                 style: TextStyle(
                     fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
             const SizedBox(height: 12),
-            const Text('Your response has been submitted successfully.',
+            Text(l10n.thankYouBody,
                 style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
                 textAlign: TextAlign.center),
             const SizedBox(height: 32),
@@ -1242,7 +1250,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
               width: double.infinity,
               child: ElevatedButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Back to Form')),
+                  child: Text(l10n.backToForm)),
             ),
           ],
         ),
@@ -1263,7 +1271,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 16, color: AppColors.textSecondary)),
             const SizedBox(height: 24),
-            ElevatedButton(onPressed: _loadForm, child: const Text('Retry')),
+            ElevatedButton(onPressed: _loadForm, child: Text(l10n.retry)),
           ],
         ),
       ),
@@ -1317,8 +1325,15 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
                               color: AppColors.primary,
                               letterSpacing: 0.5)),
                     ),
-                  const SizedBox(height: 24),
-                  const Divider(color: AppColors.inputBorder),
+                   if (_formDescription.trim().isNotEmpty) ...[
+                     const SizedBox(height: 20),
+                     Text(
+                       _formDescription,
+                       style: const TextStyle(fontSize: 15, height: 1.5, color: AppColors.textSecondary),
+                     ),
+                   ],
+                   const SizedBox(height: 24),
+                   const Divider(color: AppColors.inputBorder),
                   const SizedBox(height: 20),
                   _buildInfoRow(
                       icon: Icons.quiz_outlined,
@@ -1331,7 +1346,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
                     const SizedBox(height: 24),
                     const Divider(color: AppColors.inputBorder),
                     const SizedBox(height: 20),
-                    const Text('Form ini memerlukan token responden.',
+                    Text(l10n.tokenNeeded,
                         style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
                     const SizedBox(height: 12),
                     TextField(
@@ -1340,8 +1355,8 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
                       enableSuggestions: false,
                       textCapitalization: TextCapitalization.characters,
                       decoration: InputDecoration(
-                        labelText: 'Token Responden',
-                        hintText: 'Masukkan token yang diberikan',
+                        labelText: l10n.tokenDialogTitle,
+                        hintText: l10n.tokenDialogEmpty,
                         prefixIcon:
                             const Icon(Icons.key_outlined, color: AppColors.primary),
                         filled: true,
@@ -1389,7 +1404,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
                                   strokeWidth: 2,
                                   valueColor:
                                       AlwaysStoppedAnimation<Color>(Colors.white)))
-                          : const Text('Mulai Form',
+                          : Text(l10n.startForm,
                               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
@@ -1631,7 +1646,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
                   child: OutlinedButton.icon(
                     onPressed: _goToPreviousPage,
                     icon: const Icon(Icons.arrow_back, size: 16),
-                    label: const Text('Kembali'),
+                    label: Text(l10n.back),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primary,
                       side: const BorderSide(color: AppColors.primary),
@@ -1657,7 +1672,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
                                     color: Colors.white))
                             : const Icon(Icons.send, size: 16),
                         label: Text(
-                            _isSubmitting ? 'Mengirim...' : 'Submit'),
+                            _isSubmitting ? l10n.submitting : l10n.submitButton),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
@@ -1670,7 +1685,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
                     : ElevatedButton.icon(
                         onPressed: _goToNextPage,
                         icon: const Icon(Icons.arrow_forward, size: 16),
-                        label: const Text('Lanjut'),
+                        label: Text(l10n.nextButton),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
@@ -1747,7 +1762,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
                         strokeWidth: 2,
                         valueColor:
                             AlwaysStoppedAnimation<Color>(Colors.white)))
-                : const Text('Submit Form',
+                : Text(l10n.submitForm,
                     style:
                         TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ),
@@ -1763,11 +1778,11 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
         children: [
           Icon(Icons.quiz_outlined, size: 80, color: AppColors.textSecondary.withOpacity(0.5)),
           const SizedBox(height: 16),
-          const Text('No Questions',
+          Text(l10n.noQuestionsTitle,
               style: TextStyle(
                   fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
           const SizedBox(height: 8),
-          Text("This form doesn't have any questions yet",
+          Text(l10n.noQuestionsBody2,
               style: TextStyle(fontSize: 14, color: AppColors.textSecondary.withOpacity(0.7))),
         ],
       ),
@@ -2064,7 +2079,7 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
       controller: controller,  // ✅ FIX: Use controller bound to question ID
       maxLines: 4,
       decoration: InputDecoration(
-        hintText: 'Type your answer here...',
+        hintText: l10n.answerPlaceholder,
         filled: true,
         fillColor: AppColors.background,
         border: OutlineInputBorder(
@@ -2180,10 +2195,10 @@ class _FormViewerScreenState extends State<FormViewerScreen> {
               errorBuilder: (_, __, ___) => Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(Icons.broken_image, size: 48, color: AppColors.textHint),
+                  children: [
+                    const Icon(Icons.broken_image, size: 48, color: AppColors.textHint),
                     SizedBox(height: 8),
-                    Text('Image not available',
+                    Text(l10n.imageUnavailable,
                         style: TextStyle(fontSize: 12, color: AppColors.textHint)),
                   ],
                 ),

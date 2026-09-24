@@ -3,6 +3,7 @@ export function formPayload(data) {
     id: data.id,
     slug: data.slug,
     title: data.title,
+    description: data.description ?? null,
     banner: data.banner,
     access_type: data.access_type,
     token: {

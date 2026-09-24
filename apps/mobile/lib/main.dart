@@ -3,6 +3,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'core/theme/app_theme.dart';
 import 'core/services/form_service.dart';
+import 'core/services/locale_service.dart';
+import 'core/localizations/formatic_localizations.dart';
 import 'features/splash/screens/splash_screen.dart';
 import 'features/home/screens/home_screen.dart';
 import 'features/forms/screens/add_question_screen.dart';
@@ -21,6 +23,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  String _languageCode = LocaleService.defaultLanguage;
 
   @override
   void initState() {
@@ -31,6 +34,16 @@ class _MyAppState extends State<MyApp> {
         (route) => false,
       );
     });
+    LocaleService.setOnLanguageChanged(() {
+      if (mounted) {
+        setState(() => _languageCode = LocaleService.languageCode);
+      }
+    });
+    LocaleService.load().then((_) {
+      if (mounted) {
+        setState(() => _languageCode = LocaleService.languageCode);
+      }
+    });
   }
 
   @override
@@ -40,11 +53,13 @@ class _MyAppState extends State<MyApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       navigatorKey: _navigatorKey,
+      locale: Locale(_languageCode),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         FlutterQuillLocalizations.delegate,
+        FormaticLocalizationsDelegate.delegate,
       ],
       supportedLocales: const [
         Locale('en'),

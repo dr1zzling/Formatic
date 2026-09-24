@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:xml/xml.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/form_service.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 
 class ImportWordScreen extends StatefulWidget {
   final String formSlug;
@@ -27,6 +28,7 @@ class ImportWordScreen extends StatefulWidget {
 }
 
 class _ImportWordScreenState extends State<ImportWordScreen> {
+  FormaticLocalizations get l10n => FormaticLocalizations.of(context);
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -224,15 +226,16 @@ class _ImportWordScreenState extends State<ImportWordScreen> {
   }
 
   Future<void> _showSuccessDialog(int count) async {
+    final l10n = FormaticLocalizations.of(context);
     return showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.check_circle_outline, color: AppColors.success),
+            const Icon(Icons.check_circle_outline, color: AppColors.success),
             SizedBox(width: 12),
-            Text('Import Berhasil'),
+            Text(l10n.importSuccess),
           ],
         ),
         content: Text(
@@ -241,8 +244,8 @@ class _ImportWordScreenState extends State<ImportWordScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text(
-              'OK',
+child: Text(
+               l10n.close,
               style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
             ),
           ),
@@ -256,6 +259,7 @@ class _ImportWordScreenState extends State<ImportWordScreen> {
   }
 
   Future<void> _showTemplateFormat() async {
+    final l10n = FormaticLocalizations.of(context);
     // Try to render the real content of the bundled template_import.docx.
     String? preview;
     try {
@@ -272,11 +276,11 @@ class _ImportWordScreenState extends State<ImportWordScreen> {
       await showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Row(
+title: Row(
             children: [
               Icon(Icons.description_outlined, color: AppColors.primary),
               SizedBox(width: 12),
-              Text('Contoh Format (template_import.docx)'),
+              Text(l10n.importTemplateFormat),
             ],
           ),
           content: SingleChildScrollView(
@@ -330,11 +334,11 @@ class _ImportWordScreenState extends State<ImportWordScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
             Icon(Icons.description_outlined, color: AppColors.primary),
             SizedBox(width: 12),
-            Text('Format Template DOCX'),
+            Text(l10n.importTemplateDocx),
           ],
         ),
         content: const SingleChildScrollView(
@@ -361,7 +365,7 @@ class _ImportWordScreenState extends State<ImportWordScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Tutup'),
+            child: Text(l10n.close),
           ),
         ],
       ),

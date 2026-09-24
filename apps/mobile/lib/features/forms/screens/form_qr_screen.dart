@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/config/api_config.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 
 /// QR Code screen — generates the QR locally using qr_flutter,
 /// matching Web FE behavior (qrcode.js generates QR client-side).
@@ -26,6 +27,7 @@ class FormQrScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = FormaticLocalizations.of(context);
     final fillUrl = _fillUrl;
 
     return Scaffold(
@@ -175,8 +177,8 @@ class FormQrScreen extends StatelessWidget {
                   GestureDetector(
                     onTap: () {
                       Clipboard.setData(ClipboardData(text: formSlug));
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                        content: Text('Slug disalin!'),
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(l10n.slugCopied),
                         backgroundColor: AppColors.success,
                         duration: Duration(seconds: 2),
                       ));

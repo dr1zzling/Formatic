@@ -172,9 +172,15 @@ app.post('/user/login', /* loginLimit */ async (req, res) => {
 })
 
 // Forgot Password
+// Endpoint digunakan voor TWEE flow:
+//  1) forgot-password (reset):  body = { username, password }               (geen current_password)
+//  2) change-password (ingelogd): body = { username, password, current_password }
+// Als `current_password` meegegeven word, MOET het matchen met de huidige
+// password (bcrypt.compare, zelfde mechanisme als login) voordat de nieuwe
+// password word opgeslagen.
 app.put('/user/forgot-password', async (req, res) => {
     try {
-        const { username, password } = req.body
+        const { username, password, current_password: currentPassword } = req.body
         if (!username || !password) {
             return res.status(400).json({
                 status: 400,
@@ -188,6 +194,18 @@ app.put('/user/forgot-password', async (req, res) => {
                 status: 404,
                 message: "User Tidak Ada",
             })
+        }
+
+        // Change-password flow: verifieer de huidige password echt (bcrypt,
+        // geen plaintext vergelijking) voordat er iets word veranderd.
+        if (typeof currentPassword === 'string' && currentPassword.length > 0) {
+            const isCurrentMatch = await bcrypt.compare(currentPassword, exist.password)
+            if (!isCurrentMatch) {
+                return res.status(401).json({
+                    status: 401,
+                    message: "Password Saat Ini Salah"
+                })
+            }
         }
 
         const cleanCode = password.trim()

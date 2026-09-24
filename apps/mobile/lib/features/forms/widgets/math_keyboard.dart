@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 
 /// Professional Math Keyboard untuk Question Editor
 /// Mendukung: Basic, Algebra, Fractions, Trigonometry, Geometry, Matrix, Calculus, Statistics, Set/Logic, Greek
@@ -547,7 +548,7 @@ class _MathKeyboardState extends State<MathKeyboard>
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Build $rows×$cols Matrix'),
+        title: Text(FormaticLocalizations.of(context).buildMatrix(rows, cols)),
         content: SingleChildScrollView(
           child: SizedBox(
             width: double.maxFinite,
@@ -612,7 +613,7 @@ class _MathKeyboardState extends State<MathKeyboard>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text(FormaticLocalizations.of(context).cancel),
           ),
           ElevatedButton(
             onPressed: () {
@@ -638,7 +639,7 @@ class _MathKeyboardState extends State<MathKeyboard>
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
             ),
-            child: const Text('Insert'),
+            child: Text(FormaticLocalizations.of(context).insert),
           ),
         ],
       ),

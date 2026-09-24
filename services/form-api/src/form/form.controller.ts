@@ -70,7 +70,7 @@ export class FormController {
       }),
     )
     banner: Express.Multer.File,
-    @Body() body: { title: string, sub_kategori: number, token_respon: string, theme_color: string },
+    @Body() body: { title: string, description?: string, sub_kategori: number, token_respon: string, theme_color: string },
   ) {
     if (!body.title || !body.sub_kategori) {
       throw new BadRequestException('Judul dan kategori wajib diisi');
@@ -124,6 +124,7 @@ export class FormController {
   }
 
   @Patch('/description')
+  @UseGuards(JwtAuthGuard)
   updateDescription(
     @Request() req,
     @Query('form_slug', ValidateFormExist) form_slug: string,

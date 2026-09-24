@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/form_service.dart';
 import '../../../core/services/storage_service.dart';
+import '../../../core/localizations/formatic_localizations.dart';
 
 /// Trash Screen — stores deleted forms in SharedPreferences,
 /// matching Web FE behavior (localStorage). Permanent delete calls
@@ -103,8 +104,9 @@ class _TrashScreenState extends State<TrashScreen> {
       await prefs.setString(_storageKey, jsonEncode(updated));
     } catch (_) {}
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Form dipulihkan. Cek di My Forms.'),
+      final l10n = FormaticLocalizations.of(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(l10n.formRestored),
         backgroundColor: AppColors.success,
         duration: Duration(seconds: 2),
       ));
@@ -112,6 +114,7 @@ class _TrashScreenState extends State<TrashScreen> {
   }
 
   Future<void> _permanentDelete(int index) async {
+    final l10n = FormaticLocalizations.of(context);
     final item = _items[index];
     final slug = item['slug'] as String? ?? '';
     final title = item['title'] as String? ?? 'Form';
@@ -121,20 +124,20 @@ class _TrashScreenState extends State<TrashScreen> {
       builder: (ctx) => AlertDialog(
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        title: Row(
           children: [
             Icon(Icons.warning_amber, color: AppColors.error),
             SizedBox(width: 8),
-            Text('Hapus Permanen'),
+Text(l10n.permanentlyDelete),
           ],
         ),
         content: Text(
-          'Form "$title" akan dihapus secara permanen dan tidak dapat dikembalikan.',
+          l10n.deleteFormBody(title),
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Batal')),
+              child: Text(l10n.cancel)),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: ElevatedButton.styleFrom(
@@ -143,7 +146,7 @@ class _TrashScreenState extends State<TrashScreen> {
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8)),
             ),
-            child: const Text('Hapus Permanen'),
+            child: Text(l10n.permanentlyDelete),
           ),
         ],
       ),
@@ -160,7 +163,7 @@ class _TrashScreenState extends State<TrashScreen> {
         final statusHint = result['message'] as String;
         if (!statusHint.contains('404') && !statusHint.contains('tidak ada')) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(result['message'] ?? 'Gagal menghapus form'),
+            content: Text(result['message'] ?? l10n.deletedFailed),
             backgroundColor: AppColors.error,
           ));
           return;
@@ -175,8 +178,8 @@ class _TrashScreenState extends State<TrashScreen> {
       await prefs.setString(_storageKey, jsonEncode(updated));
     } catch (_) {}
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Form berhasil dihapus permanen.'),
+ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+         content: Text(l10n.permanentDeleteSuccess),
         backgroundColor: AppColors.success,
         duration: Duration(seconds: 2),
       ));
@@ -193,13 +196,13 @@ class _TrashScreenState extends State<TrashScreen> {
   }
 
   String _daysLeft(String? iso) {
+    final l10n = FormaticLocalizations.of(context);
     if (iso == null) return '';
     final dt = DateTime.tryParse(iso);
     if (dt == null) return '';
     final diff = _retentionDays - DateTime.now().difference(dt).inDays;
-    if (diff <= 0) return 'Kedaluwarsa';
-    if (diff == 1) return '1 hari tersisa';
-    return '$diff hari tersisa';
+    if (diff <= 0) return l10n.expired;
+    return FormaticLocalizations.of(context).daysRemaining(diff);
   }
 
   String _deletedAgo(String? iso) {
@@ -207,13 +210,14 @@ class _TrashScreenState extends State<TrashScreen> {
     final dt = DateTime.tryParse(iso);
     if (dt == null) return '';
     final diff = DateTime.now().difference(dt).inDays;
-    if (diff == 0) return 'Dihapus hari ini';
-    if (diff == 1) return 'Dihapus 1 hari lalu';
-    return 'Dihapus $diff hari lalu';
+    final l10n = FormaticLocalizations.of(context);
+    if (diff == 0) return l10n.deletedToday;
+    return l10n.deletedDaysAgo(diff);
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = FormaticLocalizations.of(context);
     final filtered = _filtered;
     return SafeArea(
       child: Column(
@@ -227,8 +231,8 @@ class _TrashScreenState extends State<TrashScreen> {
                 const Icon(Icons.delete_outline,
                     size: 22, color: AppColors.error),
                 const SizedBox(width: 8),
-                const Text(
-                  'Trash',
+                Text(
+                  l10n.trashTitle,
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -272,14 +276,14 @@ class _TrashScreenState extends State<TrashScreen> {
                 border: Border.all(
                     color: AppColors.warning.withOpacity(0.3)),
               ),
-              child: const Row(
-                children: [
+child: Row(
+                 children: [
                   Icon(Icons.info_outline,
                       size: 16, color: AppColors.warning),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Form akan dihapus permanen setelah 30 hari.',
+                      l10n.trashRetentionInfo,
                       style: TextStyle(
                           fontSize: 12, color: AppColors.warning),
                     ),
@@ -297,7 +301,7 @@ class _TrashScreenState extends State<TrashScreen> {
                 onChanged: (v) => setState(() => _search = v),
                 style: const TextStyle(fontSize: 14),
                 decoration: InputDecoration(
-                  hintText: 'Cari form di trash...',
+                  hintText: l10n.trashSearchHint,
                   prefixIcon: const Icon(Icons.search,
                       size: 18, color: AppColors.textHint),
                   filled: true,
@@ -367,6 +371,7 @@ class _TrashScreenState extends State<TrashScreen> {
   }
 
   Widget _buildEmpty() {
+    final l10n = FormaticLocalizations.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(40),
@@ -384,8 +389,8 @@ class _TrashScreenState extends State<TrashScreen> {
                   size: 40, color: AppColors.error),
             ),
             const SizedBox(height: 20),
-            const Text(
-              'Trash kosong',
+            Text(
+              l10n.trashEmptyTitle,
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -393,8 +398,8 @@ class _TrashScreenState extends State<TrashScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Form yang dihapus akan muncul di sini\nsebelum dihapus permanen.',
+            Text(
+              l10n.trashEmptyBody,
               textAlign: TextAlign.center,
               style: TextStyle(
                   fontSize: 14, color: AppColors.textSecondary),
@@ -520,7 +525,7 @@ class _TrashItem extends StatelessWidget {
                 child: OutlinedButton.icon(
                   onPressed: onRestore,
                   icon: const Icon(Icons.restore, size: 16),
-                  label: const Text('Pulihkan'),
+                  label: Text(FormaticLocalizations.of(context).restore),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.primary,
                     side: const BorderSide(color: AppColors.primary),
@@ -535,7 +540,7 @@ class _TrashItem extends StatelessWidget {
                 child: ElevatedButton.icon(
                   onPressed: onDelete,
                   icon: const Icon(Icons.delete_forever, size: 16),
-                  label: const Text('Hapus'),
+                  label: Text(FormaticLocalizations.of(context).delete),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.error,
                     foregroundColor: Colors.white,

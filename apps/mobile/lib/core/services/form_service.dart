@@ -101,17 +101,19 @@ class FormService {
     }
   }
 
-  /// Create a form. Backend requires multipart with a banner image file plus
-  /// the `title` and `category` text fields. `category` must be the lowercase
-  /// string value (e.g. 'ujian', 'survei').
+  /// Create a form. Backend accepts multipart with an optional `banner` image
+  /// file plus the `title` and `sub_kategori` text fields.
   ///
-  /// The banner MIME type and filename are resolved from the image magic
-  /// bytes, so the request always carries a real `image/...` content type that
-  /// matches the backend validator (`/^image\/(jpeg|png|webp)$/`) regardless
-  /// of what the file picker reports.
+  /// When a banner is provided, the MIME type and filename are resolved from
+  /// the image magic bytes, so the request always carries a real `image/...`
+  /// content type that matches the backend validator
+  /// (`/^image\/(jpeg|png|webp)$/`) regardless of what the file picker reports.
+  /// When `bannerBytes` is null the `banner` multipart field is omitted
+  /// entirely — banner is optional per current backend contract.
   static Future<Map<String, dynamic>> createForm({
     required String title,
-    required Uint8List bannerBytes,
+    String? description,
+    Uint8List? bannerBytes,
     int? subKategoriId,
     String? tokenRespon,
     int? duration,
@@ -120,13 +122,16 @@ class FormService {
     String? category,
   }) async {
     try {
-      final imageExt = _detectImageExt(bannerBytes);
-      if (imageExt == null) {
-        return {
-          'success': false,
-          'message':
-              'Format banner tidak valid. Hanya menerima JPG, PNG, atau WEBP.',
-        };
+      String? imageExt;
+      if (bannerBytes != null) {
+        imageExt = _detectImageExt(bannerBytes);
+        if (imageExt == null) {
+          return {
+            'success': false,
+            'message':
+                'Format banner tidak valid. Hanya menerima JPG, PNG, atau WEBP.',
+          };
+        }
       }
 
       final url = Uri.parse(
@@ -137,6 +142,9 @@ class FormService {
       final headers = await _getAuthHeaders();
       request.headers.addAll(headers);
       request.fields['title'] = title;
+      if (description != null && description.trim().isNotEmpty) {
+        request.fields['description'] = description.trim();
+      }
       // Backend membutuhkan sub_kategori sebagai ID integer dari tabel sub_kategori
       if (subKategoriId != null) {
         request.fields['sub_kategori'] = subKategoriId.toString();
@@ -150,14 +158,16 @@ class FormService {
       if (themeColor != null && themeColor.trim().isNotEmpty) {
         request.fields['theme_color'] = themeColor.trim();
       }
-      request.files.add(
-        http.MultipartFile.fromBytes(
-          'banner',
-          bannerBytes,
-          filename: 'banner.$imageExt',
-          contentType: MediaType('image', imageExt),
-        ),
-      );
+      if (bannerBytes != null && imageExt != null) {
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'banner',
+            bannerBytes,
+            filename: 'banner.$imageExt',
+            contentType: MediaType('image', imageExt),
+          ),
+        );
+      }
 
       final streamedResponse = await request.send().timeout(ApiConfig.timeout);
       final response = await http.Response.fromStream(streamedResponse);
@@ -333,6 +343,29 @@ class FormService {
         'success': false,
         'message': data['message'] ?? 'Gagal menyimpan pengaturan',
       };
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateFormDescription({
+    required String slug,
+    String? description,
+  }) async {
+    try {
+      final url = Uri.parse(
+        '${ApiConfig.formApiBaseUrl}${ApiConfig.formDescriptionEndpoint}?form_slug=$slug',
+      );
+      final headers = await _getHeaders();
+      final response = await http
+          .patch(url, headers: headers, body: jsonEncode({'description': description}))
+          .timeout(ApiConfig.timeout);
+      _handle401(response.statusCode);
+      final data = await _decodeResponse(response);
+      if (response.statusCode == 200) {
+        return {'success': true, 'message': data['message'] ?? 'Deskripsi berhasil disimpan'};
+      }
+      return {'success': false, 'message': data['message'] ?? 'Gagal menyimpan deskripsi'};
     } catch (e) {
       return {'success': false, 'message': 'Connection error: ${e.toString()}'};
     }
