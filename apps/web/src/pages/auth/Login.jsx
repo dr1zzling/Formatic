@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Check, Eye, EyeOff, FileText, Users, BarChart3 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { authAPI } from "../../utils/api";
+import { useTheme } from "../../context/ThemeContext";
+import OtpCard from "./OtpCard";
 
 const COLORS = {
     navy: "#0F2C46",
@@ -33,12 +35,21 @@ function Cluster({ icon, title, subtitle, style }) {
 
 export default function Login() {
     const navigate = useNavigate();
+    const { dark } = useTheme();
+    // Palette teks card: dark mode pakai warna terang agar tidak tabrakan dengan card gelap
+    const C = dark ? { ...COLORS, navy: "#f0f6ff", gray: "#a8bdd8", border: "#2a3a54" } : COLORS;
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
-    const [username, setUsername] = useState("");
+    const [identifier, setIdentifier] = useState(""); // username atau email
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+
+    // OTP step
+    const [step, setStep] = useState("login"); // "login" | "otp"
+    const [otpEmail, setOtpEmail] = useState("");
+    const [otp, setOtp] = useState("");
+
     const iconStyle = { color: COLORS.iconGlyph };
 
     const handleSubmit = async (e) => {
@@ -47,15 +58,72 @@ export default function Login() {
         setLoading(true);
 
         try {
-            const { data } = await authAPI.login(username, password);
-            localStorage.setItem("token", data.token);
-            navigate("/");
+            const { data } = await authAPI.login(identifier, password);
+            // Backend balas dengan email untuk step OTP
+            setOtpEmail(data.email);
+            setStep("otp");
         } catch (err) {
             setError(err.response?.data?.message || "Login gagal");
         } finally {
             setLoading(false);
         }
     };
+
+    const handleVerifyOtp = async (e) => {
+        e.preventDefault();
+        setError("");
+        setLoading(true);
+
+        try {
+            const { data } = await authAPI.verifyLogin(otpEmail, otp);
+            localStorage.setItem("token", data.token);
+            navigate("/");
+        } catch (err) {
+            setError(err.response?.data?.message || "OTP salah atau kadaluarsa");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleResendOtp = async () => {
+        setError("");
+        try {
+            await authAPI.login(identifier, password);
+        } catch (err) {
+            setError(err.response?.data?.message || "Gagal mengirim ulang kode");
+            throw err;
+        }
+    };
+
+    const backToLogin = () => { setStep("login"); setError(""); setOtp(""); };
+
+    if (step === "otp") {
+        return (
+            <div
+                className="relative min-h-screen w-full flex items-center justify-center px-6 py-12 overflow-hidden"
+                style={{
+                    background:
+                        "linear-gradient(120deg, #062457 0%, #0b3f66 20%, #1c5f86 38%, #4d91b2 55%, #8fbccb 68%, #cde3ea 82%, #f7fafb 94%, #ffffff 100%)",
+                    minHeight: "100dvh",
+                }}
+            >
+                <OtpCard
+                    email={otpEmail}
+                    otp={otp}
+                    setOtp={setOtp}
+                    onVerify={handleVerifyOtp}
+                    loading={loading}
+                    error={error}
+                    dark={dark}
+                    C={C}
+                    backLabel="Kembali ke login"
+                    onBack={backToLogin}
+                    onEditEmail={backToLogin}
+                    onResend={handleResendOtp}
+                />
+            </div>
+        );
+    }
 
     return (
         <div
@@ -122,7 +190,7 @@ export default function Login() {
                             />
 
                             <div
-                                className="absolute rounded-2xl bg-white shadow-xl overflow-hidden"
+                                className="absolute rounded-2xl bg-white shadow-xl overflow-hidden auth-mock"
                                 style={{ left: "169px", top: "117px", width: "260px" }}
                             >
                                 <div
@@ -136,7 +204,7 @@ export default function Login() {
                                 <div className="p-4 space-y-3">
                                     <div className="flex items-center gap-2.5">
                                         <div
-                                            className="rounded bg-slate-100 flex items-center justify-center font-bold flex-shrink-0"
+                                            className="rounded bg-slate-100 flex items-center justify-center font-bold flex-shrink-0 auth-mock-letter"
                                             style={{ width: "31px", height: "31px", fontSize: "13px", color: COLORS.iconGlyph }}
                                         >
                                             T
@@ -187,41 +255,41 @@ export default function Login() {
                             Form<span style={{ color: COLORS.cyan }}>atic</span>
                         </h1>
                     </div>
-                    <div className="relative w-full bg-white rounded-3xl shadow-2xl px-8 py-10" style={{ backgroundColor: "white" }}>
+                    <div className="relative w-full bg-white rounded-3xl shadow-2xl px-8 py-10 auth-card" style={{ backgroundColor: "white" }}>
                         <div className="text-center mb-8">
-                            <h2 className="text-2xl font-bold" style={{ color: COLORS.navy }}>
+                            <h2 className="text-2xl font-bold" style={{ color: C.navy }}>
                                 Welcome <span style={{ color: COLORS.cyan }}>Back</span>
                             </h2>
-                            <p className="text-sm mt-1" style={{ color: COLORS.gray }}>
+                            <p className="text-sm mt-1" style={{ color: C.gray }}>
                                 Please enter your details
                             </p>
                         </div>
 
                         {error && (
-                            <div className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-lg mb-4">
+                            <div className={`text-sm px-4 py-2 rounded-lg mb-4 ${dark ? "text-red-300 bg-red-500/10" : "text-red-600 bg-red-50"}`}>
                                 {error}
                             </div>
                         )}
 
                         <form className="space-y-5" onSubmit={handleSubmit}>
                             <div>
-                                <label htmlFor="username" className="block text-sm font-semibold mb-1.5" style={{ color: COLORS.navy }}>
-                                    Username
+                                <label htmlFor="identifier" className="block text-sm font-semibold mb-1.5" style={{ color: C.navy }}>
+                                    Username / Email
                                 </label>
                                 <input
-                                    id="username"
+                                    id="identifier"
                                     type="text"
-                                    placeholder="Your name"
-                                    value={username}
-                                    onChange={(e) => setUsername(e.target.value)}
+                                    placeholder="Username atau email"
+                                    value={identifier}
+                                    onChange={(e) => setIdentifier(e.target.value)}
                                     required
                                     className="w-full rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-cyan-400 transition"
-                                    style={{ border: `1px solid ${COLORS.border}`, backgroundColor: "white", color: COLORS.navy }}
+                                    style={{ border: `1px solid ${C.border}`, backgroundColor: "white", color: C.navy }}
                                 />
                             </div>
 
                             <div>
-                                <label htmlFor="password" className="block text-sm font-semibold mb-1.5" style={{ color: COLORS.navy }}>
+                                <label htmlFor="password" className="block text-sm font-semibold mb-1.5" style={{ color: C.navy }}>
                                     Password
                                 </label>
                                 <div className="relative">
@@ -233,7 +301,7 @@ export default function Login() {
                                         onChange={(e) => setPassword(e.target.value)}
                                         required
                                         className="w-full rounded-lg pl-4 pr-10 py-2.5 text-sm outline-none focus:ring-2 focus:ring-cyan-400 transition"
-                                        style={{ border: `1px solid ${COLORS.border}`, backgroundColor: "white", color: COLORS.navy }}
+                                        style={{ border: `1px solid ${C.border}`, backgroundColor: "white", color: C.navy }}
                                     />
                                     <button
                                         type="button"
@@ -248,7 +316,7 @@ export default function Login() {
                             </div>
 
                             <div className="flex items-center text-sm">
-                                <label className="flex items-center gap-2 cursor-pointer select-none" style={{ color: COLORS.gray }}>
+                                <label className="flex items-center gap-2 cursor-pointer select-none" style={{ color: C.gray }}>
                                     <input
                                         type="checkbox"
                                         checked={rememberMe}
@@ -269,7 +337,7 @@ export default function Login() {
                                 {loading ? "Signing In..." : "Sign In"}
                             </button>
 
-                            <p className="text-center text-sm" style={{ color: COLORS.gray }}>
+                            <p className="text-center text-sm" style={{ color: C.gray }}>
                                 Don&apos;t have an account?{" "}
                                 <Link to="/register" className="font-semibold hover:opacity-80" style={{ color: COLORS.cyan }}>
                                     Sign up

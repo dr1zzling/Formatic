@@ -23,8 +23,9 @@ export default function OptionQuillEditor({ value, onChange, placeholder = 'Tuli
   const wrapperRef    = useRef(null);
   const quillRef      = useRef(null);
   const isUpdatingRef = useRef(false);
+  const isComposingRef = useRef(false);
   const [showLatex, setShowLatex] = useState(false);
-  const [isEditing, setIsEditing] = useState(() => isEmptyHtml(value));
+  const [isEditing, setIsEditing] = useState(false);
 
   // kalau value kosong → auto edit mode (biar langsung bisa ketik)
   useEffect(() => {
@@ -35,6 +36,7 @@ export default function OptionQuillEditor({ value, onChange, placeholder = 'Tuli
   useEffect(() => {
     if (!isEditing) return;
     function onDown(e) {
+      if (showLatex) return;
       if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
         if (!isEmptyHtml(value)) setIsEditing(false);
       }
@@ -48,18 +50,7 @@ export default function OptionQuillEditor({ value, onChange, placeholder = 'Tuli
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
     };
-  }, [isEditing, value]);
-
-  // auto-focus saat masuk edit mode
-  useEffect(() => {
-    if (isEditing) {
-      // quill mungkin baru mount, delay 1 frame
-      requestAnimationFrame(() => {
-        const q = quillRef.current;
-        if (q) q.focus();
-      });
-    }
-  }, [isEditing]);
+  }, [isEditing, value, showLatex]);
 
   useEffect(() => {
     if (!isEditing) return;
@@ -77,6 +68,11 @@ export default function OptionQuillEditor({ value, onChange, placeholder = 'Tuli
     });
 
     quillRef.current = quill;
+
+    // Auto-focus setelah Quill ready
+    requestAnimationFrame(() => {
+      quill.focus();
+    });
 
     const handlePaste = (e) => {
       const text = e.clipboardData?.getData('text/plain');
@@ -109,6 +105,10 @@ export default function OptionQuillEditor({ value, onChange, placeholder = 'Tuli
       }
     });
 
+    // Track composition events for IME input
+    quill.root.addEventListener('compositionstart', () => { isComposingRef.current = true; });
+    quill.root.addEventListener('compositionend', () => { isComposingRef.current = false; });
+
     return () => {
       editorEl.removeEventListener('paste', handlePaste, true);
     };
@@ -119,7 +119,8 @@ export default function OptionQuillEditor({ value, onChange, placeholder = 'Tuli
     if (!isEditing) return;
     if (!quillRef.current) return;
     const quill = quillRef.current;
-    if (quill.hasFocus()) return;
+    // Skip sync if focused OR composing (IME input)
+    if (quill.hasFocus() || isComposingRef.current) return;
 
     const currentHtml = quill.root.innerHTML;
     const normValue   = value || '';
@@ -160,7 +161,7 @@ export default function OptionQuillEditor({ value, onChange, placeholder = 'Tuli
     }
   }, [isEditing]);
 
-  if (!isEditing) {
+if (!isEditing) {
     return (
       <>
         <div
@@ -186,7 +187,7 @@ export default function OptionQuillEditor({ value, onChange, placeholder = 'Tuli
 
   return (
     <>
-      <div ref={wrapperRef} className="option-quill-wrapper flex-1 min-w-0 rounded-lg border border-gray-200 bg-white hover:border-[#1a4fa0] focus-within:border-[#1a4fa0] focus-within:ring-2 focus-within:ring-[#1a4fa0]/15 transition-all flex flex-col relative">
+      <div ref={wrapperRef} className="option-quill-wrapper flex-1 min-w-0 rounded-lg border border-gray-200 bg-white hover:border-[#1a4fa0] focus-within:border-[#1a4fa0] focus-within:ring-2 focus-within:ring-[#1a4fa0]/15 transition-all flex flex-col relative animate-fadeIn duration-200 ease-out">
         <div ref={containerRef} className="flex-1 option-quill-container" />
         <button
           type="button"

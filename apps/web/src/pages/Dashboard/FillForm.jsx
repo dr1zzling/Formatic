@@ -323,7 +323,7 @@ export default function FillForm() {
     const empty = (allSoal ?? []).find((s) => isRequired(s) && !hasAnswer(s));
     if (empty) {
       setErrorSoalId(empty.id);
-      const clean = (empty.question || "Soal").replace(/<[^>]*>/g, "").trim();
+      const clean = (empty.question || "Soal").replace(/<[^>]*>/g, "").replace(/\$[^$]*\$/g, "[rumus]").replace(/\\\([^)]*\\\)/g, "[rumus]").trim().slice(0, 60);
       setSubmitError(`Pertanyaan "${clean}" belum dijawab. Mohon lengkapi semua soal wajib sebelum mengirim.`);
       
       // Jika mode per-halaman/quiz, pindahkan currentIdx ke halaman yang berisi soal tersebut
@@ -481,8 +481,9 @@ export default function FillForm() {
 
     if (!form?.is_random) return pages;
 
-    // Shuffle: page pertama (identitas/page 1) TIDAK diacak
-    // Soal dalam group_id yang sama bergerak bersama dan tidak diacak urutannya internal
+    // Shuffle: halaman identitas (page 1) TIDAK diacak.
+    // Soal lain diacak ANTAR halaman, bukan cuma di dalam halaman.
+    // Soal dalam group_id yang sama bergerak bersama (urutan internal group tetap).
     function shuffleArr(arr) {
       const a = [...arr];
       for (let i = a.length - 1; i > 0; i--) {
@@ -491,24 +492,36 @@ export default function FillForm() {
       }
       return a;
     }
+
     const firstPage = pages.slice(0, 1); // identitas, tidak diacak
     const restPages = pages.slice(1);
 
-    // Setiap page soal: acak berdasarkan group unit
-    const shuffledRest = restPages.map(pg => {
-      const soalList = pg.soal ?? [];
-      const units = [];
-      const groupMap = new Map();
-      soalList.forEach(s => {
-        if (s.group_id != null) {
-          if (!groupMap.has(s.group_id)) groupMap.set(s.group_id, []);
-          groupMap.get(s.group_id).push(s);
-        } else {
-          units.push([s]);
-        }
-      });
-      groupMap.forEach(group => units.push(group));
-      return { ...pg, soal: shuffleArr(units).flat() };
+    // Ukuran tiap halaman (dipakai buat sebar balik hasil acak)
+    const pageSizes = restPages.map((pg) => (pg.soal ?? []).length);
+
+    // Kumpulkan semua soal non-identitas, kelompokkan per group_id
+    const allRest = restPages.flatMap((pg) => pg.soal ?? []);
+    const units = [];
+    const groupMap = new Map();
+    allRest.forEach((s) => {
+      if (s.group_id != null) {
+        if (!groupMap.has(s.group_id)) groupMap.set(s.group_id, []);
+        groupMap.get(s.group_id).push(s);
+      } else {
+        units.push([s]);
+      }
+    });
+    groupMap.forEach((group) => units.push(group));
+
+    const shuffledFlat = shuffleArr(units).flat();
+
+    // Sebar balik ke halaman sesuai ukuran aslinya
+    const shuffledRest = [];
+    let idx = 0;
+    restPages.forEach((pg, i) => {
+      const size = pageSizes[i];
+      shuffledRest.push({ ...pg, soal: shuffledFlat.slice(idx, idx + size) });
+      idx += size;
     });
 
     return [...firstPage, ...shuffledRest];
@@ -687,7 +700,7 @@ export default function FillForm() {
       const isReq = (s) => reqMap[s.id] !== undefined ? reqMap[s.id] : true;
       const unanswered = (currPage.soal ?? []).find(s => isReq(s) && !hasAnswer(s));
       if (unanswered) {
-        const clean = (unanswered.question || "Wajib").replace(/<[^>]*>/g, "").trim();
+        const clean = (unanswered.question || "Wajib").replace(/<[^>]*>/g, "").replace(/\$[^$]*\$/g, "[rumus]").replace(/\\\([^)]*\\\)/g, "[rumus]").trim().slice(0, 60);
         setSubmitError(`Pertanyaan "${clean}" belum dijawab.`);
         return;
       }
@@ -722,9 +735,6 @@ export default function FillForm() {
           style={{ backgroundColor: theme.cardBg || "var(--fm-card)", borderColor: theme.borderCard || "#e5eef7" }}>
           <div className="max-w-2xl mx-auto">
             <div className="flex items-center justify-between mb-2.5">
-              <button onClick={() => navigate("/")} className="inline-flex items-center gap-1.5 text-[13px] font-semibold hover:underline" style={{ color: theme.primaryColor || "#1a4fa0" }}>
-                <ArrowLeft size={15} /> Kembali
-              </button>
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1.5">
                   <button onClick={zoomOut} className="p-1.5 rounded-lg border transition-all" title="Zoom Out"
@@ -823,10 +833,7 @@ export default function FillForm() {
             // Page identitas (page 1): nomor lokal. Page soal: posisi global setelah shuffle
             const displayNum = isIdentityPage
               ? idx
-              : (() => {
-                  const identityCount = pageGroups[0]?.soal?.length ?? 0;
-                  return identityCount + (currentIdx - 1);
-                })();
+              : pageGroups.slice(0, currentIdx).reduce((sum, pg) => sum + (pg.soal?.length ?? 0), 0) + idx;
             const isDoubt = doubtfulIds.has(soal.id);
             // Tampilkan group header jika soal ini punya group_text dan soal sebelumnya beda group
             const prevSoal = idx > 0 ? (currPage.soal ?? [])[idx - 1] : null;
@@ -951,9 +958,6 @@ export default function FillForm() {
         style={{ backgroundColor: theme.cardBg || "white", borderColor: theme.borderCard || "#e5eef7" }}>
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center justify-between mb-2">
-            <button onClick={() => navigate("/")} className="inline-flex items-center gap-1.5 text-[13px] font-semibold hover:underline" style={{ color: theme.primaryColor || "#1a4fa0" }}>
-              <ArrowLeft size={15} /> Kembali
-            </button>
             <span className="text-[13px] font-semibold" style={{ color: theme.descColor || "#64779d" }}>
               {totalPagesS > 1 ? `Halaman ${currentIdx + 1} / ${totalPagesS}` : title}
             </span>

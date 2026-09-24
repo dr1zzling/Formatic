@@ -6,7 +6,7 @@ exports.seed = async function(knex) {
   await knex('primary_kategori').del();
 
   await knex('primary_kategori').insert([
-    { id: 1, name: 'ujian' },
-    { id: 2, name: 'survei' }
+    { id: 1, name: 'Ujian' },
+    { id: 2, name: 'Survei' }
   ]);
 };

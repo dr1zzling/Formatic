@@ -84,10 +84,10 @@ function HistoryPengerjaan({ loading: parentLoading }) {
     <section className="border border-[#e0eaf6] rounded-xl shadow-[0_8px_25px_rgba(35,83,145,0.08)] p-6 transition-colors"
       style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="m-0 text-[16px] font-bold text-[#17366d]">History Pengerjaan</h3>
-        <button onClick={() => navigate("/history")} className="bg-transparent border-none text-[#1764d6] text-[11px] font-semibold cursor-pointer hover:underline">View all</button>
+        <h3 className="m-0 text-[16px] font-bold" style={{ color: "var(--fm-text)" }}>History Pengerjaan</h3>
+        <button onClick={() => navigate("/history")} className="bg-transparent border-none text-[13px] font-semibold cursor-pointer hover:underline transition-opacity hover:opacity-70" style={{ color: "var(--fm-text-2)" }}>View all</button>
       </div>
-      <div className="flex flex-col divide-y divide-[#edf2f8]">
+      <div className="flex flex-col divide-y" style={{ borderColor: "var(--fm-border)" }}>
         {parentLoading && [...Array(3)].map((_, i) => (
           <div key={i} className="flex items-center gap-3 py-4">
             <div className="w-[38px] h-[38px] rounded-lg bg-[#e8f0fb] animate-pulse shrink-0" />
@@ -105,19 +105,25 @@ function HistoryPengerjaan({ loading: parentLoading }) {
           const style = CAT_STYLE[cat] ?? CAT_STYLE.default;
           return (
             <article key={i} onClick={() => navigate(`/fill/${form.slug ?? form.form_slug}`)}
-              className="flex items-center gap-3 py-[14px] cursor-pointer hover:bg-[#f7faff] transition-colors first:pt-0 last:pb-0">
-              <div className={`w-[38px] h-[38px] flex items-center justify-center rounded-lg shrink-0 ${style}`}><FileText size={17} /></div>
+              className="group flex items-center gap-3 py-[13px] px-3 -mx-3 rounded-xl cursor-pointer transition-all first:pt-0 last:pb-0"
+              style={{ backgroundColor: "transparent" }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--fm-hover)"}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
+            >
+              <div className={`w-[40px] h-[40px] flex items-center justify-center rounded-xl shrink-0 transition-transform group-hover:scale-105 ${style}`}>
+                <FileText size={17} />
+              </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[12px] font-semibold text-[#17366d] truncate">{form.title ?? form.form_title}</p>
+                <p className="text-[13px] font-semibold truncate transition-colors" style={{ color: "var(--fm-text)" }}>{form.title ?? form.form_title}</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-[10px] text-[#8ba0bb]">{cat}</span>
-                  <span className="text-[10px] text-[#c5d2de]">·</span>
-                  <span className="text-[10px] text-[#8ba0bb]">{timeAgo(form.submitted_at)}</span>
+                  <span className="text-[11px]" style={{ color: "var(--fm-text-3)" }}>{cat}</span>
+                  <span className="text-[11px]" style={{ color: "var(--fm-text-3)" }}>·</span>
+                  <span className="text-[11px]" style={{ color: "var(--fm-text-3)" }}>{timeAgo(form.submitted_at)}</span>
                 </div>
               </div>
-              <div className="flex flex-col items-end shrink-0">
-                <span className="text-[11px] font-semibold text-[#1764d6]">{timeAgo(form.submitted_at)}</span>
-                <span className="text-[9px] text-[#8da0b9] mt-0.5">terakhir dikerjakan</span>
+              <div className="flex flex-col items-end shrink-0 gap-0.5">
+                <span className="text-[12px] font-bold" style={{ color: "var(--fm-text)" }}>{timeAgo(form.submitted_at)}</span>
+                <span className="text-[10px]" style={{ color: "var(--fm-text-3)" }}>terakhir dikerjakan</span>
               </div>
             </article>
           );

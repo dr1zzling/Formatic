@@ -92,7 +92,9 @@ const ALLOWED_TAGS = new Set([
   'sub', 'sup', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote',
   'pre', 'code', 'span', 'ul', 'ol', 'li', 'a', 'img', 'audio',
   'video', 'source', 'table', 'thead', 'tbody', 'tfoot', 'tr', 'th',
-  'td', 'caption', 'hr', 'div'
+  'td', 'caption', 'hr', 'div',
+  // KaTeX SVG untuk simbol matematika
+  'svg', 'path', 'line', 'use', 'defs', 'g', 'circle', 'rect', 'polyline', 'polygon',
 ]);
 
 // ── Sanitize tag HTML non-WYSIWYG/berbahaya agar tidak merusak tata letak ──

@@ -90,12 +90,24 @@ api.interceptors.response.use(
 );
 
 export const authAPI = {
-  login: (username, password) =>
-    axios.post(`${USER_API_URL}/user/login`, { username, password }, {
+  // Step 1: kirim username/email + password → OTP dikirim ke email
+  login: (data, password) =>
+    axios.post(`${USER_API_URL}/user/login`, { data, password }, {
       headers: { "Content-Type": "application/json" },
     }),
-  register: (username, password) =>
-    axios.post(`${USER_API_URL}/user/register`, { username, password }, {
+  // Step 2: verifikasi OTP login
+  verifyLogin: (email, otp) =>
+    axios.post(`${USER_API_URL}/user/verify-login`, { email, otp }, {
+      headers: { "Content-Type": "application/json" },
+    }),
+  // Step 1: kirim username + email + password → OTP dikirim ke email
+  register: (username, email, password) =>
+    axios.post(`${USER_API_URL}/user/register`, { username, email, password }, {
+      headers: { "Content-Type": "application/json" },
+    }),
+  // Step 2: verifikasi OTP register
+  verifyRegister: (email, otp) =>
+    axios.post(`${USER_API_URL}/user/verify-register`, { email, otp }, {
       headers: { "Content-Type": "application/json" },
     }),
   resetPassword: (username, password) =>

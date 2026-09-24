@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, memo } from "react";
 import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import api, { FORM_API_URL, flattenForm } from "../../utils/api";
@@ -693,6 +693,7 @@ export default function FormEditor() {
               }}
               onImportGuard={(v) => { isSavingRef.current = v; }}
               hasUnsaved={questions.some(q => q._new)}
+              onSaved={(patch) => setForm(prev => (prev ? { ...prev, ...patch } : prev))}
               onSaveFirst={async () => {
                 // Simpan hanya soal _new (identitas) tanpa validasi penuh
                 const token = localStorage.getItem("token");
@@ -766,10 +767,118 @@ export default function FormEditor() {
   );
 }
 
+/* ── Banner Form (dipakai di tab Pertanyaan) ───────────────────────────── */
+function BannerSection({ form, slug, onSaved }) {
+  const [bannerPreview, setBannerPreview] = useState(form?.banner ?? form?.form_banner ?? null);
+  const [bannerUploading, setBannerUploading] = useState(false);
+  const [bannerMsg, setBannerMsg] = useState("");
+  const bannerInputRef = useRef(null);
+
+  useEffect(() => {
+    setBannerPreview(form?.banner ?? form?.form_banner ?? null);
+  }, [form?.banner, form?.form_banner]);
+
+  async function uploadBanner(file) {
+    if (!file) return;
+    setBannerUploading(true); setBannerMsg("");
+    try {
+      const fd = new FormData();
+      fd.append("banner", file);
+      const res = await fetch(`${FORM_API_URL}/form/banner?form_slug=${form?.slug ?? slug}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setBannerPreview(data?.data?.banner);
+        onSaved?.({ banner: data?.data?.banner, form_banner: data?.data?.banner });
+        setBannerMsg("Banner berhasil diupdate!");
+      } else {
+        setBannerMsg(data?.message || "Gagal upload banner.");
+      }
+    } catch { setBannerMsg("Gagal upload banner."); }
+    finally { setBannerUploading(false); setTimeout(() => setBannerMsg(""), 3000); }
+  }
+
+  async function deleteBanner() {
+    setBannerUploading(true); setBannerMsg("");
+    try {
+      const res = await fetch(`${FORM_API_URL}/form/banner?form_slug=${form?.slug ?? slug}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      if (res.ok) {
+        setBannerPreview(null);
+        onSaved?.({ banner: null, form_banner: null });
+        setBannerMsg("Banner berhasil dihapus.");
+      } else {
+        setBannerMsg("Gagal hapus banner.");
+      }
+    } catch { setBannerMsg("Gagal hapus banner."); }
+    finally { setBannerUploading(false); setTimeout(() => setBannerMsg(""), 3000); }
+  }
+
+  return (
+    <>
+      {bannerPreview ? (
+        <div className="relative -m-0">
+          <img
+            src={bannerPreview.startsWith("http") ? bannerPreview : `${FORM_API_URL}${bannerPreview}`}
+            alt="Banner"
+            className="w-full h-[160px] object-cover"
+          />
+          <button
+            onClick={deleteBanner}
+            disabled={bannerUploading}
+            className="absolute top-2 right-2 w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shadow-md disabled:opacity-60"
+            title="Hapus banner"
+          >
+            <X size={14} />
+          </button>
+          <button
+            onClick={() => bannerInputRef.current?.click()}
+            disabled={bannerUploading}
+            className="absolute bottom-2 right-2 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold bg-black/50 text-white backdrop-blur hover:bg-black/60 transition-all disabled:opacity-60"
+          >
+            <ImagePlus size={14} />
+            {bannerUploading ? "Mengupload..." : "Ganti Banner"}
+          </button>
+        </div>
+      ) : (
+        <div className="px-5 pt-4">
+          <div
+            className="w-full rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 cursor-pointer transition-all py-9"
+            style={{ borderColor: "var(--fm-card-border)", backgroundColor: "var(--fm-hover)" }}
+            onClick={() => bannerInputRef.current?.click()}
+          >
+            <ImagePlus size={24} style={{ color: "var(--fm-text-3)" }} />
+            <span className="text-[13px] font-medium" style={{ color: "var(--fm-text-2)" }}>Tambahkan Banner</span>
+            <span className="text-[11px]" style={{ color: "var(--fm-text-3)" }}>JPG, PNG, WEBP — maks 5MB · optimal 1200×400px</span>
+          </div>
+        </div>
+      )}
+      <input
+        ref={bannerInputRef}
+        type="file"
+        accept=".jpg,.jpeg,.png,.webp"
+        className="hidden"
+        onChange={e => { if (e.target.files?.[0]) uploadBanner(e.target.files[0]); e.target.value = ""; }}
+      />
+      {bannerMsg && (
+        <p className={`px-7 pt-2 text-[12px] font-medium ${bannerMsg.includes("berhasil") ? "text-green-600" : "text-red-500"}`}>
+          {bannerMsg}
+        </p>
+      )}
+    </>
+  );
+}
+
 /* ── Pertanyaan Tab ─────────────────────────────────────────── */
-function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onAddQuestionAfter, onAddNewPage, onAddPageBreakAfter, onRemovePageBreak, onAddIdentityPage, onUpdateQ, onUpdateOpt, onUpdateOptField, onAddOpt, onRemoveOpt, onRemoveQ, onDuplicateQ, onToggleCorrect, onReorder, onCopyLink, onShowToast, onImported, onImportedSilent, onImportGuard, hasUnsaved, onSaveFirst }) {
+function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onAddQuestionAfter, onAddNewPage, onAddPageBreakAfter, onRemovePageBreak, onAddIdentityPage, onUpdateQ, onUpdateOpt, onUpdateOptField, onAddOpt, onRemoveOpt, onRemoveQ, onDuplicateQ, onToggleCorrect, onReorder, onCopyLink, onShowToast, onImported, onImportedSilent, onImportGuard, hasUnsaved, onSaveFirst, onSaved }) {
   const [dragFrom, setDragFrom] = useState(null);
   const [dragOver, setDragOver] = useState(null);
+  const [showGuide, setShowGuide] = useState(false);
   // Baca scoreType dari localStorage supaya badge score realtime ikut berubah
   const [scoreType, setScoreType] = useState(() =>
     localStorage.getItem(`score_type_${form?.slug ?? slug}`) ?? "none"
@@ -884,14 +993,16 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onAddQuest
   }
   return (
     <div ref={listRef} className="max-w-3xl mx-auto py-8 px-4 md:px-6 xl:px-8 space-y-5 relative" style={{ paddingBottom: 80 }}>
-      {/* Form header card */}
+      {/* Form header card + banner */}
       <div
-        className="rounded-2xl shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-7 border transition-colors"
+        className="rounded-2xl shadow-[0_10px_34px_rgba(23,64,120,0.08)] border transition-colors overflow-hidden"
         style={{
           backgroundColor: "var(--fm-card)",
           borderColor: "var(--fm-card-border)"
         }}
       >
+        <BannerSection form={form} slug={slug} onSaved={onSaved} />
+        <div className="p-7">
         <h2 className="text-[22px] font-extrabold mb-1 tracking-tight leading-snug" style={{ color: "var(--fm-text)" }}>
           {form?.title ?? form?.form_title}
         </h2>
@@ -923,6 +1034,7 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onAddQuest
           >
             <Share2 size={14} /> Salin
           </button>
+        </div>
         </div>
       </div>
 
@@ -1053,7 +1165,7 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onAddQuest
                 onRemove={() => onRemoveQ(qIdx)}
                 onDuplicate={() => onDuplicateQ(qIdx)}
                 onAddQuestionAfter={() => onAddQuestionAfter(qIdx)}
-                onAddPageBreakAfter={qIdx < questions.length - 1 ? () => onAddPageBreakAfter(qIdx) : undefined}
+                onAddPageBreakAfter={(qIdx < questions.length - 1 && (q.page || 1) > 1 && ((questions[qIdx + 1]?.page || 1) === (q.page || 1))) ? () => onAddPageBreakAfter(qIdx) : undefined}
                 onDragHandleStart={() => setDragFrom(qIdx)}
                 onDragHandleEnd={() => { setDragFrom(null); setDragOver(null); }}
                 onShowToast={onShowToast}
@@ -1151,7 +1263,22 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onAddQuest
               Pilih beberapa soal (grup soal)
             </span>
           </button>
+
         </div>
+      </div>
+
+      {/* Tombol Format & Template Soal — floating dengan label teks */}
+      <div className="fixed right-24 md:right-28 bottom-8 z-40">
+        <button
+          type="button"
+          onClick={() => setShowGuide(true)}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl border shadow-[0_6px_20px_rgba(61,145,178,0.18)] transition-all cursor-pointer hover:shadow-[0_8px_24px_rgba(61,145,178,0.28)] hover:border-[#3d91b2]"
+          style={{ backgroundColor: "var(--fm-card)", color: "#3d91b2", borderColor: "#a5d4e8" }}
+        >
+          <FileText size={16} />
+          <span className="text-[13px] font-semibold whitespace-nowrap">Format &amp; Template Soal</span>
+          <BookOpen size={13} className="opacity-50" />
+        </button>
       </div>
 
       {/* Floating bar mode pilih ala WA */}
@@ -1189,18 +1316,17 @@ function PertanyaanTab({ form, slug, questions, error, onAddQuestion, onAddQuest
           </button>
         </div>
       )}
+
+      {showGuide && <TemplateGuideModal onClose={() => setShowGuide(false)} />}
     </div>
   );
 }
 
 /* ── Question Card ──────────────────────────────────────────── */
-function QuestionCard({ question, index, onUpdate, onUpdateOpt, onUpdateOptField, onAddOpt, onRemoveOpt, onToggleCorrect, onRemove, onDuplicate, onAddQuestionAfter, onAddPageBreakAfter, onDragHandleStart, onDragHandleEnd, onShowToast, scoreType, totalSoal, isSelectMode, isSelected, onToggleSelect, isEditing, onStartEdit }) {
+const QuestionCard = memo(function QuestionCard({ question, index, onUpdate, onUpdateOpt, onUpdateOptField, onAddOpt, onRemoveOpt, onToggleCorrect, onRemove, onDuplicate, onAddQuestionAfter, onAddPageBreakAfter, onDragHandleStart, onDragHandleEnd, onShowToast, scoreType, totalSoal, isSelectMode, isSelected, onToggleSelect, isEditing, onStartEdit }) {
   const hasOptions = ["radio", "checkbox"].includes(question.type);
-  // Semua soal bisa diedit (tidak hanya yang baru)
-  const editable = true;
-  // ponytail: soal kosong otomatis expanded biar langsung bisa diketik
   const isEmptyText = !question.question || question.question.replace(/<[^>]*>/g, '').trim() === '';
-  const showEditor = isEditing || isEmptyText;
+  const showEditor = isEditing;
   return (
     <div onClick={isSelectMode ? onToggleSelect : undefined}
       className={`relative rounded-2xl border shadow-[0_10px_34px_rgba(23,64,120,0.08)] p-6 transition-all hover:shadow-[0_14px_40px_rgba(23,64,120,0.12)] ${
@@ -1261,11 +1387,16 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onUpdateOptField
           )}
         </div>
         {showEditor ? (
-          <QuillEditor
-            value={question.question}
-            onChange={(val) => onUpdate("question", val)}
-            placeholder="Ketik pertanyaan di sini"
-          />
+          <div className="animate-fadeIn duration-200 ease-out">
+            <QuillEditor
+              value={question.question}
+              onChange={(val) => {
+                if (!isEditing) onStartEdit?.();
+                onUpdate("question", val);
+              }}
+              placeholder="Ketik pertanyaan di sini"
+            />
+          </div>
         ) : (
           <div
             onClick={onStartEdit}
@@ -1273,10 +1404,14 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onUpdateOptField
             role="button"
             tabIndex={0}
             title="Klik untuk edit soal"
-            className="rounded-xl border px-4 py-3 cursor-text transition-all min-h-[64px] hover:border-[#1a4fa0]"
+            className="rounded-xl border px-4 py-3 cursor-text transition-all min-h-[64px] hover:border-[#1a4fa0] animate-fadeIn duration-200 ease-out"
             style={{ borderColor: "var(--fm-border)", backgroundColor: "transparent" }}
           >
-            <RichTextDisplay content={question.question} className="text-[15px] leading-relaxed" />
+            {isEmptyText ? (
+              <span className="text-[15px] leading-relaxed" style={{ color: "var(--fm-text-3)" }}>Ketik pertanyaan di sini</span>
+            ) : (
+              <RichTextDisplay content={question.question} className="text-[15px] leading-relaxed" />
+            )}
           </div>
         )}
       </div>
@@ -1579,7 +1714,7 @@ function QuestionCard({ question, index, onUpdate, onUpdateOpt, onUpdateOptField
       </div>
     </div>
   );
-}
+});
 
 /* ── Responses Tab ──────────────────────────────────────────── */
 function ResponsesTab({ formId, form }) {
@@ -2381,118 +2516,8 @@ function SettingsTab({ form, onUpdateStatus, slug, onSaved }) {
     window.dispatchEvent(new StorageEvent("storage", { key, newValue: val }));
   }
 
-  // Banner state
-  const [bannerPreview, setBannerPreview] = useState(form?.banner ?? form?.form_banner ?? null);
-  const [bannerUploading, setBannerUploading] = useState(false);
-  const [bannerMsg, setBannerMsg] = useState("");
-  const bannerInputRef = useRef(null);
-
-  async function uploadBanner(file) {
-    if (!file) return;
-    setBannerUploading(true); setBannerMsg("");
-    try {
-      const fd = new FormData();
-      fd.append("banner", file);
-      const res = await fetch(`${FORM_API_URL}/form/banner?form_slug=${form?.slug ?? slug}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        body: fd,
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setBannerPreview(data?.data?.banner);
-        onSaved?.({ banner: data?.data?.banner, form_banner: data?.data?.banner });
-        setBannerMsg("Banner berhasil diupdate!");
-      } else {
-        setBannerMsg(data?.message || "Gagal upload banner.");
-      }
-    } catch { setBannerMsg("Gagal upload banner."); }
-    finally { setBannerUploading(false); setTimeout(() => setBannerMsg(""), 3000); }
-  }
-
-  async function deleteBanner() {
-    setBannerUploading(true); setBannerMsg("");
-    try {
-      const res = await fetch(`${FORM_API_URL}/form/banner?form_slug=${form?.slug ?? slug}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
-      if (res.ok) {
-        setBannerPreview(null);
-        onSaved?.({ banner: null, form_banner: null });
-        setBannerMsg("Banner berhasil dihapus.");
-      } else {
-        setBannerMsg("Gagal hapus banner.");
-      }
-    } catch { setBannerMsg("Gagal hapus banner."); }
-    finally { setBannerUploading(false); setTimeout(() => setBannerMsg(""), 3000); }
-  }
-
   return (
     <div className="max-w-2xl mx-auto py-8 px-4 space-y-4">
-
-      {/* Banner Form */}
-      <div className="rounded-2xl border shadow-sm p-6 space-y-4" style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}>
-        <div>
-          <p className="font-bold text-[15px]" style={{ color: "var(--fm-text)" }}>Banner Form</p>
-          <p className="text-[13px] mt-1" style={{ color: "var(--fm-text-2)" }}>Gambar header yang ditampilkan di atas form. Ukuran optimal 1200×400px.</p>
-        </div>
-
-        {/* Preview banner */}
-        {bannerPreview ? (
-          <div className="relative rounded-xl overflow-hidden border" style={{ borderColor: "var(--fm-card-border)" }}>
-            <img
-              src={bannerPreview.startsWith("http") ? bannerPreview : `${FORM_API_URL}${bannerPreview}`}
-              alt="Banner"
-              className="w-full h-[140px] object-cover"
-            />
-            <button
-              onClick={deleteBanner}
-              disabled={bannerUploading}
-              className="absolute top-2 right-2 w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shadow-md disabled:opacity-60"
-              title="Hapus banner"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        ) : (
-          <div
-            className="w-full h-[120px] rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors"
-            style={{ borderColor: "var(--fm-card-border)", backgroundColor: "var(--fm-hover)" }}
-            onClick={() => bannerInputRef.current?.click()}
-          >
-            <ImagePlus size={24} style={{ color: "var(--fm-text-3)" }} />
-            <span className="text-[13px] font-medium" style={{ color: "var(--fm-text-2)" }}>Klik untuk upload banner</span>
-            <span className="text-[11px]" style={{ color: "var(--fm-text-3)" }}>JPG, PNG, WEBP — maks 5MB</span>
-          </div>
-        )}
-
-        <input
-          ref={bannerInputRef}
-          type="file"
-          accept=".jpg,.jpeg,.png,.webp"
-          className="hidden"
-          onChange={e => { if (e.target.files?.[0]) uploadBanner(e.target.files[0]); e.target.value = ""; }}
-        />
-
-        {bannerPreview && (
-          <button
-            onClick={() => bannerInputRef.current?.click()}
-            disabled={bannerUploading}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold border transition-all disabled:opacity-60"
-            style={{ borderColor: "var(--fm-card-border)", color: "var(--fm-text-2)", backgroundColor: "var(--fm-hover)" }}
-          >
-            <ImagePlus size={15} />
-            {bannerUploading ? "Mengupload..." : "Ganti Banner"}
-          </button>
-        )}
-
-        {bannerMsg && (
-          <p className={`text-[12px] font-medium ${bannerMsg.includes("berhasil") ? "text-green-600" : "text-red-500"}`}>
-            {bannerMsg}
-          </p>
-        )}
-      </div>
 
       {/* Status Publikasi */}
       <div className="rounded-2xl border shadow-sm p-6 flex items-center justify-between gap-4" style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}>
@@ -2548,7 +2573,7 @@ function SettingsTab({ form, onUpdateStatus, slug, onSaved }) {
                 type="text"
                 value={tokenValue}
                 readOnly={tokenMode === "random"}
-                onChange={e => setTokenValue(e.target.value.toUpperCase())}
+                onChange={e => setTokenValue(e.target.value)}
                 placeholder="Token belum dibuat"
                 maxLength={20}
                 className={`flex-1 border rounded-xl px-3.5 py-2.5 text-[14px] font-mono outline-none transition focus:border-[#1a4fa0] focus:ring-2 focus:ring-[#1a4fa0]/10 ${tokenMode === "random" ? "bg-gray-50 text-gray-500 border-gray-200 cursor-default" : "bg-white text-gray-800 border-gray-300"}`}
@@ -2697,18 +2722,6 @@ function SettingsTab({ form, onUpdateStatus, slug, onSaved }) {
           {timerSaving ? "Menyimpan..." : "Simpan Timer"}
         </button>
         {timerMsg && <p className="text-[13px] font-medium text-[#1a4fa0]">{timerMsg}</p>}
-      </div>
-
-      {/* Presentasi */}
-      <div className="bg-white rounded-2xl border border-[#e5eef7] shadow-sm p-6 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <span className="w-10 h-10 rounded-xl bg-[#eef5fb] flex items-center justify-center shrink-0"><Palette size={18} className="text-[#1a4fa0]" /></span>
-          <div>
-            <p className="font-bold text-gray-700 text-[15px]">Presentasi</p>
-            <p className="text-[13px] text-gray-400">Pengaturan tampilan formulir</p>
-          </div>
-        </div>
-        <Toggle />
       </div>
     </div>
   );

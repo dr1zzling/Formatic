@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Check, Eye, EyeOff, FileText, Users, BarChart3 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { authAPI } from "../../utils/api";
+import { useTheme } from "../../context/ThemeContext";
+import OtpCard from "./OtpCard";
 
 const COLORS = {
   navy: "#0F2C46",
@@ -33,13 +35,22 @@ function Cluster({ icon, title, subtitle, style }) {
 
 export default function Register() {
   const navigate = useNavigate();
+  const { dark } = useTheme();
+  // Palette teks card: dark mode pakai warna terang agar tidak tabrakan dengan card gelap
+  const C = dark ? { ...COLORS, navy: "#f0f6ff", gray: "#a8bdd8", border: "#2a3a54" } : COLORS;
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // OTP step
+  const [step, setStep] = useState("register"); // "register" | "otp"
+  const [otp, setOtp] = useState("");
+
   const iconStyle = { color: COLORS.iconGlyph };
 
   const handleSubmit = async (e) => {
@@ -54,14 +65,70 @@ export default function Register() {
     setLoading(true);
 
     try {
-      await authAPI.register(username, password);
-      navigate("/login");
+      await authAPI.register(username, email, password);
+      setStep("otp");
     } catch (err) {
       setError(err.response?.data?.message || "Register gagal");
     } finally {
       setLoading(false);
     }
   };
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const { data } = await authAPI.verifyRegister(email, otp);
+      localStorage.setItem("token", data.token);
+      navigate("/");
+    } catch (err) {
+      setError(err.response?.data?.message || "OTP salah atau kadaluarsa");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setError("");
+    try {
+      await authAPI.register(username, email, password);
+    } catch (err) {
+      setError(err.response?.data?.message || "Gagal mengirim ulang kode");
+      throw err;
+    }
+  };
+
+  const backToRegister = () => { setStep("register"); setError(""); setOtp(""); };
+
+  if (step === "otp") {
+    return (
+      <div
+        className="relative min-h-screen w-full flex items-center justify-center px-6 py-12 overflow-hidden"
+        style={{
+          background:
+            "linear-gradient(120deg, #062457 0%, #0b3f66 20%, #1c5f86 38%, #4d91b2 55%, #8fbccb 68%, #cde3ea 82%, #f7fafb 94%, #ffffff 100%)",
+          minHeight: "100dvh",
+        }}
+      >
+        <OtpCard
+          email={email}
+          otp={otp}
+          setOtp={setOtp}
+          onVerify={handleVerifyOtp}
+          loading={loading}
+          error={error}
+          dark={dark}
+          C={C}
+          backLabel="Kembali ke register"
+          onBack={backToRegister}
+          onEditEmail={backToRegister}
+          onResend={handleResendOtp}
+        />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -125,7 +192,7 @@ export default function Register() {
               />
 
               <div
-                className="absolute rounded-2xl bg-white shadow-xl overflow-hidden"
+                className="absolute rounded-2xl bg-white shadow-xl overflow-hidden auth-mock"
                 style={{ left: "169px", top: "117px", width: "260px" }}
               >
                 <div
@@ -139,7 +206,7 @@ export default function Register() {
                 <div className="p-4 space-y-3">
                   <div className="flex items-center gap-2.5">
                     <div
-                      className="rounded bg-slate-100 flex items-center justify-center font-bold flex-shrink-0"
+                      className="rounded bg-slate-100 flex items-center justify-center font-bold flex-shrink-0 auth-mock-letter"
                       style={{ width: "31px", height: "31px", fontSize: "13px", color: COLORS.iconGlyph }}
                     >
                       T
@@ -190,25 +257,25 @@ export default function Register() {
               Form<span style={{ color: COLORS.cyan }}>atic</span>
             </h1>
           </div>
-          <div className="relative w-full bg-white rounded-3xl shadow-2xl px-8 py-10" style={{ backgroundColor: "white" }}>
+            <div className="relative w-full bg-white rounded-3xl shadow-2xl px-8 py-10 auth-card" style={{ backgroundColor: "white" }}>
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold" style={{ color: COLORS.navy }}>
+              <h2 className="text-2xl font-bold" style={{ color: C.navy }}>
                 Create <span style={{ color: COLORS.cyan }}>Account</span>
               </h2>
-              <p className="text-sm mt-1" style={{ color: COLORS.gray }}>
+              <p className="text-sm mt-1" style={{ color: C.gray }}>
                 Please enter your details
               </p>
             </div>
 
             {error && (
-              <div className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-lg mb-4">
+              <div className={`text-sm px-4 py-2 rounded-lg mb-4 ${dark ? "text-red-300 bg-red-500/10" : "text-red-600 bg-red-50"}`}>
                 {error}
               </div>
             )}
 
             <form className="space-y-5" onSubmit={handleSubmit}>
               <div>
-                <label htmlFor="username" className="block text-sm font-semibold mb-1.5" style={{ color: COLORS.navy }}>
+                <label htmlFor="username" className="block text-sm font-semibold mb-1.5" style={{ color: C.navy }}>
                   Username
                 </label>
                 <input
@@ -219,12 +286,28 @@ export default function Register() {
                   onChange={(e) => setUsername(e.target.value)}
                   required
                   className="w-full rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-cyan-400 transition"
-                  style={{ border: `1px solid ${COLORS.border}`, backgroundColor: "white", color: COLORS.navy }}
+                  style={{ border: `1px solid ${C.border}`, backgroundColor: "white", color: C.navy }}
                 />
               </div>
 
               <div>
-                <label htmlFor="password" className="block text-sm font-semibold mb-1.5" style={{ color: COLORS.navy }}>
+                <label htmlFor="email" className="block text-sm font-semibold mb-1.5" style={{ color: C.navy }}>
+                  Email
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  placeholder="your@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-cyan-400 transition"
+                  style={{ border: `1px solid ${C.border}`, backgroundColor: "white", color: C.navy }}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="password" className="block text-sm font-semibold mb-1.5" style={{ color: C.navy }}>
                   Password
                 </label>
                 <div className="relative">
@@ -235,9 +318,9 @@ export default function Register() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    minLength={6}
+                    minLength={8}
                     className="w-full rounded-lg pl-4 pr-10 py-2.5 text-sm outline-none focus:ring-2 focus:ring-cyan-400 transition"
-                    style={{ border: `1px solid ${COLORS.border}`, backgroundColor: "white", color: COLORS.navy }}
+                    style={{ border: `1px solid ${C.border}`, backgroundColor: "white", color: C.navy }}
                   />
                   <button
                     type="button"
@@ -252,8 +335,8 @@ export default function Register() {
               </div>
 
               <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-semibold mb-1.5" style={{ color: COLORS.navy }}>
-                  Enter your password
+                <label htmlFor="confirmPassword" className="block text-sm font-semibold mb-1.5" style={{ color: C.navy }}>
+                  Confirm Password
                 </label>
                 <div className="relative">
                   <input
@@ -263,9 +346,9 @@ export default function Register() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
-                    minLength={6}
+                    minLength={8}
                     className="w-full rounded-lg pl-4 pr-10 py-2.5 text-sm outline-none focus:ring-2 focus:ring-cyan-400 transition"
-                    style={{ border: `1px solid ${COLORS.border}`, backgroundColor: "white", color: COLORS.navy }}
+                    style={{ border: `1px solid ${C.border}`, backgroundColor: "white", color: C.navy }}
                   />
                   <button
                     type="button"
@@ -285,10 +368,10 @@ export default function Register() {
                 className="w-full rounded-lg text-white font-semibold py-2.5 text-sm shadow-md hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ background: COLORS.cyanDeep }}
               >
-                {loading ? "Creating Account..." : "Sign Up"}
+                {loading ? "Sending OTP..." : "Sign Up"}
               </button>
 
-              <p className="text-center text-sm" style={{ color: COLORS.gray }}>
+              <p className="text-center text-sm" style={{ color: C.gray }}>
                 Already have an account?{" "}
                 <Link to="/login" className="font-semibold hover:opacity-80" style={{ color: COLORS.cyan }}>
                   Sign in

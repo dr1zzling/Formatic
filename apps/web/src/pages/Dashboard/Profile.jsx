@@ -112,23 +112,6 @@ export default function Profile() {
                   style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}>
                   <h2 className="text-[14px] font-bold mb-4" style={{ color: "var(--fm-text)" }}>Informasi Profil</h2>
 
-                  {/* Avatar */}
-                  <div className="flex items-center gap-4 mb-6 p-4 rounded-xl" style={{ backgroundColor: "var(--fm-hover)" }}>
-                    <div className="relative shrink-0">
-                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-bold text-xl"
-                        style={{ background: "linear-gradient(135deg, #1a4fa0, #1e6fc7)" }}>{initials}</div>
-                      <button className="absolute -bottom-1 -right-1 w-6 h-6 rounded-lg shadow flex items-center justify-center transition hover:opacity-80"
-                        style={{ backgroundColor: "var(--fm-card)", border: "1px solid var(--fm-card-border)", color: "var(--fm-text-2)" }}>
-                        <Camera size={11} />
-                      </button>
-                    </div>
-                    <div>
-                      <p className="text-[13.5px] font-semibold" style={{ color: "var(--fm-text)" }}>{fullName}</p>
-                      <p className="text-[12px] mt-0.5" style={{ color: "var(--fm-text-2)" }}>@{uname}</p>
-                      <button className="mt-1.5 text-[12px] font-medium hover:underline" style={{ color: "#1a4fa0" }}>Ganti foto</button>
-                    </div>
-                  </div>
-
                   <div className="space-y-4">
                     <PField label="Nama Lengkap">
                       <input value={fullName} onChange={e => setFullName(e.target.value)}

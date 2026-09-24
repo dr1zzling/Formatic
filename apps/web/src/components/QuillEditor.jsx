@@ -271,6 +271,7 @@ export default function QuillEditor({ value, onChange, placeholder = 'Tulis pert
   const containerRef   = useRef(null);
   const quillRef       = useRef(null);
   const isUpdatingRef  = useRef(false);
+  const isComposingRef = useRef(false); // track IME composition
   const [showLatex, setShowLatex] = useState(false);
   const [showCode, setShowCode]   = useState(false);
 
@@ -291,6 +292,11 @@ export default function QuillEditor({ value, onChange, placeholder = 'Tulis pert
     });
 
     quillRef.current = quill;
+
+    // Auto-focus setelah Quill ready
+    requestAnimationFrame(() => {
+      quill.focus();
+    });
 
     // Override image handler — upload ke server, bukan base64
     const toolbar = quill.getModule('toolbar');
@@ -359,6 +365,10 @@ export default function QuillEditor({ value, onChange, placeholder = 'Tulis pert
       }
     });
 
+    // Track composition events for IME input
+    quill.root.addEventListener('compositionstart', () => { isComposingRef.current = true; });
+    quill.root.addEventListener('compositionend', () => { isComposingRef.current = false; });
+
     return () => {
       editorContainer.removeEventListener('paste', handlePaste, true);
     };
@@ -367,7 +377,8 @@ export default function QuillEditor({ value, onChange, placeholder = 'Tulis pert
   useEffect(() => {
     if (!quillRef.current) return;
     const quill = quillRef.current;
-    if (quill.hasFocus()) return;
+    // Skip sync if focused OR composing (IME input)
+    if (quill.hasFocus() || isComposingRef.current) return;
 
     const currentHtml = quill.root.innerHTML;
     const normValue   = value || '';

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Check, Eye, EyeOff, FileText, Users, BarChart3, ArrowLeft } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { authAPI } from "../../utils/api";
+import { useTheme } from "../../context/ThemeContext";
 
 const COLORS = {
   navy: "#0F2C46",
@@ -33,6 +34,9 @@ function Cluster({ icon, title, subtitle, style }) {
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
+  const { dark } = useTheme();
+  // Palette teks card: dark mode pakai warna terang agar tidak tabrakan dengan card gelap
+  const C = dark ? { ...COLORS, navy: "#f0f6ff", gray: "#a8bdd8", border: "#2a3a54" } : COLORS;
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [username, setUsername] = useState("");
@@ -129,7 +133,7 @@ export default function ForgotPassword() {
               />
 
               <div
-                className="absolute rounded-2xl bg-white shadow-xl overflow-hidden"
+                className="absolute rounded-2xl bg-white shadow-xl overflow-hidden auth-mock"
                 style={{ left: "169px", top: "117px", width: "260px" }}
               >
                 <div
@@ -143,7 +147,7 @@ export default function ForgotPassword() {
                 <div className="p-4 space-y-3">
                   <div className="flex items-center gap-2.5">
                     <div
-                      className="rounded bg-slate-100 flex items-center justify-center font-bold flex-shrink-0"
+                      className="rounded bg-slate-100 flex items-center justify-center font-bold flex-shrink-0 auth-mock-letter"
                       style={{ width: "31px", height: "31px", fontSize: "13px", color: COLORS.iconGlyph }}
                     >
                       T
@@ -188,31 +192,31 @@ export default function ForgotPassword() {
         </div>
 
         <div className="relative w-full max-w-sm">
-          <div className="relative w-full bg-white rounded-3xl shadow-2xl px-8 py-10">
+          <div className="relative w-full bg-white rounded-3xl shadow-2xl px-8 py-10 auth-card">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold" style={{ color: COLORS.navy }}>
+              <h2 className="text-2xl font-bold" style={{ color: C.navy }}>
                 Reset <span style={{ color: COLORS.cyan }}>Password</span>
               </h2>
-              <p className="text-sm mt-1" style={{ color: COLORS.gray }}>
+              <p className="text-sm mt-1" style={{ color: C.gray }}>
                 Enter your username to change your password
               </p>
             </div>
 
             {error && (
-              <div className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-lg mb-4">
+              <div className={`text-sm px-4 py-2 rounded-lg mb-4 ${dark ? "text-red-300 bg-red-500/10" : "text-red-600 bg-red-50"}`}>
                 {error}
               </div>
             )}
 
             {success && (
-              <div className="text-sm text-emerald-600 bg-emerald-50 px-4 py-2 rounded-lg mb-4">
+              <div className={`text-sm px-4 py-2 rounded-lg mb-4 ${dark ? "text-emerald-300 bg-emerald-500/10" : "text-emerald-600 bg-emerald-50"}`}>
                 {success}
               </div>
             )}
 
             <form className="space-y-5" onSubmit={handleSubmit}>
               <div>
-                <label htmlFor="username" className="block text-sm font-semibold mb-1.5" style={{ color: COLORS.navy }}>
+                <label htmlFor="username" className="block text-sm font-semibold mb-1.5" style={{ color: C.navy }}>
                   Username
                 </label>
                 <input
@@ -223,12 +227,12 @@ export default function ForgotPassword() {
                   onChange={(e) => setUsername(e.target.value)}
                   required
                   className="w-full rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-cyan-400 transition"
-                  style={{ border: `1px solid ${COLORS.border}` }}
+                  style={{ border: `1px solid ${C.border}` }}
                 />
               </div>
 
               <div>
-                <label htmlFor="password" className="block text-sm font-semibold mb-1.5" style={{ color: COLORS.navy }}>
+                <label htmlFor="password" className="block text-sm font-semibold mb-1.5" style={{ color: C.navy }}>
                   New Password
                 </label>
                 <div className="relative">
@@ -241,7 +245,7 @@ export default function ForgotPassword() {
                     required
                     minLength={6}
                     className="w-full rounded-lg pl-4 pr-10 py-2.5 text-sm outline-none focus:ring-2 focus:ring-cyan-400 transition"
-                    style={{ border: `1px solid ${COLORS.border}` }}
+                    style={{ border: `1px solid ${C.border}` }}
                   />
                   <button
                     type="button"
@@ -256,7 +260,7 @@ export default function ForgotPassword() {
               </div>
 
               <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-semibold mb-1.5" style={{ color: COLORS.navy }}>
+                <label htmlFor="confirmPassword" className="block text-sm font-semibold mb-1.5" style={{ color: C.navy }}>
                   Confirm New Password
                 </label>
                 <div className="relative">
@@ -269,7 +273,7 @@ export default function ForgotPassword() {
                     required
                     minLength={6}
                     className="w-full rounded-lg pl-4 pr-10 py-2.5 text-sm outline-none focus:ring-2 focus:ring-cyan-400 transition"
-                    style={{ border: `1px solid ${COLORS.border}` }}
+                    style={{ border: `1px solid ${C.border}` }}
                   />
                   <button
                     type="button"

@@ -30,6 +30,10 @@ services:
       - ENV_MODE=${ENV_MODE}
       - APP_PORT=${APP_PORT}
       - SECRET=${SECRET}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
     depends_on:
       - db-formatic
     restart: always
