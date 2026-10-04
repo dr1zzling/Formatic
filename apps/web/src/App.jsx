@@ -15,6 +15,8 @@ import History from "./pages/Dashboard/History";
 import Collaborate from "./pages/Dashboard/Collaborate";
 import Discovery from "./pages/Dashboard/Discovery";
 import Monitoring from "./pages/Dashboard/Monitoring";
+import AdminLogin from "./pages/admin/AdminLogin";
+import Admin from "./pages/admin/Admin";
 
 // isAnimating: true berarti halaman ini adalah "prev" yang sedang slide keluar
 // — jangan boleh trigger redirect apapun saat animasi
@@ -30,7 +32,7 @@ function AuthRoute({ children, isAnimating }) {
 }
 
 /* ── Auth pages & responden pages (no sidebar) ───────────────── */
-const AUTH_PATHS = ["/login", "/register", "/forgot-password", "/fill/"];
+const AUTH_PATHS = ["/login", "/register", "/forgot-password", "/fill/", "/admin"];
 
 /* ── Nav order untuk arah slide ─────────────────────────────── */
 const NAV = ["/", "/home", "/my-forms", "/discovery", "/history", "/trash", "/profile"];
@@ -175,6 +177,8 @@ function PageContent({ location }) {
       <Route path="/form/:slug/monitoring" element={<ProtectedRoute><Monitoring /></ProtectedRoute>} />
       <Route path="/trash" element={<ProtectedRoute><Trash /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+      <Route path="/admin/login" element={<AdminLogin />} />
+      <Route path="/admin" element={<Admin />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

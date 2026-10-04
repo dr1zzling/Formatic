@@ -345,7 +345,7 @@ app.post('/user/register', async (req, res) => {
         `
 
         await transporter.sendMail({
-            from: '"Formatic Auth" <nabixka05@gmail.com>',
+            from: `"Formatic Auth" <${process.env.SMTP_USER}>`,
             to: email,
             subject: "🔒 Kode Verifikasi OTP Anda (Formatic)",
             text: `Kode OTP Anda adalah: ${generateOtp}. Berlaku selama 5 menit.`,
@@ -495,7 +495,7 @@ app.post('/user/login', async (req, res) => {
         </div>
 
         await transporter.sendMail({
-            from: '"Formatic Auth" <nabixka05@gmail.com>',
+            from: `"Formatic Auth" <${process.env.SMTP_USER}>`,
             to: exist.email,
             subject: "🔑 Kode OTP Login Anda (Formatic)",
             text: `Kode OTP Login Anda adalah: ${generateOtp}`,
