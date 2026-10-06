@@ -422,7 +422,7 @@ export class SubmitService {
         : answer.soal_option_id == null ? [] : [answer.soal_option_id]
 
       if (optionIds.length > 0) {
-        const validOptions = await this.knexService.connection('soal_option'
+        const validOptions = await this.knexService.connection('soal_option')
           .where('soal_id', question.id)
           .whereIn('id', optionIds)
           .pluck('id')
