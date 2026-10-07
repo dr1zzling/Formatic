@@ -2220,18 +2220,20 @@ function ResponsesTab({ formId, form }) {
                         const barPct = answered > 0 ? (count / maxCount) * 70 : 0;
                         return (
                           <div key={oi} className="flex items-center gap-3">
-                            <span className="w-[30%] text-[12px] font-medium truncate shrink-0 flex items-center gap-1.5" style={{ color: "var(--fm-text)" }}>
+                            <div className="w-[40%] min-w-0 text-[12px] font-medium shrink-0 flex items-center gap-2" style={{ color: "var(--fm-text)" }}>
                               {opt.image && (
                                 <img
                                   src={opt.image.startsWith("http") ? opt.image : `${FORM_API_URL}${opt.image.startsWith("/") ? opt.image : "/uploads/soal/" + opt.image}`}
                                   alt=""
-                                  className="w-8 h-8 rounded object-cover shrink-0 border"
+                                  className="w-10 h-10 rounded-lg object-contain bg-white/5 shrink-0 border"
                                   style={{ borderColor: "var(--fm-card-border)" }}
                                   onError={e => { e.target.style.display = "none"; }}
                                 />
                               )}
-                              <RichTextDisplay content={opt.value ?? opt.option_value ?? `Opsi ${oi+1}`} />
-                            </span>
+                              <div className="flex-1 min-w-0 break-words">
+                                <RichTextDisplay content={opt.value ?? opt.option_value ?? `Opsi ${oi+1}`} />
+                              </div>
+                            </div>
                             <div className="flex-1 flex items-center gap-2">
                               <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ backgroundColor: "var(--fm-hover)" }}>
                                 <div className="h-full rounded-full transition-all duration-500"
@@ -2590,7 +2592,11 @@ function ViewAllBtn({ q, total, formSlug }) {
                             <span>Unduh File: {ans.split("/").pop()}</span>
                           </a>
                         ) : (
-                          typeof ans === "string" ? ans : JSON.stringify(ans)
+                          typeof ans === "string" ? (
+                            <RichTextDisplay content={ans} />
+                          ) : (
+                            JSON.stringify(ans)
+                          )
                         )}
                       </div>
                     );
