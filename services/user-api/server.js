@@ -10,13 +10,13 @@ const pLimit = require("p-limit")
 const { rateLimit } = require("express-rate-limit")
 const { transporter } = require("./smtp")
 
-const limit = pLimit(10)
+const limit = pLimit(1000)
 
 const otpStorage = new Map()
 
 app.use(express.json())
 app.use(cors({
-    origin: ["https://formatic.commandspes.tech", "http://localhost:5173", "http://localhost:3000"],
+    origin: ["http://103.247.219.34:8080", "https://formatic.commandspes.tech", "http://localhost:5173", "http://localhost:3000"],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     credentials: true
 }))

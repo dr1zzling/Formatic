@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Home, FileText, Trash2, LogOut, User, ChevronDown, History, Compass, Sun, Moon } from "lucide-react";
+import { Home, FileText, Trash2, LogOut, User, ChevronDown, Compass, Sun, Moon } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 
 function getUser() {
@@ -21,10 +21,10 @@ const NAV = [
 ];
 
 const BOTTOM_NAV = [
-  { id: "home",     label: "Home",    path: "/",         Icon: Home },
-  { id: "my-forms", label: "My Form", path: "/my-forms", Icon: FileText },
-  { id: "history",  label: "History", path: "/history",  Icon: History },
-  { id: "profile",  label: "Profil",  path: "/profile",  Icon: User },
+  { id: "home",      label: "Home",      path: "/",          Icon: Home },
+  { id: "my-forms",  label: "My Form",   path: "/my-forms",  Icon: FileText },
+  { id: "discovery", label: "Discovery", path: "/discovery", Icon: Compass },
+  { id: "profile",   label: "Profil",    path: "/profile",   Icon: User },
 ];
 
 export default function Sidebar() {
@@ -39,8 +39,7 @@ export default function Sidebar() {
   function isActive(item) {
     if (item.id === "home")    return loc.pathname === "/" || loc.pathname === "/home";
     if (item.id === "my-forms") return loc.pathname.startsWith("/my-forms") || loc.pathname.startsWith("/form/");
-    if (item.id === "discovery") return loc.pathname === "/discovery";
-    if (item.id === "history") return loc.pathname === "/history";
+    if (item.id === "discovery") return loc.pathname.startsWith("/discovery");
     if (item.id === "profile") return loc.pathname === "/profile";
     return loc.pathname.startsWith(item.path);
   }
@@ -151,13 +150,23 @@ export default function Sidebar() {
           <span className="text-[15px] font-bold text-white">Formatic</span>
         </div>
         {/* Mobile dark mode toggle */}
-        <button onClick={toggle}
-          className="w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-90 text-white"
-          style={{ background: dark ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.1)" }}
-          aria-label="Toggle tema"
-        >
-          {dark ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={logout}
+            className="w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-90 text-white"
+            style={{ background: dark ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.1)" }}
+            aria-label="Keluar"
+            title="Keluar"
+          >
+            <LogOut size={18} />
+          </button>
+          <button onClick={toggle}
+            className="w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-90 text-white"
+            style={{ background: dark ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.1)" }}
+            aria-label="Toggle tema"
+          >
+            {dark ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+        </div>
       </header>
 
       {/* ── Mobile bottom nav ─────────────────────── */}

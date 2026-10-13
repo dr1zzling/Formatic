@@ -19,9 +19,9 @@ const pool = new Pool({
     database: process.env.DB_NAME_USER || "postgres",
     ssl: sslConfig,
     port: Number(process.env.DB_PORT) || 6543,
-    max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000
+    // max: 20,
+    // idleTimeoutMillis: 30000,
+    // connectionTimeoutMillis: 5000
 })
 
 // Tangkap error koneksi supaya process tidak crash

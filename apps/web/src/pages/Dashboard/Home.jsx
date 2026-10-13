@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import api, { FORM_API_URL, flattenForm } from "../../utils/api";
-import { Bell, ArrowRight, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
-
-const FORM_API = FORM_API_URL;
 
 function getUsername() {
   try {
@@ -34,14 +31,12 @@ function getHistoryKey() { return `${HISTORY_KEY}_${getUserId()}`; }
 
 /* ── Activity Card ─────────────────────────────────────────────── */
 function ActivityCard({ forms, loading }) {
-  const navigate = useNavigate();
   const CAT_STYLE = { ujian: "bg-[#eee7ff] text-[#7850d9]", survey: "bg-[#e9f2ff] text-[#1768df]", survei: "bg-[#e9f2ff] text-[#1768df]", default: "bg-[#e5faee] text-[#21a964]" };
   return (
     <section className="border border-[#e0eaf6] rounded-xl shadow-[0_8px_25px_rgba(35,83,145,0.08)] p-6 min-h-[355px] flex flex-col transition-colors"
       style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}>
       <div className="flex items-center justify-between mb-4">
         <h3 className="m-0 text-[16px] font-bold text-[#17366d]">Aktivitas Terbaru</h3>
-        <button onClick={() => navigate("/my-forms")} className="bg-transparent border-none text-[#1764d6] text-[11px] font-semibold cursor-pointer">View all</button>
       </div>
       <div className="flex flex-col gap-3 flex-1">
         {loading && [...Array(4)].map((_, i) => (
@@ -54,10 +49,10 @@ function ActivityCard({ forms, loading }) {
           const cat = form.category ?? "default";
           const style = CAT_STYLE[cat] ?? CAT_STYLE.default;
           return (
-            <div key={form.id ?? form.form_id ?? i} onClick={() => navigate(`/form/${form.slug ?? form.form_slug}`)} className="flex items-center gap-3 cursor-pointer group">
+            <div key={form.id ?? form.form_id ?? i} className="flex items-center gap-3">
               <div className={`w-[42px] h-[42px] flex items-center justify-center rounded-[9px] shrink-0 ${style}`}><FileText size={20} /></div>
               <div className="flex-1 min-w-0">
-                <p className="text-[12px] font-semibold text-[#17366d] truncate group-hover:text-[#1764d6] transition-colors">{form.title ?? form.form_title ?? "Untitled"}</p>
+                <p className="text-[12px] font-semibold text-[#17366d] truncate">{form.title ?? form.form_title ?? "Untitled"}</p>
                 <p className="text-[10px] text-[#8ca0ba] mt-1">{form.category ?? "—"} &nbsp;•&nbsp; 0 responses</p>
               </div>
             </div>
@@ -65,17 +60,12 @@ function ActivityCard({ forms, loading }) {
         })}
         {!loading && forms.length === 0 && <p className="text-[12px] text-[#8ca0ba] my-3">Belum ada aktivitas.</p>}
       </div>
-      <button onClick={() => navigate("/my-forms")} className="w-full h-[38px] mt-4 px-[14px] flex items-center justify-between rounded-[7px] text-[11px] border-none cursor-pointer transition-colors"
-        style={{ backgroundColor: "var(--fm-hover)", color: "#1764d6" }}>
-        <span>View all activity</span><ArrowRight size={17} />
-      </button>
     </section>
   );
 }
 
 /* ── History Pengerjaan ────────────────────────────────────────── */
 function HistoryPengerjaan({ loading: parentLoading }) {
-  const navigate = useNavigate();
   const [history, setHistory] = useState([]);
   const CAT_STYLE = { ujian: "bg-[#eee7ff] text-[#7b51d6]", survey: "bg-[#eaf2ff] text-[#246de0]", survei: "bg-[#eaf2ff] text-[#246de0]", default: "bg-[#e6f9ed] text-[#25af67]" };
 
@@ -91,7 +81,6 @@ function HistoryPengerjaan({ loading: parentLoading }) {
       style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}>
       <div className="flex items-center justify-between mb-4">
         <h3 className="m-0 text-[16px] font-bold" style={{ color: "var(--fm-text)" }}>History Pengerjaan</h3>
-        <button onClick={() => navigate("/history")} className="bg-transparent border-none text-[13px] font-semibold cursor-pointer hover:underline transition-opacity hover:opacity-70" style={{ color: "var(--fm-text-2)" }}>View all</button>
       </div>
       <div className="flex flex-col divide-y" style={{ borderColor: "var(--fm-border)" }}>
         {parentLoading && [...Array(3)].map((_, i) => (
@@ -103,20 +92,17 @@ function HistoryPengerjaan({ loading: parentLoading }) {
         {!parentLoading && history.length === 0 && (
           <div className="py-8 text-center">
             <p className="text-[12px] text-[#8ca0ba]">Belum ada history pengerjaan.</p>
-            <button onClick={() => navigate("/")} className="mt-2 text-[12px] text-[#1764d6] hover:underline">Cari form →</button>
           </div>
         )}
         {!parentLoading && history.slice(0, 4).map((form, i) => {
           const cat = form.category ?? "default";
           const style = CAT_STYLE[cat] ?? CAT_STYLE.default;
           return (
-            <article key={i} onClick={() => navigate(`/fill/${form.slug ?? form.form_slug}`)}
-              className="group flex items-center gap-3 py-[13px] px-3 -mx-3 rounded-xl cursor-pointer transition-all first:pt-0 last:pb-0"
+            <article key={i}
+              className="flex items-center gap-3 py-[13px] px-3 -mx-3 rounded-xl transition-all first:pt-0 last:pb-0"
               style={{ backgroundColor: "transparent" }}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--fm-hover)"}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
             >
-              <div className={`w-[40px] h-[40px] flex items-center justify-center rounded-xl shrink-0 transition-transform group-hover:scale-105 ${style}`}>
+              <div className={`w-[40px] h-[40px] flex items-center justify-center rounded-xl shrink-0 ${style}`}>
                 <FileText size={17} />
               </div>
               <div className="flex-1 min-w-0">
@@ -141,7 +127,6 @@ function HistoryPengerjaan({ loading: parentLoading }) {
 
 /* ── Manage Forms Card ─────────────────────────────────────────── */
 function ManageFormsCard({ totalForms }) {
-  const navigate = useNavigate();
   const { dark }  = useTheme();
   return (
     <section className="relative flex items-center min-h-[315px] px-[38px] py-[35px] border border-[#e0eaf6] rounded-xl overflow-hidden shadow-[0_8px_25px_rgba(35,83,145,0.08)]"
@@ -156,15 +141,6 @@ function ManageFormsCard({ totalForms }) {
           style={{ color: dark ? "#e2eaf8" : "#103b86" }}>Kelola Semua Form<br />Dalam Satu Tempat</h2>
         <p className="m-0 text-[13px] leading-relaxed"
           style={{ color: dark ? "#8fa8cc" : "#7088a8" }}>Pantau respons, lihat statistik, dan kelola form<br />dengan praktis dan efisien.</p>
-        <button onClick={() => navigate("/my-forms")}
-          className="mt-[22px] h-[42px] inline-flex items-center gap-[11px] px-[18px] border rounded-[7px] text-[12px] font-semibold cursor-pointer transition-colors"
-          style={{
-            backgroundColor: dark ? "#1e2d45" : "#ffffff",
-            borderColor: dark ? "#3a5070" : "#1b67dc",
-            color: dark ? "#7ab3ef" : "#155dc4",
-          }}>
-          Go to My Form <ArrowRight size={18} />
-        </button>
       </div>
       <div className="absolute right-[30px] top-[28px] w-[44%] h-[260px]">
         <div className="absolute right-[30px] top-[15px] w-[250px] h-[215px] rounded-xl shadow-[0_18px_30px_rgba(31,89,151,0.14)] overflow-hidden rotate-[2deg]"
@@ -198,7 +174,6 @@ function ManageFormsCard({ totalForms }) {
 
 /* ── MyFormsRow — horizontal scroll form milik sendiri ─────────── */
 function MyFormsRow({ forms, loading }) {
-  const navigate = useNavigate();
   const CARD_COLORS = [
     { from: "#dbeafe", to: "#bfdbfe" },
     { from: "#ede9fe", to: "#ddd6fe" },
@@ -211,23 +186,8 @@ function MyFormsRow({ forms, loading }) {
     <div className="mb-6">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-[15px] font-bold" style={{ color: "var(--fm-text)" }}>Form Saya</h2>
-        <button onClick={() => navigate("/my-forms")}
-          className="text-[12px] font-semibold hover:underline"
-          style={{ color: "#1764d6", background: "none", border: "none", cursor: "pointer" }}>
-          Lihat semua →
-        </button>
       </div>
       <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-        {/* Tombol buat form baru */}
-        <button
-          onClick={() => navigate("/my-forms")}
-          className="flex-shrink-0 w-[160px] h-[120px] rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-all hover:border-[#1a4fa0] hover:bg-[#f0f6fe]"
-          style={{ borderColor: "var(--fm-border)", backgroundColor: "var(--fm-card)" }}
-        >
-          <div className="w-10 h-10 rounded-full bg-[#eef5fb] flex items-center justify-center text-[#1a4fa0] text-[22px] font-bold">+</div>
-          <span className="text-[12px] font-semibold" style={{ color: "#1a4fa0" }}>Buat Form</span>
-        </button>
-
         {loading && [...Array(4)].map((_, i) => (
           <div key={i} className="flex-shrink-0 w-[160px] h-[120px] rounded-2xl animate-pulse" style={{ backgroundColor: "var(--fm-card)" }} />
         ))}
@@ -239,9 +199,8 @@ function MyFormsRow({ forms, loading }) {
           const cat    = form.category ?? form.sub_kategori ?? "";
           const clr    = CARD_COLORS[i % CARD_COLORS.length];
           return (
-            <div key={form.id ?? i}
-              onClick={() => navigate(`/form/${form.slug ?? form.form_slug}`)}
-              className="flex-shrink-0 w-[160px] rounded-2xl overflow-hidden border cursor-pointer hover:-translate-y-1 hover:shadow-lg transition-all flex flex-col"
+          <div key={form.id ?? i}
+            className="flex-shrink-0 w-[160px] rounded-2xl overflow-hidden border flex flex-col"
               style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}
             >
               <div className="h-[72px] relative overflow-hidden"
@@ -265,7 +224,7 @@ function MyFormsRow({ forms, loading }) {
 
         {!loading && forms.length === 0 && (
           <div className="flex-1 py-8 text-center">
-            <p className="text-[12px]" style={{ color: "var(--fm-text-2)" }}>Belum ada form. Buat form pertamamu!</p>
+            <p className="text-[12px]" style={{ color: "var(--fm-text-2)" }}>Belum ada form.</p>
           </div>
         )}
       </div>
@@ -275,7 +234,6 @@ function MyFormsRow({ forms, loading }) {
 
 /* ── Main ──────────────────────────────────────────────────────── */
 export default function Home() {
-  const navigate = useNavigate();
   const username = getUsername();
   const [myForms, setMyForms]   = useState([]);
   const [myLoading, setMyLoading] = useState(true);

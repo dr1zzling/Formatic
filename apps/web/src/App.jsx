@@ -35,16 +35,15 @@ function AuthRoute({ children, isAnimating }) {
 const AUTH_PATHS = ["/login", "/register", "/forgot-password", "/fill/", "/admin"];
 
 /* ── Nav order untuk arah slide ─────────────────────────────── */
-const NAV = ["/", "/home", "/my-forms", "/discovery", "/history", "/trash", "/profile"];
+const NAV = ["/", "/home", "/my-forms", "/discovery", "/trash", "/profile"];
 
 function getNavIndex(pathname) {
   let i = NAV.indexOf(pathname);
   if (i !== -1) return i;
   if (pathname.startsWith("/my-forms")) return 2;
   if (pathname.startsWith("/discovery")) return 3;
-  if (pathname.startsWith("/history")) return 4;
-  if (pathname.startsWith("/trash")) return 5;
-  if (pathname.startsWith("/profile")) return 6;
+  if (pathname.startsWith("/trash")) return 4;
+  if (pathname.startsWith("/profile")) return 5;
   return -1;
 }
 
