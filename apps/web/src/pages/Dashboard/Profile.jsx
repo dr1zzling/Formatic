@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { KeyRound, Camera, Bell, Shield } from "lucide-react";
+import { KeyRound, Camera, Bell, Shield, LogOut } from "lucide-react";
 import { authAPI } from "../../utils/api";
 import { useTheme } from "../../context/ThemeContext";
 
@@ -64,7 +64,7 @@ export default function Profile() {
   return (
     <div className="flex min-h-screen transition-colors" style={{ backgroundColor: "var(--fm-bg)" }}>
 
-      <div className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-[52px] md:pt-0 pb-6 md:pb-0">
+      <div className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-[52px] md:pt-0 pb-24 md:pb-0">
 
         {/* ── Header ─────────────────────────────────── */}
         <div className="px-6 md:px-8 xl:px-10 pt-6 pb-0 transition-colors" style={{ backgroundColor: "var(--fm-bg)" }}>
@@ -138,6 +138,20 @@ export default function Profile() {
                       className="px-5 py-2.5 rounded-lg text-white text-[13px] font-semibold hover:opacity-90 disabled:opacity-50 transition"
                       style={{ background: "linear-gradient(135deg, #1a4fa0, #1e6fc7)" }}>
                       {saving ? "Menyimpan..." : "Simpan Perubahan"}
+                    </button>
+                  </div>
+
+                  <div className="mt-5 rounded-xl border p-5 flex items-center justify-between gap-4"
+                    style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}>
+                    <div>
+                      <h2 className="text-[14px] font-bold" style={{ color: "var(--fm-text)" }}>Keluar dari akun</h2>
+                      <p className="text-[12px] mt-1" style={{ color: "var(--fm-text-3)" }}>Akhiri sesi Formatic di perangkat ini.</p>
+                    </div>
+                    <button onClick={logout}
+                      className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border text-[13px] font-semibold transition hover:bg-red-500/10"
+                      style={{ color: "#dc2626", borderColor: "rgba(220,38,38,0.3)", backgroundColor: "transparent" }}>
+                      <LogOut size={15} />
+                      Keluar
                     </button>
                   </div>
                 </div>

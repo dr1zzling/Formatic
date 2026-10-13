@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Home, FileText, Trash2, LogOut, User, ChevronDown, History, Compass, Sun, Moon } from "lucide-react";
+import { Home, FileText, Trash2, LogOut, User, ChevronDown, Compass, Sun, Moon } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 
 function getUser() {
@@ -21,10 +21,10 @@ const NAV = [
 ];
 
 const BOTTOM_NAV = [
-  { id: "home",     label: "Home",    path: "/",         Icon: Home },
-  { id: "my-forms", label: "My Form", path: "/my-forms", Icon: FileText },
-  { id: "history",  label: "History", path: "/history",  Icon: History },
-  { id: "profile",  label: "Profil",  path: "/profile",  Icon: User },
+  { id: "home",      label: "Home",      path: "/",          Icon: Home },
+  { id: "my-forms",  label: "My Form",   path: "/my-forms",  Icon: FileText },
+  { id: "discovery", label: "Discovery", path: "/discovery", Icon: Compass },
+  { id: "profile",   label: "Profil",    path: "/profile",   Icon: User },
 ];
 
 export default function Sidebar() {
@@ -32,47 +32,15 @@ export default function Sidebar() {
   const navigate  = useNavigate();
   const [user, setUser]           = useState({ username: "User", initial: "U" });
   const [dropdown, setDropdown]   = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const { dark, toggle }          = useTheme();
-  const drawerRef = useRef(null);
 
   useEffect(() => { setUser(getUser()); }, []);
-
-  // Tutup drawer saat navigasi
-  useEffect(() => { setDrawerOpen(false); }, [loc.pathname]);
-
-  // Tutup drawer saat klik di luar
-  useEffect(() => {
-    if (!drawerOpen) return;
-    function handleClick(e) {
-      if (drawerRef.current && !drawerRef.current.contains(e.target)) {
-        setDrawerOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    document.addEventListener("touchstart", handleClick);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("touchstart", handleClick);
-    };
-  }, [drawerOpen]);
-
-  // Cegah scroll body saat drawer terbuka
-  useEffect(() => {
-    if (drawerOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => { document.body.style.overflow = ""; };
-  }, [drawerOpen]);
 
   function isActive(item) {
     if (item.id === "home")    return loc.pathname === "/" || loc.pathname === "/home";
     if (item.id === "my-forms") return loc.pathname.startsWith("/my-forms") || loc.pathname.startsWith("/form/");
-    if (item.id === "discovery") return loc.pathname === "/discovery";
-    if (item.id === "history") return loc.pathname === "/history";
-    if (item.id === "profile") return loc.pathname === "/profile";
+    if (item.id === "discovery") return loc.pathname.startsWith("/discovery");
+    if (item.id === "profile") return loc.pathname.startsWith("/profile");
     return loc.pathname.startsWith(item.path);
   }
 
@@ -181,7 +149,6 @@ export default function Sidebar() {
           <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center text-[13px] font-extrabold text-[#1251aa]">F</div>
           <span className="text-[15px] font-bold text-white">Formatic</span>
         </div>
-        {/* Mobile dark mode toggle */}
         <button onClick={toggle}
           className="w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-90 text-white"
           style={{ background: dark ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.1)" }}
@@ -191,91 +158,45 @@ export default function Sidebar() {
         </button>
       </header>
 
-      {/* ── Mobile Drawer Overlay ─────────────────── */}
-      {drawerOpen && (
-        <div
-          className="md:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm transition-opacity"
-          aria-hidden="true"
-        />
-      )}
-
-      {/* ── Mobile Drawer Panel ───────────────────── */}
-      <div
-        ref={drawerRef}
-        className="md:hidden fixed top-0 right-0 z-[60] h-full w-[280px] flex flex-col transition-transform duration-300 ease-in-out"
+      {/* ── Mobile bottom navigation ─────────────── */}
+      <nav
+        className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t shadow-[0_-2px_12px_rgba(0,0,0,0.08)]"
         style={{
-          transform: drawerOpen ? "translateX(0)" : "translateX(100%)",
-          background: dark
-            ? "linear-gradient(180deg,#0d1117 0%,#111827 50%,#161d2b 100%)"
-            : "linear-gradient(180deg,#06245a 0%,#0a438f 50%,#257dc6 100%)",
-          paddingTop: "env(safe-area-inset-top, 0px)",
-          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          backgroundColor: "var(--fm-card)",
+          borderColor: "var(--fm-border)",
+          paddingBottom: "env(safe-area-inset-bottom)",
         }}
+        aria-label="Navigasi utama"
       >
-        {/* Drawer header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-white/10">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-white rounded-[8px] flex items-center justify-center text-[13px] font-extrabold text-[#1251aa]">F</div>
-            <span className="text-[15px] font-bold text-white">Formatic</span>
-          </div>
-          <button
-            onClick={() => setDrawerOpen(false)}
-            className="w-8 h-8 rounded-xl flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-all"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* User info */}
-        <div className="px-5 py-4 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#1663df] flex items-center justify-center font-bold text-white text-[14px] shrink-0">
-              {user.initial}
-            </div>
-            <div className="min-w-0">
-              <p className="text-[14px] font-semibold text-white truncate">{user.username}</p>
-              <p className="text-[11px] text-white/50">My Account</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Nav items */}
-        <nav className="flex flex-col gap-1 px-3 py-4 flex-1 overflow-y-auto">
-          {DRAWER_NAV.map(({ id, label, path, Icon }) => {
+        <div className="flex">
+          {BOTTOM_NAV.map(({ id, label, path, Icon }) => {
             const on = isActive({ id, path });
             return (
-              <button key={id} onClick={() => navigate(path)}
-                className="w-full h-[50px] flex items-center gap-4 px-4 rounded-xl text-[15px] font-medium transition-all duration-200 border-none cursor-pointer active:scale-[0.98] text-left"
-                style={on
-                  ? { background: "rgba(255,255,255,0.18)", color: "#fff" }
-                  : { color: "rgba(255,255,255,0.65)", background: "transparent" }}
+              <button
+                key={id}
+                onClick={() => navigate(path)}
+                aria-current={on ? "page" : undefined}
+                className="flex-1 min-h-[56px] flex flex-col items-center justify-center gap-0.5 bg-transparent border-none cursor-pointer relative transition-all active:scale-95"
               >
-                <Icon size={19} strokeWidth={on ? 2.2 : 1.8} className="shrink-0" />
-                {label}
+                {on && (
+                  <span
+                    className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full"
+                    style={{ background: "linear-gradient(90deg,#1a4fa0,#1e6fc7)" }}
+                  />
+                )}
+                <Icon
+                  size={21}
+                  className={on ? "text-[#1a4fa0]" : "text-gray-400"}
+                  strokeWidth={on ? 2.2 : 1.7}
+                />
+                <span className={`text-[10px] font-semibold leading-tight ${on ? "text-[#1a4fa0]" : "text-gray-400"}`}>
+                  {label}
+                </span>
               </button>
             );
           })}
-        </nav>
-
-        {/* Bottom actions */}
-        <div className="px-3 pb-6 space-y-1 border-t border-white/10 pt-3">
-          <button onClick={() => { navigate("/profile"); }}
-            className="w-full h-[46px] flex items-center gap-3 px-4 rounded-xl text-[14px] font-medium text-white/70 hover:bg-white/10 hover:text-white transition-all border-none cursor-pointer"
-          >
-            <User size={17} className="shrink-0" />
-            Profil Saya
-          </button>
-          <button onClick={logout}
-            className="w-full h-[46px] flex items-center gap-3 px-4 rounded-xl text-[14px] font-medium transition-all border-none cursor-pointer"
-            style={{ color: "#fca5a5" }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = "rgba(239,68,68,0.1)"}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
-          >
-            <LogOut size={17} className="shrink-0" />
-            Keluar
-          </button>
         </div>
-      </div>
+      </nav>
     </>
   );
 }
