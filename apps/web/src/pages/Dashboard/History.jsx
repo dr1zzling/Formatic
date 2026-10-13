@@ -129,7 +129,7 @@ export default function History() {
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "#F5F6FA" }}>
 
-      <div className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-[52px] md:pt-0 pb-16 md:pb-0">
+      <div className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-[52px] md:pt-0 pb-6 md:pb-0">
 
         {/* ── Header ─────────────────────────────────── */}
         <div className="px-6 md:px-8 xl:px-10 pt-7 pb-5 flex items-center justify-between gap-4 bg-white border-b border-gray-100">

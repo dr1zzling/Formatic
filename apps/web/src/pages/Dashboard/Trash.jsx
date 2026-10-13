@@ -134,7 +134,7 @@ export default function Trash() {
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "var(--fm-bg)" }}>
 
-      <div className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-[52px] md:pt-0 pb-20 md:pb-0">
+      <div className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-[52px] md:pt-0 pb-6 md:pb-0">
 
         {/* Header */}
         <div className="px-4 sm:px-6 md:px-8 xl:px-10 pt-6 pb-5 flex items-center justify-between gap-4 border-b transition-colors"

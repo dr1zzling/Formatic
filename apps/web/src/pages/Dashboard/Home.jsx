@@ -257,7 +257,7 @@ export default function Home() {
   return (
     <div className="flex h-screen overflow-hidden">
       <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
-        <div className="px-4 sm:px-6 md:px-8 xl:px-11 py-16 md:py-9 pb-24 md:pb-16"
+        <div className="px-4 sm:px-6 md:px-8 xl:px-11 py-16 md:py-9 pb-10 md:pb-16"
           style={{ background: "linear-gradient(135deg, var(--fm-bg) 0%, var(--fm-bg-2) 55%, var(--fm-bg-3) 100%)", minHeight: "100%" }}>
           <header className="flex items-start justify-between mb-6 gap-3">
             <div className="min-w-0">

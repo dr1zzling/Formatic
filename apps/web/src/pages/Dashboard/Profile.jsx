@@ -64,7 +64,7 @@ export default function Profile() {
   return (
     <div className="flex min-h-screen transition-colors" style={{ backgroundColor: "var(--fm-bg)" }}>
 
-      <div className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-[52px] md:pt-0 pb-16 md:pb-0">
+      <div className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-[52px] md:pt-0 pb-6 md:pb-0">
 
         {/* ── Header ─────────────────────────────────── */}
         <div className="px-6 md:px-8 xl:px-10 pt-6 pb-0 transition-colors" style={{ backgroundColor: "var(--fm-bg)" }}>

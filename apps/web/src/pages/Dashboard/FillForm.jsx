@@ -790,8 +790,14 @@ export default function FillForm() {
           style={{ backgroundColor: theme.cardBg || "var(--fm-card)", borderColor: theme.borderCard || "#e5eef7" }}>
           <div className="max-w-2xl mx-auto">
             <div className="flex items-center justify-between mb-2.5">
+              {/* Kembali */}
+              <button onClick={() => navigate("/")} className="inline-flex items-center gap-1.5 text-[13px] font-semibold hover:underline shrink-0" style={{ color: theme.primaryColor || "#1a4fa0" }}>
+                <ArrowLeft size={15} /> Kembali
+              </button>
+
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5">
+                {/* Zoom controls — hanya desktop (md ke atas) */}
+                <div className="hidden md:flex items-center gap-1.5">
                   <button onClick={zoomOut} className="p-1.5 rounded-lg border transition-all" title="Zoom Out"
                     style={{ borderColor: theme.borderCard || "#d0e3f5", backgroundColor: theme.cardBg || "#ffffff" }}>
                     <ZoomOut size={14} style={{ color: theme.descColor || "#64779d" }} />
@@ -809,29 +815,28 @@ export default function FillForm() {
                     <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} style={{ color: theme.descColor || "#64779d" }} />
                   </button>
                 </div>
+
+                {/* Timer */}
+                {timeLeft !== null && <TimerBadge timeLeft={timeLeft} />}
+
+                {/* Tombol Soal — sembunyikan di page identitas */}
+                {!isIdentityPage && (
+                  <SoalIndicatorBtn
+                    allSoal={allSoal.filter(s => {
+                      const identityPage = pageGroups[0];
+                      return !(identityPage?.soal ?? []).some(is => is.id === s.id);
+                    })}
+                    answers={answers}
+                    hasAnswer={hasAnswer}
+                    doubtfulIds={doubtfulIds}
+                    pageGroups={pageGroups.slice(1)}
+                    currentIdx={Math.max(0, currentIdx - 1)}
+                    setCurrentIdx={(i) => setCurrentIdx(i + 1)}
+                    answeredCount={answeredCount}
+                    doubtCount={doubtCount}
+                  />
+                )}
               </div>
-              {/* Timer */}
-              {timeLeft !== null && (
-                <TimerBadge timeLeft={timeLeft} />
-              )}
-              {/* Tombol Soal — sembunyikan di page identitas */}
-              {!isIdentityPage && (
-              <SoalIndicatorBtn
-                allSoal={allSoal.filter(s => {
-                  // Soal indicator hanya untuk soal non-identitas
-                  const identityPage = pageGroups[0];
-                  return !(identityPage?.soal ?? []).some(is => is.id === s.id);
-                })}
-                answers={answers}
-                hasAnswer={hasAnswer}
-                doubtfulIds={doubtfulIds}
-                pageGroups={pageGroups.slice(1)} // skip page identitas
-                currentIdx={Math.max(0, currentIdx - 1)}
-                setCurrentIdx={(i) => setCurrentIdx(i + 1)}
-                answeredCount={answeredCount}
-                doubtCount={doubtCount}
-              />
-              )}
             </div>
 
             {/* Progress Section */}
@@ -1019,21 +1024,31 @@ export default function FillForm() {
 
   return (
     <div data-theme="light" className="min-h-screen flex flex-col transition-colors duration-300" style={{ backgroundColor: theme.bg || "var(--fm-bg)" }}>
-      {/* Top bar */}
+      {/* Top bar survey */}
       <div className="sticky top-0 z-10 backdrop-blur border-b px-4 py-3"
         style={{ backgroundColor: theme.cardBg || "white", borderColor: theme.borderCard || "#e5eef7" }}>
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[13px] font-semibold" style={{ color: theme.descColor || "#64779d" }}>
-              {totalPagesS > 1 ? `Halaman ${currentIdx + 1} / ${totalPagesS}` : title}
-            </span>
+            {/* Kiri: kembali */}
+            <button onClick={() => navigate("/")} className="inline-flex items-center gap-1.5 text-[13px] font-semibold hover:underline shrink-0" style={{ color: theme.primaryColor || "#1a4fa0" }}>
+              <ArrowLeft size={15} /> Kembali
+            </button>
+
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5">
+              {/* Halaman info */}
+              {totalPagesS > 1 && (
+                <span className="text-[12px] font-semibold" style={{ color: theme.descColor || "#64779d" }}>
+                  {currentIdx + 1}/{totalPagesS}
+                </span>
+              )}
+
+              {/* Zoom — hanya desktop */}
+              <div className="hidden md:flex items-center gap-1.5">
                 <button onClick={zoomOut} className="p-1.5 rounded-lg border transition-all" title="Zoom Out"
                   style={{ borderColor: theme.borderCard || "#d0e3f5", backgroundColor: theme.cardBg || "#ffffff" }}>
                   <ZoomOut size={14} style={{ color: theme.descColor || "#64779d" }} />
                 </button>
-                <button onClick={resetZoom} title="Reset zoom ke 100%" className="px-2 py-1.5 rounded-lg border transition-all text-[11px] font-bold tabular-nums min-w-[44px]"
+                <button onClick={resetZoom} title="Reset zoom" className="px-2 py-1.5 rounded-lg border transition-all text-[11px] font-bold tabular-nums min-w-[44px]"
                   style={{ borderColor: theme.borderCard || "#d0e3f5", backgroundColor: theme.cardBg || "#ffffff", color: theme.primaryColor || "#1a4fa0" }}>
                   {Math.round(zoomLevel * 100)}%
                 </button>
@@ -1041,13 +1056,14 @@ export default function FillForm() {
                   style={{ borderColor: theme.borderCard || "#d0e3f5", backgroundColor: theme.cardBg || "#ffffff" }}>
                   <ZoomIn size={14} style={{ color: theme.descColor || "#64779d" }} />
                 </button>
-                <button onClick={refreshForm} disabled={refreshing} className="p-1.5 rounded-lg border transition-all disabled:opacity-60" title="Muat ulang soal"
+                <button onClick={refreshForm} disabled={refreshing} className="p-1.5 rounded-lg border transition-all disabled:opacity-60" title="Refresh"
                   style={{ borderColor: theme.borderCard || "#d0e3f5", backgroundColor: theme.cardBg || "#ffffff" }}>
                   <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} style={{ color: theme.descColor || "#64779d" }} />
                 </button>
               </div>
+
+              {timeLeft !== null && <TimerBadge timeLeft={timeLeft} />}
             </div>
-            {timeLeft !== null && <TimerBadge timeLeft={timeLeft} />}
           </div>
           {totalPagesS > 1 && (
             <div className="w-full h-1.5 bg-black/5 rounded-full overflow-hidden">
