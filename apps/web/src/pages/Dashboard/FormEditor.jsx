@@ -5,7 +5,7 @@ import api, { FORM_API_URL, flattenForm } from "../../utils/api";
 import AlertModal from "../../components/AlertModal";
 import * as XLSX from "xlsx";
 import { socket } from "../../utils/socket";
-import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, ListChecks, FileQuestion, FileText, UploadCloud, GripVertical, ImagePlus, X, QrCode, Download, Palette, Info, BookOpen, ChevronRight, IdCard, Paperclip, Lightbulb, AlertTriangle, Music, LockKeyhole, Target, Star, Inbox, Users, CheckCircle2, Clock, PieChart, Dices, PenLine, Save, RefreshCw, Timer, Trophy, Shuffle, Layers, Unlink, FileDown } from "lucide-react";
+import { ArrowLeft, Link2, Trash2, Plus, Copy, Share2, Check, ListPlus, ListChecks, FileQuestion, FileText, UploadCloud, GripVertical, ImagePlus, X, QrCode, Download, Palette, Info, BookOpen, ChevronRight, IdCard, Paperclip, Lightbulb, AlertTriangle, Music, LockKeyhole, Target, Star, Inbox, Users, CheckCircle2, Clock, PieChart, Dices, PenLine, Save, RefreshCw, Timer, Trophy, Shuffle, Layers, Unlink, FileDown, ZoomIn } from "lucide-react";
 import QRCode from "qrcode";
 import QuillEditor from "../../components/QuillEditor";
 import OptionQuillEditor from "../../components/OptionQuillEditor";
@@ -1908,6 +1908,17 @@ function ResponsesTab({ formId, form }) {
   const [exportAlert, setExportAlert]   = useState(null);
   const [detail, setDetail]             = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [zoomModal, setZoomModal]       = useState(null);
+
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === "Escape") setZoomModal(null);
+    }
+    if (zoomModal) {
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }
+  }, [zoomModal]);
 
   async function loadDetail() {
     if (detail) return; // sudah di-fetch
@@ -2212,42 +2223,60 @@ function ResponsesTab({ formId, form }) {
                   </div>
 
                   {/* BAR CHART — radio/checkbox */}
-                  {(q.type === "radio" || q.type === "checkbox") && opts.length > 0 && (
-                    <div className="px-5 py-4 space-y-3">
-                      {opts.map((opt, oi) => {
-                        const count  = opt.total_answer ?? 0;
-                        const pctVal = answered > 0 ? ((count / answered) * 100).toFixed(1) : "0.0";
-                        const barPct = answered > 0 ? (count / maxCount) * 70 : 0;
-                        return (
-                          <div key={oi} className="flex items-center gap-3">
-                            <div className="w-[40%] min-w-0 text-[12px] font-medium shrink-0 flex items-center gap-2" style={{ color: "var(--fm-text)" }}>
-                              {opt.image && (
-                                <img
-                                  src={opt.image.startsWith("http") ? opt.image : `${FORM_API_URL}${opt.image.startsWith("/") ? opt.image : "/uploads/soal/" + opt.image}`}
-                                  alt=""
-                                  className="w-10 h-10 rounded-lg object-contain bg-white/5 shrink-0 border"
-                                  style={{ borderColor: "var(--fm-card-border)" }}
-                                  onError={e => { e.target.style.display = "none"; }}
-                                />
-                              )}
-                              <div className="flex-1 min-w-0 break-words">
-                                <RichTextDisplay content={opt.value ?? opt.option_value ?? `Opsi ${oi+1}`} />
+                  {(q.type === "radio" || q.type === "checkbox") && opts.length > 0 && (() => {
+                    const hasOptImages = opts.some(o => Boolean(o.image));
+                    return (
+                      <div className={`px-5 py-4 ${hasOptImages ? "space-y-4" : "space-y-3"}`}>
+                        {opts.map((opt, oi) => {
+                          const count  = opt.total_answer ?? 0;
+                          const pctVal = answered > 0 ? ((count / answered) * 100).toFixed(1) : "0.0";
+                          const barPct = answered > 0 ? (count / maxCount) * 70 : 0;
+                          const imgUrl = opt.image
+                            ? (opt.image.startsWith("http") ? opt.image : `${FORM_API_URL}${opt.image.startsWith("/") ? opt.image : "/uploads/soal/" + opt.image}`)
+                            : null;
+                          return (
+                            <div key={oi} className={`flex ${hasOptImages ? "flex-col sm:flex-row sm:items-center" : "items-center"} gap-3.5 p-2 rounded-xl transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.02]`}>
+                              <div className={`${hasOptImages ? "sm:w-[48%] w-full" : "w-[40%]"} min-w-0 text-[13px] font-medium shrink-0 flex items-center gap-3`} style={{ color: "var(--fm-text)" }}>
+                                {imgUrl && (
+                                  <div
+                                    className="relative group shrink-0 cursor-zoom-in"
+                                    onClick={() => setZoomModal({
+                                      src: imgUrl,
+                                      title: opt.value ? `Opsi: ${opt.value}` : `Opsi ${oi + 1}`
+                                    })}
+                                    title="Klik untuk memperbesar gambar"
+                                  >
+                                    <img
+                                      src={imgUrl}
+                                      alt=""
+                                      className="h-20 sm:h-24 max-w-[140px] sm:max-w-[180px] rounded-xl object-contain bg-black/5 dark:bg-white/5 border p-1 group-hover:scale-[1.03] transition-all shadow-xs"
+                                      style={{ borderColor: "var(--fm-card-border)" }}
+                                      onError={e => { e.target.style.display = "none"; }}
+                                    />
+                                    <div className="absolute inset-0 rounded-xl bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                      <ZoomIn size={18} className="text-white drop-shadow" />
+                                    </div>
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0 break-words font-semibold">
+                                  <RichTextDisplay content={opt.value ?? opt.option_value ?? `Opsi ${oi+1}`} />
+                                </div>
+                              </div>
+                              <div className="flex-1 flex items-center gap-3 w-full">
+                                <div className="flex-1 h-3 rounded-full overflow-hidden" style={{ backgroundColor: "var(--fm-hover)" }}>
+                                  <div className="h-full rounded-full transition-all duration-500"
+                                    style={{ width: `${barPct}%`, background: CHART_COLORS[oi % CHART_COLORS.length] }} />
+                                </div>
+                                <span className="text-[12px] font-bold shrink-0 min-w-[56px] text-right" style={{ color: "var(--fm-text)" }}>
+                                  {count} <span className="font-normal" style={{ color: "var(--fm-text-3)" }}>({pctVal}%)</span>
+                                </span>
                               </div>
                             </div>
-                            <div className="flex-1 flex items-center gap-2">
-                              <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ backgroundColor: "var(--fm-hover)" }}>
-                                <div className="h-full rounded-full transition-all duration-500"
-                                  style={{ width: `${barPct}%`, background: CHART_COLORS[oi % CHART_COLORS.length] }} />
-                              </div>
-                              <span className="text-[11px] font-bold shrink-0 w-[52px] text-right" style={{ color: "var(--fm-text)" }}>
-                                {count} <span className="font-normal" style={{ color: "var(--fm-text-3)" }}>({pctVal}%)</span>
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                   {q.type === "text" && (
                     <div className="px-5 py-4">
                       <p className="text-[12px]" style={{ color: "var(--fm-text-2)" }}>
@@ -2437,11 +2466,15 @@ function ResponsesTab({ formId, form }) {
                               const raw = row.answers[s.id];
                               let display = "-";
                               let isFileUrl = false;
+                              let optImg = null;
                               const correct = checkCorrect(s, raw);
                               if (raw != null) {
                                 if (typeof raw === "number") {
                                   const opt = (s.options ?? []).find(o => o.id === raw);
                                   display = opt?.value ?? String(raw);
+                                  if (opt?.image) {
+                                    optImg = opt.image.startsWith("http") ? opt.image : `${FORM_API_URL}${opt.image.startsWith("/") ? opt.image : "/uploads/soal/" + opt.image}`;
+                                  }
                                 } else {
                                   display = String(raw);
                                   if (typeof raw === "string" && (raw.startsWith("/uploads/") || raw.includes("/uploads/answers/"))) {
@@ -2455,9 +2488,20 @@ function ResponsesTab({ formId, form }) {
                                   <span className="font-medium shrink-0 max-w-[40%] truncate" style={{ color: "var(--fm-text-2)" }}>
                                     {(s.question ?? "").replace(/<[^>]*>/g, "").slice(0, 35)}:
                                   </span>
-                                  <div className="flex-1 min-w-0 flex items-start gap-1">
+                                  <div className="flex-1 min-w-0 flex items-center gap-2">
                                     {correct === true && <span className="shrink-0 text-green-500 font-bold text-[13px] mt-[-1px]">✓</span>}
                                     {correct === false && <span className="shrink-0 text-red-500 font-bold text-[13px] mt-[-1px]">✗</span>}
+                                    {optImg && (
+                                      <img
+                                        src={optImg}
+                                        alt=""
+                                        className="h-10 max-w-[80px] rounded-lg object-contain bg-black/5 dark:bg-white/5 border shrink-0 cursor-zoom-in hover:scale-105 transition-transform"
+                                        style={{ borderColor: "var(--fm-card-border)" }}
+                                        onClick={() => setZoomModal({ src: optImg, title: `Opsi: ${display}` })}
+                                        title="Klik untuk memperbesar"
+                                        onError={e => { e.target.style.display = "none"; }}
+                                      />
+                                    )}
                                     {isFileUrl ? (
                                       <a href={`${FORM_API_URL}${raw.startsWith('/') ? raw : '/' + raw}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[#075ee0] hover:underline font-medium">
                                         <FileDown size={14} className="shrink-0" />
@@ -2492,6 +2536,40 @@ function ResponsesTab({ formId, form }) {
       message={exportAlert?.message}
       onConfirm={() => setExportAlert(null)}
     />
+
+    {/* Lightbox Modal Gambar Opsi */}
+    {zoomModal && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-fadeIn"
+        onClick={() => setZoomModal(null)}
+      >
+        <div
+          className="relative max-w-3xl w-full max-h-[90vh] rounded-2xl shadow-2xl p-5 flex flex-col items-center overflow-hidden border"
+          style={{ backgroundColor: "var(--fm-card)", borderColor: "var(--fm-card-border)" }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="w-full flex items-center justify-between pb-3 mb-3 border-b" style={{ borderColor: "var(--fm-card-border)" }}>
+            <h3 className="text-[14px] font-bold truncate pr-4" style={{ color: "var(--fm-text)" }}>
+              {zoomModal.title || "Pratinjau Gambar Opsi"}
+            </h3>
+            <button
+              onClick={() => setZoomModal(null)}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+              title="Tutup (Esc)"
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <div className="flex-1 flex items-center justify-center overflow-auto max-h-[72vh] w-full p-2">
+            <img
+              src={zoomModal.src}
+              alt={zoomModal.title || "Gambar"}
+              className="max-h-[68vh] max-w-full object-contain rounded-xl shadow-md"
+            />
+          </div>
+        </div>
+      </div>
+    )}
     </>
   );
 }
@@ -2501,6 +2579,7 @@ function ViewAllBtn({ q, total, formSlug }) {
   const [open, setOpen]       = useState(false);
   const [detail, setDetail]   = useState(null);
   const [loading, setLoading] = useState(false);
+  const [zoomImg, setZoomImg] = useState(null);
 
   async function loadDetail() {
     setOpen(true);
@@ -2526,14 +2605,31 @@ function ViewAllBtn({ q, total, formSlug }) {
           return (d.responses ?? []).map(r => {
             const raw = r.answer;
             if (raw == null) return null;
-            // Pilihan ganda — resolve ke teks opsi
+            // Pilihan ganda — resolve ke teks opsi + gambar
             if (typeof raw === "number") {
               const opt = opts.find(o => o.id === raw);
-              return opt?.value ?? opt?.option_value ?? `Opsi #${raw}`;
+              return {
+                text: opt?.value ?? opt?.option_value ?? `Opsi #${raw}`,
+                image: opt?.image
+                  ? (opt.image.startsWith("http") ? opt.image : `${FORM_API_URL}${opt.image.startsWith("/") ? opt.image : "/uploads/soal/" + opt.image}`)
+                  : null
+              };
+            }
+            if (Array.isArray(raw)) {
+              return raw.map(id => {
+                const opt = opts.find(o => o.id === id);
+                return {
+                  text: opt?.value ?? opt?.option_value ?? `Opsi #${id}`,
+                  image: opt?.image
+                    ? (opt.image.startsWith("http") ? opt.image : `${FORM_API_URL}${opt.image.startsWith("/") ? opt.image : "/uploads/soal/" + opt.image}`)
+                    : null
+                };
+              });
             }
             return String(raw);
           });
         })
+        .flat()
         .filter(a => a !== null && a !== undefined)
     : [];
 
@@ -2578,6 +2674,9 @@ function ViewAllBtn({ q, total, formSlug }) {
                 <div className="space-y-2">
                   {answers.map((ans, i) => {
                     const isFile = typeof ans === "string" && (ans.startsWith("/uploads/") || ans.includes("/uploads/answers/"));
+                    const isObj = typeof ans === "object" && ans !== null;
+                    const text = isObj ? ans.text : ans;
+                    const img = isObj ? ans.image : null;
                     return (
                       <div key={i} className="px-4 py-3 rounded-xl text-[13px]"
                         style={{ backgroundColor: "var(--fm-hover)", border: "1px solid var(--fm-card-border)", color: "var(--fm-text)" }}>
@@ -2592,11 +2691,21 @@ function ViewAllBtn({ q, total, formSlug }) {
                             <span>Unduh File: {ans.split("/").pop()}</span>
                           </a>
                         ) : (
-                          typeof ans === "string" ? (
-                            <RichTextDisplay content={ans} />
-                          ) : (
-                            JSON.stringify(ans)
-                          )
+                          <div className="flex items-center gap-3">
+                            {img && (
+                              <img
+                                src={img}
+                                alt=""
+                                onClick={() => setZoomImg(img)}
+                                className="h-16 max-w-[120px] rounded-lg object-contain bg-black/5 dark:bg-white/5 border shrink-0 cursor-zoom-in hover:scale-105 transition-transform"
+                                style={{ borderColor: "var(--fm-card-border)" }}
+                                title="Klik untuk memperbesar"
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <RichTextDisplay content={text} />
+                            </div>
+                          </div>
                         )}
                       </div>
                     );
@@ -2610,6 +2719,31 @@ function ViewAllBtn({ q, total, formSlug }) {
               {answers.length} jawaban
             </div>
           </div>
+
+          {/* Modal zoom foto di dalam View All */}
+          {zoomImg && (
+            <div
+              className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 animate-fadeIn"
+              onClick={() => setZoomImg(null)}
+            >
+              <div
+                className="relative max-w-2xl max-h-[85vh] p-3 rounded-2xl bg-white dark:bg-slate-900 shadow-2xl flex flex-col items-center"
+                onClick={e => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => setZoomImg(null)}
+                  className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 transition-colors"
+                >
+                  <X size={16} />
+                </button>
+                <img
+                  src={zoomImg}
+                  alt=""
+                  className="max-h-[75vh] max-w-full object-contain rounded-xl"
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
     </>
