@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import api, { FORM_API_URL, flattenForm, monitoringAPI } from "../../utils/api";
 import { socket } from "../../utils/socket";
-import { ArrowLeft, Send, Check, CheckCircle2, UploadCloud, FileText, Bell, ArrowRight, ZoomIn, ZoomOut, RefreshCw, Flag, LockKeyhole, Music, FileQuestion, AlarmClock } from "lucide-react";
+import { ArrowLeft, Send, Check, CheckCircle2, UploadCloud, FileText, Bell, ArrowRight, ZoomIn, ZoomOut, RefreshCw, Flag, LockKeyhole, Music, FileQuestion, AlarmClock, ListChecks } from "lucide-react";
 import { saveToHistory } from "./History";
 import RichTextDisplay from "../../components/RichTextDisplay";
 import { getStoredTheme, DEFAULT_FORM_THEME } from "../../utils/theme";
@@ -448,7 +448,8 @@ export default function FillForm() {
   }
 
   const title = form?.title ?? form?.form_title ?? "Form";
-  const isQuiz = (form?.primary_kategori ?? form?.category) === "ujian";
+  const primaryCat = (form?.primary_kategori ?? form?.category ?? "")?.toLowerCase();
+  const isQuiz = primaryCat === "ujian" || primaryCat === "kuis" || form?.category?.toLowerCase() === "ujian" || form?.primary_kategori?.toLowerCase() === "ujian";
 
   // ── Flatten & group soal — harus di atas early returns (Rules of Hooks) ──
   const rawSoal  = form?.soal ?? [];
@@ -534,6 +535,52 @@ export default function FillForm() {
   }, [form?.soal, form?.is_random, form?.slug, form?.category]);
 
   const allSoal = soalList;
+
+  // Cek apakah halaman pertama adalah halaman identitas murni (semua soal text tanpa skor)
+  const page0Soal = (pageGroups[0]?.soal ?? []);
+  const hasIdentityPage = isQuiz && page0Soal.length > 0 && page0Soal.every(s => s.type === "text" && (!s.score || Number(s.score) === 0));
+
+  // Flat list semua soal dengan nomor global & indeks halaman
+  const flatQuestions = useMemo(() => {
+    const list = [];
+    let num = 1;
+    pageGroups.forEach((pg, pgIdx) => {
+      if (hasIdentityPage && pgIdx === 0) return;
+      (pg.soal ?? []).forEach((s) => {
+        list.push({
+          ...s,
+          globalNum: num++,
+          pageIdx: pgIdx,
+          pageNum: pg.page ?? (pgIdx + 1),
+        });
+      });
+    });
+    return list;
+  }, [pageGroups, hasIdentityPage]);
+
+  function handleSelectQuestion(q) {
+    if (currentIdx !== q.pageIdx) {
+      setCurrentIdx(q.pageIdx);
+      emitProgress(q.pageIdx, pageGroups, allSoal.length);
+      setTimeout(() => {
+        const el = soalRefs.current[q.id];
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.classList.add("ring-2", "ring-[#1a4fa0]");
+          setTimeout(() => el.classList.remove("ring-2", "ring-[#1a4fa0]"), 1500);
+        } else {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      }, 150);
+    } else {
+      const el = soalRefs.current[q.id];
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("ring-2", "ring-[#1a4fa0]");
+        setTimeout(() => el.classList.remove("ring-2", "ring-[#1a4fa0]"), 1500);
+      }
+    }
+  }
 
   // ── Manual Zoom Handlers ──
   function zoomIn()  { setZoomLevel(prev => Math.min(prev + 0.1, 3.0)); }
@@ -745,19 +792,21 @@ export default function FillForm() {
     const progress    = totalPages > 0 ? ((currentIdx + 1) / totalPages) * 100 : 0;
     const pageNum     = currPage.page ?? (currentIdx + 1);
 
-    // Page 1 = halaman identitas — tampil semua soal sekaligus (scroll)
-    const isIdentityPage = currentIdx === 0;
+    // Page 1 = halaman identitas hanya jika memang halaman identitas murni
+    const isIdentityPage = currentIdx === 0 && hasIdentityPage;
 
     function goNext() {
-      // Validasi wajib diisi — tapi hanya untuk soal required
-      let reqMap = {};
-      try { const s = localStorage.getItem(`soal_required_${slug}`); if (s) reqMap = JSON.parse(s); } catch {}
-      const isReq = (s) => reqMap[s.id] !== undefined ? reqMap[s.id] : true;
-      const unanswered = (currPage.soal ?? []).find(s => isReq(s) && !hasAnswer(s));
-      if (unanswered) {
-        const clean = (unanswered.question || "Wajib").replace(/<[^>]*>/g, "").replace(/\$[^$]*\$/g, "[rumus]").replace(/\\\([^)]*\\\)/g, "[rumus]").trim().slice(0, 60);
-        setSubmitError(`Pertanyaan "${clean}" belum dijawab.`);
-        return;
+      // Hanya validasi jika berada di halaman identitas murni (Nama/Kelas)
+      if (isIdentityPage) {
+        let reqMap = {};
+        try { const s = localStorage.getItem(`soal_required_${slug}`); if (s) reqMap = JSON.parse(s); } catch {}
+        const isReq = (s) => reqMap[s.id] !== undefined ? reqMap[s.id] : true;
+        const unanswered = (currPage.soal ?? []).find(s => isReq(s) && !hasAnswer(s));
+        if (unanswered) {
+          const clean = (unanswered.question || "Identitas").replace(/<[^>]*>/g, "").replace(/\$[^$]*\$/g, "[rumus]").replace(/\\\([^)]*\\\)/g, "[rumus]").trim().slice(0, 60);
+          setSubmitError(`Kolom "${clean}" wajib diisi sebelum melanjutkan.`);
+          return;
+        }
       }
       setSubmitError("");
       setErrorSoalId(null);
@@ -779,9 +828,10 @@ export default function FillForm() {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
-    // Hitung status ringkasan untuk badge tombol Soal
-    const answeredCount = allSoal.filter(s => hasAnswer(s)).length;
-    const doubtCount    = doubtfulIds.size;
+    // Hitung status ringkasan untuk navigasi kuis
+    const totalQCount       = flatQuestions.length;
+    const quizAnsweredCount = flatQuestions.filter(s => hasAnswer(s)).length;
+    const doubtCount        = flatQuestions.filter(s => doubtfulIds.has(s.id)).length;
 
     return (
       <div data-theme="light" className="min-h-screen flex flex-col transition-colors duration-300" style={{ backgroundColor: theme.bg || "var(--fm-bg)" }}>
@@ -790,12 +840,19 @@ export default function FillForm() {
           style={{ backgroundColor: theme.cardBg || "var(--fm-card)", borderColor: theme.borderCard || "#e5eef7" }}>
           <div className="max-w-2xl mx-auto">
             <div className="flex items-center justify-between mb-2.5">
-              {/* Kembali */}
-              <button onClick={() => navigate("/")} className="inline-flex items-center gap-1.5 text-[13px] font-semibold hover:underline shrink-0" style={{ color: theme.primaryColor || "#1a4fa0" }}>
-                <ArrowLeft size={15} /> Kembali
-              </button>
+              {/* Kiri: Judul formulir (tanpa tombol kembali) */}
+              <div className="flex items-center gap-2 min-w-0 pr-2">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0 animate-pulse" style={{ backgroundColor: theme.accentColor || "#1a4fa0" }} />
+                <span className="font-bold text-[14px] truncate" style={{ color: theme.titleColor || "#102f56" }}>
+                  {title}
+                </span>
+                <span className="hidden sm:inline-flex px-2 py-0.5 rounded-md text-[10.5px] font-bold uppercase tracking-wider shrink-0"
+                  style={{ backgroundColor: `${theme.accentColor || "#1a4fa0"}15`, color: theme.accentColor || "#1a4fa0" }}>
+                  {form?.category || "Ujian"}
+                </span>
+              </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 {/* Zoom controls — hanya desktop (md ke atas) */}
                 <div className="hidden md:flex items-center gap-1.5">
                   <button onClick={zoomOut} className="p-1.5 rounded-lg border transition-all" title="Zoom Out"
@@ -819,23 +876,18 @@ export default function FillForm() {
                 {/* Timer */}
                 {timeLeft !== null && <TimerBadge timeLeft={timeLeft} />}
 
-                {/* Tombol Soal — sembunyikan di page identitas */}
-                {!isIdentityPage && (
-                  <SoalIndicatorBtn
-                    allSoal={allSoal.filter(s => {
-                      const identityPage = pageGroups[0];
-                      return !(identityPage?.soal ?? []).some(is => is.id === s.id);
-                    })}
-                    answers={answers}
-                    hasAnswer={hasAnswer}
-                    doubtfulIds={doubtfulIds}
-                    pageGroups={pageGroups.slice(1)}
-                    currentIdx={Math.max(0, currentIdx - 1)}
-                    setCurrentIdx={(i) => setCurrentIdx(i + 1)}
-                    answeredCount={answeredCount}
-                    doubtCount={doubtCount}
-                  />
-                )}
+                {/* Tombol Navigasi Soal — selalu ada di mode kuis */}
+                <SoalIndicatorBtn
+                  flatQuestions={flatQuestions}
+                  hasIdentityPage={hasIdentityPage}
+                  answers={answers}
+                  hasAnswer={hasAnswer}
+                  doubtfulIds={doubtfulIds}
+                  currentIdx={currentIdx}
+                  onSelectQuestion={handleSelectQuestion}
+                  onGoIdentity={() => { setCurrentIdx(0); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  theme={theme}
+                />
               </div>
             </div>
 
@@ -843,14 +895,13 @@ export default function FillForm() {
             <div className="pt-1">
               <div className="flex items-center justify-between text-[12px] font-semibold mb-1.5">
                 <div className="flex items-center gap-1.5" style={{ color: theme.titleColor || "#102f56" }}>
-                  <span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: theme.accentColor || "#1a4fa0" }}></span>
-                  <span>Soal {currentIdx + 1} dari {totalPages}</span>
+                  <span>Halaman {currentIdx + 1} dari {totalPages}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-400 font-normal">{answeredCount} dijawab</span>
+                  <span className="text-gray-400 font-normal">{quizAnsweredCount} dijawab</span>
                   <span className="px-2 py-0.5 rounded-full font-bold text-[11px] border"
                     style={{ backgroundColor: `${theme.accentColor || "#1a4fa0"}15`, color: theme.accentColor || "#1a4fa0", borderColor: `${theme.accentColor || "#1a4fa0"}30` }}>
-                    {Math.round(progress)}%
+                    {Math.round(totalQCount > 0 ? (quizAnsweredCount / totalQCount) * 100 : progress)}%
                   </span>
                 </div>
               </div>
@@ -858,7 +909,7 @@ export default function FillForm() {
                 <div
                   className="h-full rounded-full transition-all duration-500 ease-out shadow-sm"
                   style={{
-                    width: `${Math.min(100, Math.max(3, progress))}%`,
+                    width: `${Math.min(100, Math.max(3, totalQCount > 0 ? (quizAnsweredCount / totalQCount) * 100 : progress))}%`,
                     backgroundColor: theme.accentColor || "#1a4fa0",
                     boxShadow: `0 1px 4px ${theme.accentColor || "#1a4fa0"}50`
                   }}
@@ -897,10 +948,10 @@ export default function FillForm() {
 
         {/* Semua soal di halaman ini */}
           {(currPage.soal ?? []).map((soal, idx) => {
-            // Page identitas (page 1): nomor lokal. Page soal: posisi global setelah shuffle
+            // Page identitas: nomor lokal. Page soal: posisi global setelah shuffle
             const displayNum = isIdentityPage
               ? idx
-              : pageGroups.slice(0, currentIdx).reduce((sum, pg) => sum + (pg.soal?.length ?? 0), 0) + idx;
+              : pageGroups.slice(hasIdentityPage ? 1 : 0, currentIdx).reduce((sum, pg) => sum + (pg.soal?.length ?? 0), 0) + idx;
             const isDoubt = doubtfulIds.has(soal.id);
             // Tampilkan group header jika soal ini punya group_text dan soal sebelumnya beda group
             const prevSoal = idx > 0 ? (currPage.soal ?? [])[idx - 1] : null;
@@ -958,9 +1009,9 @@ export default function FillForm() {
           <div className="flex items-center gap-3">
             {!isFirst && (
               <button onClick={goPrev}
-                className="py-3 px-4 rounded-xl border text-[14px] font-semibold hover:bg-black/5 transition flex items-center justify-center"
+                className="py-3 px-5 rounded-xl border text-[14px] font-semibold hover:bg-black/5 transition flex items-center justify-center gap-1.5 cursor-pointer"
                 style={{ borderColor: theme.borderCard || "#e5eef7", color: theme.descColor || "#64779d", backgroundColor: theme.cardBg || "#ffffff" }}>
-                <ArrowLeft size={18} />
+                <ArrowLeft size={16} /> <span>Sebelumnya</span>
               </button>
             )}
             {!isLast ? (
@@ -1029,12 +1080,19 @@ export default function FillForm() {
         style={{ backgroundColor: theme.cardBg || "white", borderColor: theme.borderCard || "#e5eef7" }}>
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center justify-between mb-2">
-            {/* Kiri: kembali */}
-            <button onClick={() => navigate("/")} className="inline-flex items-center gap-1.5 text-[13px] font-semibold hover:underline shrink-0" style={{ color: theme.primaryColor || "#1a4fa0" }}>
-              <ArrowLeft size={15} /> Kembali
-            </button>
+            {/* Kiri: Judul formulir */}
+            <div className="flex items-center gap-2 min-w-0 pr-2">
+              <span className="w-2.5 h-2.5 rounded-full shrink-0 animate-pulse" style={{ backgroundColor: theme.accentColor || "#1a4fa0" }} />
+              <span className="font-bold text-[14px] truncate" style={{ color: theme.titleColor || "#102f56" }}>
+                {title}
+              </span>
+              <span className="hidden sm:inline-flex px-2 py-0.5 rounded-md text-[10.5px] font-bold uppercase tracking-wider shrink-0"
+                style={{ backgroundColor: `${theme.accentColor || "#1a4fa0"}15`, color: theme.accentColor || "#1a4fa0" }}>
+                {form?.category || "Survei"}
+              </span>
+            </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               {/* Halaman info */}
               {totalPagesS > 1 && (
                 <span className="text-[12px] font-semibold" style={{ color: theme.descColor || "#64779d" }}>
@@ -1063,6 +1121,21 @@ export default function FillForm() {
               </div>
 
               {timeLeft !== null && <TimerBadge timeLeft={timeLeft} />}
+
+              {/* Navigasi Soal */}
+              {flatQuestions.length > 0 && (
+                <SoalIndicatorBtn
+                  flatQuestions={flatQuestions}
+                  hasIdentityPage={false}
+                  answers={answers}
+                  hasAnswer={hasAnswer}
+                  doubtfulIds={doubtfulIds}
+                  currentIdx={currentIdx}
+                  onSelectQuestion={handleSelectQuestion}
+                  onGoIdentity={() => { setCurrentIdx(0); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  theme={theme}
+                />
+              )}
             </div>
           </div>
           {totalPagesS > 1 && (
@@ -1190,7 +1263,8 @@ export default function FillForm() {
                           <RichTextDisplay content={opt.value?.trim() || opt.option_value?.trim() || `Opsi ${oi + 1}`} className="text-[15px] font-medium" style={{ color: theme.titleColor || "#102f56" }} />
                           {optImage && (
                             <img src={optImage} alt={fallbackLabel(opt, oi)}
-                              className="mt-2.5 w-full max-h-52 object-contain rounded-xl border border-[#d4e5fa]" />
+                              className="mt-2.5 max-h-60 max-w-full rounded-xl object-contain mx-auto block"
+                              onError={e => { e.target.style.display = "none"; }} />
                           )}
                         </div>
                       </button>
@@ -1339,7 +1413,8 @@ function SoalItem({ soal, idx, answers, setAnswer, toggleOption, errorSoalId, so
                   <RichTextDisplay content={opt.value?.trim() || opt.option_value?.trim() || `Opsi ${oi + 1}`} className="text-[15px] font-medium" style={{ color: theme.titleColor || "#102f56" }} />
                   {optImage && (
                     <img src={optImage} alt={fallbackLabel(opt, oi)}
-                      className="mt-2.5 w-full max-h-55 object-contain rounded-xl border border-[#d4e5fa]" />
+                      className="mt-2.5 max-h-60 max-w-full rounded-xl object-contain mx-auto block"
+                      onError={e => { e.target.style.display = "none"; }} />
                   )}
                 </div>
               </button>
@@ -1394,32 +1469,56 @@ function TimerBadge({ timeLeft }) {
   );
 }
 
-/* ── Soal Indicator Button + Modal ─────────────────────────── */
-function SoalIndicatorBtn({ allSoal, answers, hasAnswer, doubtfulIds, pageGroups, currentIdx, setCurrentIdx, answeredCount, doubtCount }) {
+/* ── Soal Indicator Button + Modal (Navigasi Soal) ─────────── */
+function SoalIndicatorBtn({
+  flatQuestions = [],
+  hasIdentityPage = false,
+  answers = {},
+  hasAnswer = () => false,
+  doubtfulIds = new Set(),
+  currentIdx = 0,
+  onSelectQuestion = () => {},
+  onGoIdentity = () => {},
+  theme = DEFAULT_FORM_THEME
+}) {
   const [open, setOpen] = useState(false);
-  const total      = allSoal.length;
-  const unanswered = total - answeredCount;
-  const pct        = total > 0 ? Math.round((answeredCount / total) * 100) : 0;
+  const total = flatQuestions.length;
+  const answeredCount = flatQuestions.filter(s => hasAnswer(s)).length;
+  const doubtCount = flatQuestions.filter(s => doubtfulIds.has(s.id)).length;
+  const unanswered = Math.max(0, total - answeredCount);
+  const pct = total > 0 ? Math.round((answeredCount / total) * 100) : 0;
+
+  const isDark = Boolean(
+    theme?.id === "dark" ||
+    (theme?.cardBg && (
+      theme.cardBg === "#1e293b" || 
+      theme.cardBg === "#0f172a" ||
+      theme.cardBg === "#111827" ||
+      theme.cardBg === "#18181b"
+    ))
+  );
 
   return (
     <>
       {/* Trigger button */}
       <button
         onClick={() => setOpen(true)}
-        className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#d0e3f5] bg-white text-[13px] font-semibold text-[#1a4fa0] hover:bg-[#eef5fb] active:scale-95 transition-all shadow-sm"
+        className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all active:scale-95 shadow-xs font-semibold text-[13px] shrink-0 cursor-pointer"
+        style={{
+          borderColor: theme.borderCard || "#d0e3f5",
+          backgroundColor: theme.cardBg || "#ffffff",
+          color: theme.primaryColor || "#1a4fa0",
+        }}
+        title="Buka Navigasi Soal"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
-          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
-        </svg>
-        <span>Soal</span>
-        {unanswered > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold grid place-items-center leading-none">
-            {unanswered}
-          </span>
-        )}
-        {unanswered === 0 && doubtCount > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-amber-400 text-white text-[9px] font-bold grid place-items-center leading-none">
+        <ListChecks size={15} />
+        <span className="font-bold"> Soal</span>
+        <span className="text-[11px] font-normal opacity-75">
+          ({answeredCount}/{total})
+        </span>
+
+        {doubtCount > 0 && (
+          <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-amber-400 text-amber-950 text-[10px] font-bold flex items-center justify-center leading-none">
             {doubtCount}
           </span>
         )}
@@ -1428,39 +1527,52 @@ function SoalIndicatorBtn({ allSoal, answers, hasAnswer, doubtfulIds, pageGroups
       {/* Modal overlay */}
       {open && createPortal(
         <div
-          className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center"
+          data-theme={isDark ? "dark" : "light"}
+          className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center animate-fadeIn"
           style={{ background: "rgba(5,20,50,0.55)", backdropFilter: "blur(6px)" }}
           onClick={() => setOpen(false)}
         >
           <div
-            className="bg-white w-full sm:w-[420px] rounded-t-[28px] sm:rounded-2xl shadow-[0_24px_60px_rgba(5,20,50,0.25)] overflow-hidden flex flex-col"
-            style={{ maxHeight: "85dvh" }}
+            className={`w-full sm:w-[480px] rounded-t-[28px] sm:rounded-2xl shadow-[0_24px_60px_rgba(5,20,50,0.25)] overflow-hidden flex flex-col border ${
+              isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-[#e5eef7] text-slate-800"
+            }`}
+            style={{ maxHeight: "88dvh" }}
             onClick={e => e.stopPropagation()}
           >
             {/* Drag handle — mobile only */}
             <div className="flex justify-center pt-3 pb-0 sm:hidden shrink-0">
-              <div className="w-9 h-[5px] rounded-full bg-gray-200" />
+              <div className={`w-9 h-[5px] rounded-full ${isDark ? "bg-slate-700" : "bg-gray-200"}`} />
             </div>
 
             {/* Header */}
-            <div className="flex items-start justify-between px-5 pt-4 pb-2 shrink-0">
+            <div className={`flex items-start justify-between px-5 pt-4 pb-2 shrink-0 border-b ${isDark ? "border-slate-800" : "border-gray-100"}`}>
               <div className="flex-1 min-w-0">
-                <h3 className="font-extrabold text-[#102f56] text-[17px] leading-tight tracking-tight">
+                <h3 className="font-extrabold text-[17px] leading-tight tracking-tight flex items-center gap-2"
+                  style={{ color: isDark ? "#ffffff" : (theme.titleColor || "#102f56") }}>
+                  <ListChecks size={18} style={{ color: theme.primaryColor || "#1a4fa0" }} />
                   Navigasi Soal
                 </h3>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
-                  <span className="text-[12.5px] text-gray-400">
-                    <span className="font-bold text-[#1a4fa0]">{answeredCount}</span>
-                    <span className="text-gray-300 mx-0.5">/</span>
+                  <span className={`text-[12.5px] ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                    <span className="font-bold" style={{ color: theme.primaryColor || "#1a4fa0" }}>{answeredCount}</span>
+                    <span className="opacity-40 mx-0.5">/</span>
                     {total} dijawab
                   </span>
                   {doubtCount > 0 && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-[11px] font-semibold text-amber-700">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] font-semibold ${
+                      isDark
+                        ? "bg-amber-950/40 border-amber-800 text-amber-300"
+                        : "bg-amber-50 border-amber-200 text-amber-700"
+                    }`}>
                       <Flag size={11} /> {doubtCount} ragu-ragu
                     </span>
                   )}
                   {unanswered > 0 && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 border border-red-200 text-[11px] font-semibold text-red-600">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] font-semibold ${
+                      isDark
+                        ? "bg-slate-800 border-slate-700 text-slate-300"
+                        : "bg-slate-100 border-slate-200 text-slate-600"
+                    }`}>
                       ○ {unanswered} belum
                     </span>
                   )}
@@ -1468,68 +1580,125 @@ function SoalIndicatorBtn({ allSoal, answers, hasAnswer, doubtfulIds, pageGroups
               </div>
               <button
                 onClick={() => setOpen(false)}
-                className="ml-3 shrink-0 w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 text-[17px] font-bold transition-colors"
+                className={`ml-3 shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-[17px] font-bold transition-colors cursor-pointer ${
+                  isDark
+                    ? "bg-slate-800 hover:bg-slate-700 text-gray-300"
+                    : "bg-gray-100 hover:bg-gray-200 text-gray-500"
+                }`}
                 aria-label="Tutup navigasi soal"
               >×</button>
             </div>
 
             {/* Progress bar */}
-            <div className="mx-5 mt-1 mb-3 shrink-0">
+            <div className="mx-5 mt-3 mb-2 shrink-0">
               <div className="flex justify-between items-center mb-1">
-                <span className="text-[11px] text-gray-400 font-medium">Progress</span>
-                <span className="text-[11px] font-bold text-[#1a4fa0]">{pct}%</span>
+                <span className={`text-[11px] font-medium ${isDark ? "text-gray-400" : "text-gray-400"}`}>Progress Pengerjaan</span>
+                <span className="text-[11px] font-bold" style={{ color: theme.primaryColor || "#1a4fa0" }}>{pct}%</span>
               </div>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className={`h-2 rounded-full overflow-hidden ${isDark ? "bg-slate-800" : "bg-gray-100"}`}>
                 <div
                   className="h-full rounded-full transition-all duration-500"
-                  style={{ width: `${pct}%`, background: "linear-gradient(90deg,#1a4fa0,#3b82f6)" }}
+                  style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${theme.primaryColor || "#1a4fa0"}, #3b82f6)` }}
                 />
               </div>
             </div>
 
             {/* Legend */}
-            <div className="flex items-center gap-3 px-5 pb-3 shrink-0">
-              <span className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium">
-                <span className="w-3.5 h-3.5 rounded-[4px] bg-[#1a4fa0] inline-block shrink-0" />
+            <div className={`flex items-center gap-3 px-5 py-2 shrink-0 text-[11px] border-b ${
+              isDark ? "text-gray-400 border-slate-800" : "text-gray-500 border-gray-100"
+            }`}>
+              <span className="flex items-center gap-1.5 font-medium">
+                <span className="w-3.5 h-3.5 rounded-[4px] inline-block shrink-0" style={{ backgroundColor: theme.primaryColor || "#1a4fa0" }} />
                 Dijawab
               </span>
-              <span className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium">
-                <span className="w-3.5 h-3.5 rounded-[4px] bg-amber-100 border border-amber-400 inline-block shrink-0" />
+              <span className="flex items-center gap-1.5 font-medium">
+                <span className={`w-3.5 h-3.5 rounded-[4px] border inline-block shrink-0 ${
+                  isDark ? "bg-amber-950/60 border-amber-500" : "bg-amber-100 border-amber-400"
+                }`} />
                 Ragu-ragu
               </span>
-              <span className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium">
-                <span className="w-3.5 h-3.5 rounded-[4px] bg-white border border-gray-300 inline-block shrink-0" />
+              <span className="flex items-center gap-1.5 font-medium">
+                <span className={`w-3.5 h-3.5 rounded-[4px] border inline-block shrink-0 ${
+                  isDark ? "bg-slate-800 border-slate-600" : "bg-white border-gray-300"
+                }`} />
                 Belum
               </span>
             </div>
 
-            <div className="border-t border-gray-100 shrink-0" />
+            {/* Identity page button if exists */}
+            {hasIdentityPage && (
+              <div className="px-5 pt-3 pb-1 shrink-0">
+                <button
+                  onClick={() => {
+                    onGoIdentity();
+                    setOpen(false);
+                  }}
+                  className={`w-full py-2 px-3 rounded-xl text-[12px] font-semibold border flex items-center justify-between transition-colors cursor-pointer ${
+                    currentIdx === 0
+                      ? isDark
+                        ? "bg-blue-950/40 border-blue-500 text-blue-300"
+                        : "bg-[#eef5fb] border-[#1a4fa0] text-[#1a4fa0]"
+                      : isDark
+                        ? "bg-slate-800 border-slate-700 text-gray-300 hover:bg-slate-700"
+                        : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <FileText size={14} /> Halaman Identitas (Nama & Kelas)
+                  </span>
+                  <span className="text-[10px] font-bold opacity-60">Page 1 →</span>
+                </button>
+              </div>
+            )}
 
-            {/* Soal grid — nomor ikut urutan shuffle (pageGroups), wrap kalau penuh */}
+            {/* Soal Grid */}
             <div className="px-5 py-4 overflow-y-auto flex-1">
-              <div className="flex flex-wrap gap-2">
-                {pageGroups.map((pg, pgIdx) => {
-                  const s       = (pg.soal ?? [])[0]; // 1 soal per halaman
-                  if (!s) return null;
-                  const answered = hasAnswer(s);
-                  const doubt    = doubtfulIds.has(s.id);
-                  const isCurrent = pgIdx === currentIdx;
+              <div className="grid grid-cols-5 sm:grid-cols-6 gap-2.5">
+                {flatQuestions.map((q) => {
+                  const answered = hasAnswer(q);
+                  const doubt = doubtfulIds.has(q.id);
+                  const isCurrentPage = q.pageIdx === currentIdx;
+
+                  let itemClass = "";
+                  let itemStyle = {};
+
+                  if (doubt) {
+                    itemClass = isDark
+                      ? "bg-amber-950/50 border-amber-400 text-amber-200 hover:bg-amber-900/60"
+                      : "bg-amber-50 border-amber-400 text-amber-800 hover:bg-amber-100";
+                  } else if (answered) {
+                    itemClass = "text-white hover:opacity-95 shadow-xs";
+                    itemStyle = {
+                      backgroundColor: theme.primaryColor || "#1a4fa0",
+                      borderColor: theme.primaryColor || "#1a4fa0",
+                    };
+                  } else if (isCurrentPage) {
+                    itemClass = isDark
+                      ? "bg-blue-950/40 border-blue-400 text-blue-300 ring-2 ring-blue-500/25"
+                      : "bg-[#eef5fb] border-[#1a4fa0] text-[#1a4fa0] ring-2 ring-[#1a4fa0]/25";
+                  } else {
+                    itemClass = isDark
+                      ? "bg-slate-800 border-slate-700 text-gray-200 hover:border-blue-400 hover:text-blue-300 hover:bg-slate-750"
+                      : "bg-white border-gray-200 text-gray-700 hover:border-[#1a4fa0] hover:text-[#1a4fa0] hover:bg-[#f0f6fe]";
+                  }
+
                   return (
                     <button
-                      key={s.id}
-                      onClick={() => { setCurrentIdx(pgIdx); setOpen(false); }}
-                      title={`Soal ${pgIdx + 1}${doubt ? " — ragu-ragu" : answered ? " — sudah dijawab" : " — belum dijawab"}`}
-                      className={`w-10 h-10 rounded-xl text-[13px] font-bold border-2 transition-all active:scale-90 focus:outline-none shrink-0 ${
-                        doubt
-                          ? "bg-amber-50 border-amber-400 text-amber-700 hover:bg-amber-100"
-                          : answered
-                            ? "bg-[#1a4fa0] border-[#1a4fa0] text-white hover:opacity-90"
-                            : isCurrent
-                              ? "bg-[#eef5fb] border-[#1a4fa0] text-[#1a4fa0]"
-                              : "bg-white border-gray-200 text-gray-500 hover:border-[#1a4fa0] hover:text-[#1a4fa0] hover:bg-[#f0f6fe]"
-                      }`}
+                      key={q.id}
+                      onClick={() => {
+                        onSelectQuestion(q);
+                        setOpen(false);
+                      }}
+                      title={`Soal ${q.globalNum}${doubt ? " — ragu-ragu" : answered ? " — sudah dijawab" : " — belum dijawab"}`}
+                      className={`h-11 rounded-xl text-[14px] font-extrabold border-2 transition-all active:scale-90 focus:outline-none flex flex-col items-center justify-center relative cursor-pointer ${itemClass}`}
+                      style={itemStyle}
                     >
-                      {pgIdx + 1}
+                      <span>{q.globalNum}</span>
+                      {doubt && (
+                        <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-400 text-white flex items-center justify-center text-[7px] shadow-xs">
+                          <Flag size={7} fill="currentColor" />
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -1537,11 +1706,11 @@ function SoalIndicatorBtn({ allSoal, answers, hasAnswer, doubtfulIds, pageGroups
             </div>
 
             {/* Footer */}
-            <div className="px-5 pt-3 pb-5 border-t border-gray-100 shrink-0">
+            <div className={`px-5 pt-3 pb-5 border-t shrink-0 ${isDark ? "border-slate-800" : "border-gray-100"}`}>
               <button
                 onClick={() => setOpen(false)}
-                className="w-full py-3 rounded-xl text-white text-[14px] font-bold hover:opacity-90 active:scale-[0.98] transition-all"
-                style={{ backgroundColor: "#1a4fa0" }}
+                className="w-full py-3 rounded-xl text-white text-[14px] font-bold hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer shadow-sm"
+                style={{ backgroundColor: theme.primaryColor || "#1a4fa0" }}
               >
                 Tutup
               </button>

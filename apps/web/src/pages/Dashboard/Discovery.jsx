@@ -326,8 +326,7 @@ export default function Discovery() {
                               <img
                                 src={opt.image.startsWith("http") ? opt.image : `${FORM_API_URL}${opt.image.startsWith("/") ? opt.image : "/uploads/soal/" + opt.image}`}
                                 alt={`Opsi ${String.fromCharCode(65 + oi)}`}
-                                className="mt-2 max-h-40 rounded-lg object-contain border"
-                                style={{ borderColor: "var(--fm-card-border)" }}
+                                className="mt-2 max-h-48 max-w-full rounded-lg object-contain"
                                 onError={e => { e.target.style.display = "none"; }}
                               />
                             )}
